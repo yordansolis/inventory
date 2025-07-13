@@ -1,11 +1,11 @@
 "use client"
-import React, { useState } from 'react';
-import { 
-  ShoppingCart, 
-  Package, 
-  BarChart3, 
-  Truck, 
-  TestTube, 
+import React, { useState, useEffect } from 'react';
+import {
+  ShoppingCart,
+  Package,
+  BarChart3,
+  Truck,
+  TestTube,
   Plus,
   Eye,
   AlertTriangle,
@@ -16,15 +16,43 @@ import {
   DollarSign,
   TrendingUp,
   Menu,
-  X
+  X,
+  Moon
 } from 'lucide-react';
+
+interface VendibleProduct {
+  id: number;
+  nombre: string;
+  tipo: string;
+  precio: number;
+  stock: number;
+  minimo: number;
+  estado: string;
+}
+
+interface ConsumableProduct {
+  id: number;
+  nombre: string;
+  cantidad: number;
+  minimo: number;
+  estado: string;
+}
 
 export default function InventoryDashboard() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
   // Datos de ejemplo basados en tu estructura
-  const productosVendibles = [
+  const productosVendibles: VendibleProduct[] = [
     { id: 1, nombre: 'BOLA DE HELADO DE VAINILLA', tipo: 'HELADO', precio: 1000, stock: 25, minimo: 10, estado: 'bien' },
     { id: 2, nombre: 'BOLA DE HELADO DE FRESA', tipo: 'HELADO', precio: 1500, stock: 8, minimo: 5, estado: 'bien' },
     { id: 3, nombre: 'BOLA DE ESPUMA', tipo: 'ESPUMA', precio: 5000, stock: 3, minimo: 10, estado: 'bajo' },
@@ -32,11 +60,11 @@ export default function InventoryDashboard() {
     { id: 5, nombre: 'MINI DONAS X12', tipo: 'DONAS', precio: 3000, stock: 300, minimo: 10, estado: 'bien' },
   ];
 
-  const productosConsumibles = [
-    { id: 1, nombre: 'VASOS X 16', cantidad: 50, minimo: 10, estado: 'bien' },
-    { id: 2, nombre: 'VASOS X 6', cantidad: 100, minimo: 10, estado: 'bien' },
-    { id: 3, nombre: 'PAQUETE DE SERVILLETAS X 50', cantidad: 6, minimo: 7, estado: 'bajo' },
-    { id: 4, nombre: 'PAQUETES DE FRESAS', cantidad: 2, minimo: 5, estado: 'bajo' },
+  const productosConsumibles: ConsumableProduct[] = [
+    { id: 101, nombre: 'VASOS X 16', cantidad: 50, minimo: 10, estado: 'bien' },
+    { id: 102, nombre: 'VASOS X 6', cantidad: 100, minimo: 10, estado: 'bien' },
+    { id: 103, nombre: 'PAQUETE DE SERVILLETAS X 50', cantidad: 6, minimo: 7, estado: 'bajo' },
+    { id: 104, nombre: 'PAQUETES DE FRESAS', cantidad: 2, minimo: 5, estado: 'bajo' },
   ];
 
   const ventasRecientes = [
@@ -55,7 +83,11 @@ export default function InventoryDashboard() {
     { id: 'adicciones', label: 'Adicciones', icon: Plus },
   ];
 
-  const formatPrice = (price) => {
+  const isVendibleProduct = (product: VendibleProduct | ConsumableProduct): product is VendibleProduct => {
+    return 'tipo' in product;
+  };
+
+  const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
@@ -64,14 +96,14 @@ export default function InventoryDashboard() {
   };
 
   // Componente Card personalizado
-  const Card = ({ children, className = "" }) => (
+  const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
     <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 ${className}`}>
       {children}
     </div>
   );
 
   // Componente Badge personalizado
-  const Badge = ({ children, variant = "default", size = "default" }) => {
+  const Badge = ({ children, variant = "default", size = "default" }: { children: React.ReactNode; variant?: "default" | "success" | "info" | "warning" | "danger"; size?: "default" | "lg" }) => {
     const variants = {
       default: "bg-gray-100 text-gray-800",
       success: "bg-green-100 text-green-800",
@@ -79,7 +111,7 @@ export default function InventoryDashboard() {
       warning: "bg-yellow-100 text-yellow-800",
       danger: "bg-red-100 text-red-800"
     };
-    
+
     const sizes = {
       default: "px-2 py-1 text-xs",
       lg: "px-3 py-1 text-sm"
@@ -93,19 +125,19 @@ export default function InventoryDashboard() {
   };
 
   // Componente Button personalizado
-  const Button = ({ children, variant = "default", size = "default", className = "", ...props }) => {
+  const Button = ({ children, variant = "default", size = "default", className = "", ...props }: { children: React.ReactNode; variant?: "default" | "danger"; size?: "default" | "sm"; className?: string; [key: string]: any }) => {
     const variants = {
       default: "bg-gray-900 text-white hover:bg-gray-800",
       danger: "bg-red-600 text-white hover:bg-red-700"
     };
-    
+
     const sizes = {
       default: "px-4 py-2 text-sm",
       sm: "px-3 py-1.5 text-xs"
     };
 
     return (
-      <button 
+      <button
         className={`inline-flex items-center justify-center rounded-md font-medium transition-colors ${variants[variant]} ${sizes[size]} ${className}`}
         {...props}
       >
@@ -129,13 +161,19 @@ export default function InventoryDashboard() {
             Sistema de Inventario
           </span>
         </div>
-        
+
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
               <User className="h-5 w-5 text-gray-600" />
             </div>
             <span className="text-sm font-medium hidden sm:block">Administrador</span>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="p-2 rounded-lg hover:bg-gray-100"
+            >
+              <Moon className="h-5 w-5 text-gray-600" />
+            </button>
           </div>
         </div>
       </div>
@@ -170,7 +208,7 @@ export default function InventoryDashboard() {
 
         {/* Overlay for mobile */}
         {sidebarOpen && (
-          <div 
+          <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
             onClick={() => setSidebarOpen(false)}
           />
@@ -221,7 +259,7 @@ export default function InventoryDashboard() {
                     <div>
                       <p className="text-sm font-medium text-gray-600 mb-1">Stock Bajo</p>
                       <p className="text-2xl font-bold text-red-600">
-                        {[...productosVendibles, ...productosConsumibles].filter(p => p.estado === 'bajo').length}
+                        {[...productosVendibles, ...productosConsumibles].filter((p: any) => p.estado === 'bajo').length}
                       </p>
                     </div>
                     <div className="p-3 bg-red-100 rounded-full">
@@ -301,14 +339,30 @@ export default function InventoryDashboard() {
                   </Badge>
                 </div>
                 <div className="space-y-3">
-                  {[...productosVendibles, ...productosConsumibles]
+                  {productosVendibles
                     .filter(p => p.estado === 'bajo')
                     .map((producto) => (
                       <div key={producto.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
                         <div>
                           <p className="font-medium text-gray-900">{producto.nombre}</p>
                           <p className="text-sm text-gray-600">
-                            Stock: {producto.stock || producto.cantidad} | Mínimo: {producto.minimo}
+                            Stock: {producto.stock} | Mínimo: {producto.minimo}
+                          </p>
+                        </div>
+                        <Button variant="danger" size="sm">
+                          <Plus className="h-4 w-4 mr-1" />
+                          Reabastecer
+                        </Button>
+                      </div>
+                    ))}
+                  {productosConsumibles
+                    .filter(p => p.estado === 'bajo')
+                    .map((producto) => (
+                      <div key={producto.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+                        <div>
+                          <p className="font-medium text-gray-900">{producto.nombre}</p>
+                          <p className="text-sm text-gray-600">
+                            Cantidad: {producto.cantidad} | Mínimo: {producto.minimo}
                           </p>
                         </div>
                         <Button variant="danger" size="sm">
