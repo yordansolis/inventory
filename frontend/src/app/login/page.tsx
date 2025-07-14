@@ -12,7 +12,7 @@ export default function InventoryLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -22,7 +22,7 @@ export default function InventoryLogin() {
     if (error) setError('');
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -54,7 +54,7 @@ export default function InventoryLogin() {
       localStorage.setItem('token', data.token);
       window.location.href = '/dashboard';
       
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
@@ -82,7 +82,7 @@ export default function InventoryLogin() {
               <div className="mb-2 block">
                 <Label 
                   htmlFor="email" 
-                  value="Correo electrónico"
+                  children="Correo electrónico"
                   className="text-gray-900 text-sm font-medium"
                 />
               </div>
@@ -114,7 +114,7 @@ export default function InventoryLogin() {
               <div className="mb-2 block">
                 <Label 
                   htmlFor="password" 
-                  value="Contraseña"
+                  children="Contraseña"
                   className="text-gray-900 text-sm font-medium"
                 />
               </div>
@@ -134,12 +134,12 @@ export default function InventoryLogin() {
                         base: "block w-full border disabled:cursor-not-allowed disabled:opacity-50",
                         colors: {
                           gray: "bg-white border-gray-300 text-gray-900 focus:border-black focus:ring-black"
-                        }
                       }
                     }
-                  }}
-                  color="gray"
-                />
+                  }
+                }}
+                color="gray"
+              />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
