@@ -39,6 +39,8 @@ export default function SuministroPage() {
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const productsPerPage = 5;
 
   // Función para calcular el estado basado en cantidad y mínimo
   const calculateEstado = useCallback((cantidad: number, minimo: number): ConsumableProduct['estado'] => {
@@ -215,6 +217,16 @@ export default function SuministroPage() {
     );
   }, [productosConsumibles, searchTerm]);
 
+  // Calcular productos para la página actual
+  const indexOfLastProduct = currentPage * productsPerPage;
+  const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
+  const currentProducts = useMemo(() => filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct), [filteredProducts, indexOfFirstProduct, indexOfLastProduct]);
+
+  // Cambiar de página
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+
+  const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
+
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Suministros</h1>
@@ -368,7 +380,7 @@ export default function SuministroPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredProducts.map((producto) => (
+                {currentProducts.map((producto) => (
                   <tr key={producto.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {producto.nombre}
@@ -415,6 +427,42 @@ export default function SuministroPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {filteredProducts.length > productsPerPage && (
+          <div className="flex justify-center mt-4">
+            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              <Button
+                onClick={() => paginate(currentPage - 1)}
+                disabled={currentPage === 1}
+                variant="default"
+                size="sm"
+                className="rounded-l-md"
+              >
+                Anterior
+              </Button>
+              {[...Array(totalPages)].map((_, index) => (
+                <Button
+                  key={index}
+                  onClick={() => paginate(index + 1)}
+                  variant={currentPage === index + 1 ? "default" : "secondary"}
+                  size="sm"
+                  className="-ml-px"
+                >
+                  {index + 1}
+                </Button>
+              ))}
+              <Button
+                onClick={() => paginate(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                variant="default"
+                size="sm"
+                className="rounded-r-md"
+              >
+                Siguiente
+              </Button>
+            </nav>
           </div>
         )}
       </Card>

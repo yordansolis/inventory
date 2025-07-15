@@ -52,7 +52,7 @@ export default function InventarioConsumoPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const productsPerPage = 10;
+  const productsPerPage = 5;
 
   // Función para calcular el estado de alerta basado en stock
   const calculateAlertaStockBajo = useCallback((unidades: number | null, stockMinimo: number): InventoryProduct['alertaStockBajo'] => {
@@ -423,6 +423,42 @@ export default function InventarioConsumoPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {filteredProducts.length > productsPerPage && (
+          <div className="flex justify-center mt-4">
+            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              <Button
+                onClick={() => paginate(currentPage - 1)}
+                disabled={currentPage === 1}
+                variant="default"
+                size="sm"
+                className="rounded-l-md"
+              >
+                Anterior
+              </Button>
+              {[...Array(totalPages)].map((_, index) => (
+                <Button
+                  key={index}
+                  onClick={() => paginate(index + 1)}
+                  variant={currentPage === index + 1 ? "success" : "default"}
+                  size="sm"
+                  className="-ml-px"
+                >
+                  {index + 1}
+                </Button>
+              ))}
+              <Button
+                onClick={() => paginate(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                variant="default"
+                size="sm"
+                className="rounded-r-md"
+              >
+                Siguiente
+              </Button>
+            </nav>
           </div>
         )}
       </Card>
