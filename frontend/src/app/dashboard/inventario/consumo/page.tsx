@@ -442,7 +442,7 @@ export default function InventarioConsumoPage() {
                 <Button
                   key={index}
                   onClick={() => paginate(index + 1)}
-                  variant={currentPage === index + 1 ? "success" : "default"}
+                  variant={currentPage === index + 1 ? "default" : "default"}
                   size="sm"
                   className="-ml-px"
                 >

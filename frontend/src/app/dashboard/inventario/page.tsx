@@ -1,61 +1,101 @@
-
-
 "use client"
 import React from 'react';
 import {
   ShoppingCart,
-  Package
+  Package,
+  ArrowRight
 } from 'lucide-react';
-import { Card, Button } from '../../../../components/ui'; // Corrected import path
-
-interface VendibleProduct {
-  id: number;
-  nombre: string;
-  tipo: string;
-  precio: number;
-  stock: number;
-  minimo: number;
-  estado: string;
-}
-
-interface ConsumableProduct {
-  id: number;
-  nombre: string;
-  cantidad: number;
-  minimo: number;
-  estado: string;
-}
+import { Card, Button } from '../../../../components/ui';
+import Link from 'next/link';
 
 export default function InventoryDashboard() {
-
-  // Datos de ejemplo basados en tu estructura
-  const productosVendibles = [
-    { id: 1, nombre: 'BOLA DE HELADO DE VAINILLA', tipo: 'HELADO', precio: 1000, stock: 25, minimo: 10, estado: 'bien' },
-    { id: 2, nombre: 'BOLA DE HELADO DE FRESA', tipo: 'HELADO', precio: 1500, stock: 8, minimo: 5, estado: 'bien' },
-    { id: 3, nombre: 'BOLA DE ESPUMA', tipo: 'ESPUMA', precio: 5000, stock: 3, minimo: 10, estado: 'bajo' },
-    { id: 4, nombre: 'MINI PANCAKES', tipo: 'PANCAKES', precio: 1000, stock: 100, minimo: 10, estado: 'bien' },
-    { id: 5, nombre: 'MINI DONAS X12', tipo: 'DONAS', precio: 3000, stock: 300, minimo: 10, estado: 'bien' },
-  ];
-
-  const productosConsumibles = [
-    { id: 101, nombre: 'VASOS X 16', cantidad: 50, minimo: 10, estado: 'bien' },
-    { id: 102, nombre: 'VASOS X 6', cantidad: 100, minimo: 10, estado: 'bien' },
-    { id: 103, nombre: 'PAQUETE DE SERVILLETAS X 50', cantidad: 6, minimo: 7, estado: 'bajo' },
-    { id: 104, nombre: 'PAQUETES DE FRESAS', cantidad: 2, minimo: 5, estado: 'bajo' },
-  ];
-
   return (
-    <div className="flex flex-col items-center justify-center py-12">
-      <h2 className="text-2xl font-semibold text-gray-900 mb-6">Organizar Inventario</h2>
-      <div className="flex space-x-4">
-        <Button variant="default" size="lg" className="min-w-[200px] py-4">
-          <Package className="h-5 w-5 mr-2" />
-          Productos No Consumibles
-        </Button>
-        <Button variant="default" size="lg" className="min-w-[200px] py-4">
-          <ShoppingCart className="h-5 w-5 mr-2" />
-          Productos Consumibles
-        </Button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-gray-900 mb-3">
+            Organizar Inventario
+          </h1>
+          <p className="text-lg text-gray-600">
+            Gestiona tus productos de manera eficiente
+          </p>
+        </div>
+
+        {/* Cards Container */}
+        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+          {/* Productos No Consumibles */}
+          <Card className="group hover:shadow-xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm h-full">
+            <div className="p-8 h-full flex flex-col">
+              <div className="flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-6 mx-auto group-hover:bg-slate-200 transition-colors">
+                <Package className="h-8 w-8 text-slate-600" />
+              </div>
+              
+              <h3 className="text-xl font-semibold text-gray-900 mb-3 text-center">
+                Productos No Consumibles
+              </h3>
+              
+              <p className="text-gray-600 text-center mb-6 flex-grow">
+                Equipos, herramientas y artículos reutilizables
+              </p>
+              
+              <Link href="/dashboard/inventario/consumo" className="block mt-auto">
+                <Button 
+                  variant="default" 
+                  size="lg" 
+                  className="w-full bg-slate-700 hover:bg-slate-800 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 group-hover:scale-105 flex items-center justify-center gap-2"
+                >
+                  Gestionar
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </Card>
+
+          {/* Productos Consumibles */}
+          <Card className="group hover:shadow-xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm h-full">
+            <div className="p-8 h-full flex flex-col">
+              <div className="flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-6 mx-auto group-hover:bg-slate-200 transition-colors">
+                <ShoppingCart className="h-8 w-8 text-slate-600" />
+              </div>
+              
+              <h3 className="text-xl font-semibold text-gray-900 mb-3 text-center">
+                Productos Consumibles
+              </h3>
+              
+              <p className="text-gray-600 text-center mb-6 flex-grow">
+                Suministros, materiales y artículos de uso único
+              </p>
+              
+              <Link href="/dashboard/inventario/suministro" className="block mt-auto">
+                <Button 
+                  variant="default" 
+                  size="lg" 
+                  className="w-full bg-slate-700 hover:bg-slate-800 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 group-hover:scale-105 flex items-center justify-center gap-2"
+                >
+                  Gestionar
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        </div>
+
+        {/* Stats Section (Optional) */}
+        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="text-center p-6 bg-white/60 rounded-lg backdrop-blur-sm">
+            <div className="text-3xl font-bold text-slate-600 mb-2">234</div>
+            <div className="text-sm text-gray-600">Total Productos</div>
+          </div>
+          <div className="text-center p-6 bg-white/60 rounded-lg backdrop-blur-sm">
+            <div className="text-3xl font-bold text-slate-600 mb-2">89%</div>
+            <div className="text-sm text-gray-600">En Stock</div>
+          </div>
+          <div className="text-center p-6 bg-white/60 rounded-lg backdrop-blur-sm">
+            <div className="text-3xl font-bold text-slate-600 mb-2">12</div>
+            <div className="text-sm text-gray-600">Bajo Stock</div>
+          </div>
+        </div>
       </div>
     </div>
   );

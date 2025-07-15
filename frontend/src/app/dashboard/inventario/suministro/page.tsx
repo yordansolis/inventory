@@ -446,7 +446,7 @@ export default function SuministroPage() {
                 <Button
                   key={index}
                   onClick={() => paginate(index + 1)}
-                  variant={currentPage === index + 1 ? "default" : "secondary"}
+                  variant={currentPage === index + 1 ? "default" : "default"}
                   size="sm"
                   className="-ml-px"
                 >
