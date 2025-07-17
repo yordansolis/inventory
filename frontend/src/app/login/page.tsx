@@ -1,16 +1,27 @@
 "use client"
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Label, TextInput, Button, Alert, Spinner } from 'flowbite-react';
 import { HiEye, HiEyeOff, HiInformationCircle } from 'react-icons/hi';
+import { useRouter } from 'next/navigation';
 
 export default function InventoryLogin() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: ''
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Verificar si ya hay una sesión activa
+  useEffect(() => {
+    const authToken = localStorage.getItem('authToken');
+    if (authToken) {
+      router.push('/dashboard');
+    }
+  }, [router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -28,31 +39,41 @@ export default function InventoryLogin() {
     setError('');
 
     // Validaciones básicas
-    if (!formData.email || !formData.password) {
+    if (!formData.username || !formData.password) {
       setError('Por favor completa todos los campos');
       setLoading(false);
       return;
     }
 
     try {
-      // Aquí va tu lógica de autenticación
-      const response = await fetch('/api/auth/login', {
+      // Crear FormData para enviar como application/x-www-form-urlencoded
+      const formBody = new URLSearchParams();
+      formBody.append('username', formData.username);
+      formBody.append('password', formData.password);
+
+      // Petición usando application/x-www-form-urlencoded como en el ejemplo curl
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/users/auth/token`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify(formData),
+        body: formBody,
       });
-
+      
       if (!response.ok) {
         throw new Error('Credenciales inválidas');
       }
 
       const data = await response.json();
       
-      // Guardar token y redirigir
-      localStorage.setItem('token', data.token);
-      window.location.href = '/dashboard';
+      // Guardar token y información del usuario
+      localStorage.setItem('authToken', data.access_token);
+      localStorage.setItem('username', formData.username);
+      localStorage.setItem('tokenType', data.token_type);
+      localStorage.setItem('loginTime', new Date().toISOString());
+      
+      // Redirigir usando el router de Next.js
+      router.push('/dashboard');
       
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
@@ -77,21 +98,21 @@ export default function InventoryLogin() {
         {/* Login Card */}
         <Card className="bg-white border border-gray-200 shadow-none">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {/* Email Field */}
+            {/* username Field */}
             <div>
               <div className="mb-2 block">
                 <Label 
-                  htmlFor="email" 
-                  children="Correo electrónico"
+                  htmlFor="username" 
+                  children="Nombre de usuario"
                   className="text-gray-900 text-sm font-medium"
                 />
               </div>
               <TextInput
-                id="email"
-                name="email"
-                type="email"
-                placeholder="admin@inventario.com"
-                value={formData.email}
+                id="username"
+                name="username"
+                type="text"
+                placeholder="johndoe"
+                value={formData.username}
                 onChange={handleInputChange}
                 required
                 className="text-sm"

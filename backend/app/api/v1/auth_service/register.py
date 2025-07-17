@@ -115,7 +115,7 @@ async def register_user(user: UserCreate):
     if not validate_password_strength(user.password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters long and contain uppercase, lowercase, number and special character"
+            detail="La contraseña debe tener al menos 8 caracteres y contener mayúsculas, minúsculas, números y caracteres especiales."
         )
     
     # Crear hash de contraseña
