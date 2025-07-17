@@ -8,7 +8,7 @@ load_dotenv('.env.dev')
 # Configuración de la base de datos
 DATABASE_CONFIG = {
     'host': os.getenv('HOSTNAME'),
-    'user': os.getenv('USERNAME'),
+    'user': os.getenv('DB_USERNAME', 'root'),  # Cambiado de USERNAME a DB_USERNAME
     'password': os.getenv('PASSWORD'),
     'port': int(os.getenv('PORT', 3306)),
     'database': os.getenv('DATABASE_NAME'),
@@ -214,7 +214,7 @@ def create_tables():
     insumos_table = """ 
             CREATE TABLE IF NOT EXISTS insumos (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                nombre_insumo VARCHAR(100) NOT NULL,        
+                nombre_insumo VARCHAR(100) UNIQUE NOT NULL,        
                 unidad VARCHAR(20) NOT NULL,                -- Ej: gramos, litros, unidad
                 cantidad_actual DECIMAL(10,2) DEFAULT 0,    -- Stock actual
                 stock_minimo DECIMAL(10,2) DEFAULT 0,       -- Punto de reposición

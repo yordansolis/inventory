@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from api.v1.router import router_user
 from database.db import create_tables
 import os
@@ -535,9 +536,12 @@ async def create_insumo(
             cantidad_actual = body["cantidad_actual"]
         if stock_minimo is None and "stock_minimo" in body:
             stock_minimo = body["stock_minimo"]
-    except:
+    except Exception as e:
+        print(f"Error al procesar el cuerpo JSON: {str(e)}")
         # Si no hay cuerpo JSON o hay un error, usar los parámetros de consulta
         pass
+    
+    print(f"Datos recibidos: nombre={nombre_insumo}, unidad={unidad}, cantidad={cantidad_actual}, min={stock_minimo}")
     
     # Validar que los campos obligatorios estén presentes
     if nombre_insumo is None:
@@ -557,20 +561,55 @@ async def create_insumo(
     if stock_minimo is None:
         stock_minimo = 0
     
-    insumo_id = InsumoService.create_insumo(
-        nombre_insumo=nombre_insumo,
-        unidad=unidad,
-        cantidad_actual=cantidad_actual,
-        stock_minimo=stock_minimo
-    )
-    
-    if not insumo_id:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al crear el insumo"
+    try:
+        # Verificar si ya existe un insumo con el mismo nombre
+        check_query = "SELECT id FROM insumos WHERE nombre_insumo = %s"
+        from database.db import execute_query
+        existing_insumo = execute_query(check_query, (nombre_insumo,), fetch_one=True)
+        
+        if existing_insumo:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"detail": f"Ya existe un insumo con el nombre '{nombre_insumo}'"}
+            )
+            
+        insumo_id = InsumoService.create_insumo(
+            nombre_insumo=nombre_insumo,
+            unidad=unidad,
+            cantidad_actual=cantidad_actual,
+            stock_minimo=stock_minimo
         )
-    
-    return {"id": insumo_id, "message": "Insumo creado exitosamente"}
+        
+        print(f"ID del insumo creado: {insumo_id}")
+        
+        if not insumo_id:
+            # Intentar verificar si el insumo se creó de todas formas
+            check_query = "SELECT id FROM insumos WHERE nombre_insumo = %s ORDER BY id DESC LIMIT 1"
+            check_result = execute_query(check_query, (nombre_insumo,), fetch_one=True)
+            
+            if check_result:
+                insumo_id = check_result["id"]
+                print(f"Insumo encontrado con ID: {insumo_id}")
+                return {"id": insumo_id, "message": "Insumo creado exitosamente (recuperado)"}
+            
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error al crear el insumo"
+            )
+        
+        return {"id": insumo_id, "message": "Insumo creado exitosamente"}
+    except ValueError as e:
+        print(f"Error de validación al crear insumo: {str(e)}")
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(e)}
+        )
+    except Exception as e:
+        print(f"Error inesperado al crear insumo: {str(e)}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": f"Error al crear el insumo: {str(e)}"}
+        )
 
 @router_insumos.get("/{insumo_id}")
 async def get_insumo(insumo_id: int):

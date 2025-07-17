@@ -1,12 +1,15 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { Plus, Edit, Trash2, AlertCircle, Loader2 } from 'lucide-react';
+import { getAuthHeaders, isAuthenticated } from '../../../utils/auth';
+import { useRouter } from 'next/navigation';
+import { log } from 'console';
 
 interface ConsumableProduct {
   id: number;
   nombre: string;
-  tipo: string;
+  tipo: string; // Keeping this to maintain compatibility with existing data structure
   unidadMedida: string;
   cantidad: number;
   minimo: number;
@@ -15,23 +18,42 @@ interface ConsumableProduct {
 
 interface ProductFormData {
   nombre: string;
-  tipo: string;
   unidadMedida: string;
   cantidad: string;
   minimo: string;
 }
 
+interface Category {
+  id: number;
+  nombre_categoria: string;
+}
+
+interface ApiProduct {
+  id: number;
+  nombre_insumo: string;
+  // price: number;
+  // category_id: number;
+  unidad: string;
+  cantidad_actual: number;
+  stock_minimo: number;
+}
+
+// Default categories for fallback
+// const DEFAULT_CATEGORIES = [
+//   { id: 1, name: 'Consumible' },
+//   { id: 2, name: 'No consumible' },
+//   { id: 3, name: 'Bebidas' },
+//   { id: 4, name: 'Alimentos' },
+//   { id: 5, name: 'Desechables' }
+// ];
+
 export default function SuministroPage() {
-  const [productosConsumibles, setProductosConsumibles] = useState<ConsumableProduct[]>([
-    { id: 1, nombre: 'VASOS X 16', tipo: 'Consumible', unidadMedida: 'unidad (u)', cantidad: 50, minimo: 10, estado: 'bien' },
-    { id: 2, nombre: 'VASOS X 6', tipo: 'Consumible', unidadMedida: 'unidad (u)', cantidad: 100, minimo: 10, estado: 'bien' },
-    { id: 3, nombre: 'PAQUETE DE SERVILLETAS X 50', tipo: 'Consumible', unidadMedida: 'unidad (u)', cantidad: 10, minimo: 7, estado: 'alerta' },
-    { id: 4, nombre: 'PAQUETES DE FRESAS', tipo: 'Consumible', unidadMedida: 'kilogramo (kg)', cantidad: 2, minimo: 5, estado: 'critico' },
-  ]);
+  const router = useRouter();
+  
+  const [productosConsumibles, setProductosConsumibles] = useState<ConsumableProduct[]>([]);
 
   const [formData, setFormData] = useState<ProductFormData>({
     nombre: '',
-    tipo: '',
     unidadMedida: '',
     cantidad: '',
     minimo: '',
@@ -41,6 +63,13 @@ export default function SuministroPage() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const productsPerPage = 5;
+  
+  // States for API integration
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [loadingProducts, setLoadingProducts] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+  const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
 
   // Función para calcular el estado basado en cantidad y mínimo
   const calculateEstado = useCallback((cantidad: number, minimo: number): ConsumableProduct['estado'] => {
@@ -48,6 +77,148 @@ export default function SuministroPage() {
     if (cantidad <= minimo * 1.5) return 'alerta';
     return 'bien';
   }, []);
+
+  // Extract fetch functions outside useEffect for reuse
+  const fetchCategories = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const headers = getAuthHeaders();
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND;
+      
+      if (!apiUrl) {
+        console.error('NEXT_PUBLIC_BACKEND environment variable is not defined');
+        throw new Error('Error de configuración: URL del backend no definida');
+      }
+      
+      console.log('Fetching categories from:', `${apiUrl}/api/v1/categories`);
+      
+      const response = await fetch(`${apiUrl}/api/v1/categories`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Categories fetched:', data); // Debug log
+      
+      // Check if data is an array or has a specific property containing categories
+      let categoriesData = data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        // If data is an object, try to find an array property
+        const possibleArrayProps = Object.keys(data).filter(key => Array.isArray(data[key]));
+        if (possibleArrayProps.length > 0) {
+          categoriesData = data[possibleArrayProps[0]];
+          console.log('Found categories in property:', possibleArrayProps[0]);
+        }
+      }
+      
+      if (!Array.isArray(categoriesData) || categoriesData.length === 0) {
+        console.error('Categories data is not an array or is empty:', categoriesData);
+        console.log('No categories found in API response');
+        categoriesData = [];
+      }
+      
+      // Normalize category objects to ensure they have id and nombre_categoria properties
+      const normalizedCategories = categoriesData.map((cat: any) => {
+        return {
+          id: cat.id || cat.category_id || cat.categoryId || 0,
+          nombre_categoria: cat.nombre_categoria || cat.name || cat.category_name || cat.categoryName || cat.nombre || 'Categoría sin nombre'
+        };
+      });
+      
+      console.log('Normalized categories:', normalizedCategories);
+      setCategories(normalizedCategories);
+      
+      // Create a map of category id to name for easy lookup
+      const catMap: Record<number, string> = {};
+      normalizedCategories.forEach((cat: Category) => {
+        catMap[cat.id] = cat.nombre_categoria;
+      });
+      console.log('Category map created:', catMap); // Debug log
+      setCategoryMap(catMap);
+      return catMap; // Return the map for use in fetchProducts
+    } catch (err: any) {
+      console.error('Error fetching categories:', err);
+      setError(err.message || 'Error al cargar categorías');
+      
+      // Create empty map in case of error
+      setCategories([]);
+      setCategoryMap({});
+      return {};
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
+  const fetchProducts = useCallback(async (categoryMapping: Record<number, string>) => {
+    setLoadingProducts(true);
+    
+    try {
+      const headers = getAuthHeaders();
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND;
+      
+      if (!apiUrl) {
+        throw new Error('Error de configuración: URL del backend no definida');
+      }
+      
+      const response = await fetch(`${apiUrl}/api/v1/insumos`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Transform API products to our ConsumableProduct format
+      const transformedProducts: ConsumableProduct[] = data.map((product: ApiProduct) => {
+        const estado = calculateEstado(product.cantidad_actual, product.stock_minimo);
+        return {
+          id: product.id,
+          nombre: product.nombre_insumo,
+          // tipo: categoryMapping[product.category_id] || `Categoría ${product.category_id}`,
+          unidadMedida: product.unidad || 'unidad (u)',
+          cantidad: product.cantidad_actual,
+          minimo: product.stock_minimo,
+          estado
+        };
+      });
+      
+      setProductosConsumibles(transformedProducts);
+    } catch (err: any) {
+      console.error('Error fetching products:', err);
+      setError(prev => prev || err.message || 'Error al cargar productos');
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, [calculateEstado]);
+
+  // Fetch categories and products on component mount
+  useEffect(() => {
+    fetchCategories().then(catMap => fetchProducts(catMap));
+  }, [fetchCategories, fetchProducts]);
+  
+  // Handler to manually refresh categories
+  const handleRefreshCategories = async () => {
+    await fetchCategories();
+  };
+
+  // Check authentication on component mount
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      console.log('User not authenticated, redirecting to login');
+      router.push('/login');
+    }
+  }, [router]);
 
   // Optimización: useCallback para evitar re-renders innecesarios
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -60,57 +231,114 @@ export default function SuministroPage() {
   }, []);
 
   // Optimización: useCallback para las funciones de manejo
-  const handleAddOrUpdateProduct = useCallback(() => {
+  const handleAddOrUpdateProduct = useCallback(async () => {
     const parsedCantidad = formData.cantidad === '' ? 0 : parseInt(formData.cantidad);
     const parsedMinimo = formData.minimo === '' ? 0 : parseInt(formData.minimo);
     
-    if (!formData.nombre.trim() || !formData.tipo.trim() || !formData.unidadMedida.trim() || 
+    if (!formData.nombre.trim() || !formData.unidadMedida.trim() || 
         (formData.cantidad !== '' && (isNaN(parsedCantidad) || parsedCantidad < 0)) ||
         (formData.minimo !== '' && (isNaN(parsedMinimo) || parsedMinimo < 0))) {
       alert('Por favor, complete todos los campos obligatorios y asegúrese de que las cantidades sean números válidos.');
       return;
     }
 
-    const estado = calculateEstado(parsedCantidad, parsedMinimo);
-
-    if (editingId) {
-      // Update logic
-      setProductosConsumibles((prev) =>
-        prev.map((p) =>
-          p.id === editingId ? {
-            id: editingId,
+    setLoading(true);
+    
+    try {
+      const headers = getAuthHeaders();
+      
+      const productData = {
+        nombre_insumo: formData.nombre.trim(),
+        unidad: formData.unidadMedida.trim(),
+        cantidad_actual: parsedCantidad,
+        stock_minimo: parsedMinimo
+      };
+      
+      let response;
+      console.log(productData);
+      
+      if (editingId) {
+        // Update existing product
+        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos/${editingId}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(productData)
+        });
+      } else {
+        // Create new product
+        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(productData)
+        });
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Error al ${editingId ? 'actualizar' : 'crear'} producto`);
+      }
+      
+      const savedProduct = await response.json();
+      console.log('API response for product creation/update:', savedProduct);
+      
+      if (!savedProduct || typeof savedProduct !== 'object') {
+        throw new Error(`Error al ${editingId ? 'actualizar' : 'crear'} producto. Respuesta inválida del servidor.`);
+      }
+      
+      if (!savedProduct.id) {
+        throw new Error(`Error al ${editingId ? 'actualizar' : 'crear'} producto. No se pudo obtener el ID del producto.`);
+      }
+      
+      const estado = calculateEstado(parsedCantidad, parsedMinimo);
+      
+      if (editingId) {
+        // Update product in state
+        setProductosConsumibles(prev => 
+          prev.map(p => p.id === editingId ? {
+            id: savedProduct.id,
             nombre: formData.nombre.trim(),
-            tipo: formData.tipo.trim(),
+            tipo: '', // Set empty as we removed the field
             unidadMedida: formData.unidadMedida.trim(),
             cantidad: parsedCantidad,
             minimo: parsedMinimo,
             estado
-          } : p
-        )
-      );
+          } : p)
+        );
+      } else {
+        // Add new product to state
+        setProductosConsumibles(prev => [...prev, {
+          id: savedProduct.id,
+          nombre: formData.nombre.trim(),
+          tipo: '', // Set empty as we removed the field
+          unidadMedida: formData.unidadMedida.trim(),
+          cantidad: parsedCantidad,
+          minimo: parsedMinimo,
+          estado
+        }]);
+      }
+      
+      // Clear form and editing state
+      setFormData({ nombre: '', unidadMedida: '', cantidad: '', minimo: '' });
       setEditingId(null);
-    } else {
-      // Add logic
-      const newId = productosConsumibles.length > 0 ? Math.max(...productosConsumibles.map(p => p.id)) + 1 : 1;
-      setProductosConsumibles((prev) => [...prev, {
-        id: newId,
-        nombre: formData.nombre.trim(),
-        tipo: formData.tipo.trim(),
-        unidadMedida: formData.unidadMedida.trim(),
-        cantidad: parsedCantidad,
-        minimo: parsedMinimo,
-        estado
-      }]);
+      
+      // Refresh the products list from the server to ensure we have the latest data
+      const catMap = await fetchCategories();
+      await fetchProducts(catMap);
+      
+    } catch (err: any) {
+      console.error('Error saving product:', err);
+      setError(err.message || `Error al ${editingId ? 'actualizar' : 'crear'} producto`);
+      
+      // Show alert for better visibility of the error
+      alert(`Error: ${err.message || `Error al ${editingId ? 'actualizar' : 'crear'} producto`}`);
+    } finally {
+      setLoading(false);
     }
-
-    // Clear form
-    setFormData({ nombre: '', tipo: '', unidadMedida: '', cantidad: '', minimo: '' });
-  }, [formData, editingId, productosConsumibles, calculateEstado]);
+  }, [formData, editingId, categories, calculateEstado]);
 
   const handleEditProduct = useCallback((producto: ConsumableProduct) => {
     setFormData({ 
-      nombre: producto.nombre, 
-      tipo: producto.tipo, 
+      nombre: producto.nombre,
       unidadMedida: producto.unidadMedida,
       cantidad: String(producto.cantidad),
       minimo: String(producto.minimo)
@@ -118,8 +346,25 @@ export default function SuministroPage() {
     setEditingId(producto.id);
   }, []);
 
-  const handleDeleteProduct = useCallback((id: number) => {
-    setProductosConsumibles((prev) => prev.filter((p) => p.id !== id));
+  const handleDeleteProduct = useCallback(async (id: number) => {
+    try {
+      const headers = getAuthHeaders();
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al eliminar producto');
+      }
+      
+      setProductosConsumibles((prev) => prev.filter((p) => p.id !== id));
+    } catch (err: any) {
+      console.error('Error deleting product:', err);
+      setError(err.message || 'Error al eliminar producto');
+    }
   }, []);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,7 +372,7 @@ export default function SuministroPage() {
   }, []);
 
   const handleCancelEdit = useCallback(() => {
-    setFormData({ nombre: '', tipo: '', unidadMedida: '', cantidad: '', minimo: '' });
+    setFormData({ nombre: '', unidadMedida: '', cantidad: '', minimo: '' });
     setEditingId(null);
   }, []);
 
@@ -143,12 +388,14 @@ export default function SuministroPage() {
     variant = "default", 
     size = "default", 
     className = "", 
+    disabled = false,
     ...props 
   }: { 
     children: React.ReactNode; 
     variant?: "default" | "danger" | "secondary"; 
     size?: "default" | "sm"; 
-    className?: string; 
+    className?: string;
+    disabled?: boolean;
     [key: string]: any 
   }) => {
     const variants = {
@@ -162,7 +409,8 @@ export default function SuministroPage() {
     };
     return (
       <button
-        className={`inline-flex items-center justify-center rounded-md font-medium transition-colors ${variants[variant]} ${sizes[size]} ${className}`}
+        className={`inline-flex items-center justify-center rounded-md font-medium transition-colors ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+        disabled={disabled}
         {...props}
       >
         {children}
@@ -212,7 +460,6 @@ export default function SuministroPage() {
     return productosConsumibles.filter(
       (producto) =>
         producto.nombre.toLowerCase().includes(lowerCaseSearchTerm) ||
-        producto.tipo.toLowerCase().includes(lowerCaseSearchTerm) ||
         producto.unidadMedida.toLowerCase().includes(lowerCaseSearchTerm)
     );
   }, [productosConsumibles, searchTerm]);
@@ -231,6 +478,24 @@ export default function SuministroPage() {
     <div className="p-6">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Suministros</h1>
       
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md flex items-start">
+          <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-sm font-medium text-red-800">Error</h3>
+            <p className="text-sm text-red-700 mt-1">{error}</p>
+            <div className="mt-2">
+              <Button 
+                size="sm" 
+                onClick={handleRefreshCategories}
+                className="!bg-red-600 hover:!bg-red-700"
+              >
+                Reintentar cargar categorías
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <Card className="mb-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
@@ -252,34 +517,25 @@ export default function SuministroPage() {
             />
           </div>
           
-          <div>
-            <label htmlFor="tipo" className="block text-sm font-medium text-gray-700 mb-1">
-              Categoría *
-            </label>
-            <select
-              id="tipo"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={formData.tipo}
-              onChange={handleChange}
-            >
-              <option value="">Seleccione una categoría</option>
-              <option value="Consumible">Consumible</option>
-              <option value="No consumible">No consumible</option>
-            </select>
-          </div>
+
           
           <div>
             <label htmlFor="unidadMedida" className="block text-sm font-medium text-gray-700 mb-1">
               Unidad de Medida *
             </label>
-            <input
-              type="text"
+            <select
               id="unidadMedida"
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={formData.unidadMedida}
               onChange={handleChange}
-              placeholder="Ej: unidad (u)"
-            />
+            >
+              <option value="">Seleccione una unidad</option>
+              <option value="Litros (L)">Litros (L)</option>
+              <option value="Kilogramos (kg)">Kilogramos (kg)</option>
+              <option value="Gramos (g)">Gramos (g)</option>
+              <option value="Unidad (u)">Unidad (u)</option>
+              <option value="Mililitros (ml)">Mililitros (ml)</option>
+            </select>
           </div>
           
           <div>
@@ -319,8 +575,13 @@ export default function SuministroPage() {
               Cancelar
             </Button>
           )}
-          <Button onClick={handleAddOrUpdateProduct}>
-            {editingId ? (
+          <Button onClick={handleAddOrUpdateProduct} disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {editingId ? 'Actualizando...' : 'Agregando...'}
+              </>
+            ) : editingId ? (
               <>
                 <Edit className="h-4 w-4 mr-2" />
                 Actualizar Producto
@@ -349,7 +610,14 @@ export default function SuministroPage() {
           placeholder="Buscar por nombre, categoría o subcategoría..."
         />
 
-        {filteredProducts.length === 0 ? (
+        {loadingProducts ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="flex flex-col items-center">
+              <Loader2 className="h-8 w-8 text-gray-500 mb-4 animate-spin" />
+              <p className="text-gray-500">Cargando productos...</p>
+            </div>
+          </div>
+        ) : filteredProducts.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             No hay productos registrados. Agrega uno para comenzar.
           </div>
@@ -360,9 +628,6 @@ export default function SuministroPage() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Nombre
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Categoría
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Unidad
@@ -386,9 +651,6 @@ export default function SuministroPage() {
                   <tr key={producto.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {producto.nombre}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {producto.tipo}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {producto.unidadMedida}

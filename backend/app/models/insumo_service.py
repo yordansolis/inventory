@@ -10,24 +10,40 @@ class InsumoService:
     def create_insumo(nombre_insumo: str, unidad: str, cantidad_actual: float = 0, 
                      stock_minimo: float = 0) -> Optional[int]:
         """Crear un nuevo insumo"""
+        # Verificar si ya existe un insumo con el mismo nombre
+        check_query = "SELECT id FROM insumos WHERE nombre_insumo = %s"
+        existing_insumo = execute_query(check_query, (nombre_insumo,), fetch_one=True)
+        
+        if existing_insumo:
+            print(f"Ya existe un insumo con el nombre '{nombre_insumo}'")
+            raise ValueError(f"Ya existe un insumo con el nombre '{nombre_insumo}'")
+            
         query = """
         INSERT INTO insumos (nombre_insumo, unidad, cantidad_actual, stock_minimo)
         VALUES (%s, %s, %s, %s)
         """
         
         try:
+            print(f"Intentando crear insumo: {nombre_insumo}, {unidad}, {cantidad_actual}, {stock_minimo}")
             result = execute_query(query, (nombre_insumo, unidad, cantidad_actual, stock_minimo))
+            print(f"Resultado de execute_query: {result}")
             
-            if result:
+            if result is not None:
                 # Obtener el ID del insumo recién creado
                 id_query = "SELECT LAST_INSERT_ID() as id"
                 id_result = execute_query(id_query, fetch_one=True)
-                return id_result['id'] if id_result else None
+                print(f"ID result: {id_result}")
+                insumo_id = id_result['id'] if id_result else None
+                print(f"Insumo creado con ID: {insumo_id}")
+                return insumo_id
             
+            print("La ejecución de la consulta no devolvió un resultado válido")
             return None
         except Exception as e:
+            print(f"Error detallado al crear insumo: {str(e)}")
             logger.error(f"Error creando insumo: {e}")
-            return None
+            # Re-lanzar la excepción para que pueda ser manejada en el nivel superior
+            raise
     
     @staticmethod
     def get_insumo_by_id(insumo_id: int) -> Optional[dict]:
