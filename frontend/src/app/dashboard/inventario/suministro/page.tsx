@@ -14,6 +14,9 @@ interface ConsumableProduct {
   cantidad: number;
   minimo: number;
   estado: 'bien' | 'alerta' | 'critico';
+  valorUnitario: number;
+  valorUnitarioxUnidad: number;
+  sitioReferencia: string;
 }
 
 interface ProductFormData {
@@ -21,6 +24,9 @@ interface ProductFormData {
   unidadMedida: string;
   cantidad: string;
   minimo: string;
+  valorUnitario: string;
+  valorUnitarioxUnidad: string;
+  sitioReferencia: string;
 }
 
 interface Category {
@@ -36,6 +42,9 @@ interface ApiProduct {
   unidad: string;
   cantidad_actual: number;
   stock_minimo: number;
+  valor_unitario: number;
+  valor_unitarioxunidad: number;
+  sitio_referencia: string;
 }
 
 // Default categories for fallback
@@ -57,6 +66,9 @@ export default function SuministroPage() {
     unidadMedida: '',
     cantidad: '',
     minimo: '',
+    valorUnitario: '',
+    valorUnitarioxUnidad: '',
+    sitioReferencia: ''
   });
 
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -189,7 +201,10 @@ export default function SuministroPage() {
           unidadMedida: product.unidad || 'unidad (u)',
           cantidad: product.cantidad_actual,
           minimo: product.stock_minimo,
-          estado
+          estado,
+          valorUnitario: product.valor_unitario || 0,
+          valorUnitarioxUnidad: product.valor_unitarioxunidad || 0,
+          sitioReferencia: product.sitio_referencia || ''
         };
       });
       
@@ -220,24 +235,95 @@ export default function SuministroPage() {
     }
   }, [router]);
 
-  // Optimización: useCallback para evitar re-renders innecesarios
+  // Add a function to format currency values
+  const formatCurrency = useCallback((value: string): string => {
+    // Remove non-numeric characters
+    const numericValue = value.replace(/[^0-9]/g, '');
+    
+    if (!numericValue) return '';
+    
+    // Convert to number and format with thousands separators
+    const number = parseInt(numericValue, 10);
+    return number.toLocaleString('es-CO');
+  }, []);
+
+  // Add a function to format currency without unnecessary trailing zeros
+  const formatCurrencyWithoutTrailingZeros = useCallback((value: number): string => {
+    if (value === 0) return '0';
+    
+    // Format with thousands separators
+    const formatted = value.toLocaleString('es-CO');
+    
+    // For integers, keep the format as is (with thousands separators)
+    // Only remove trailing zeros after decimal point if they exist
+    if (formatted.includes(',')) {
+      // If there's a decimal part
+      return formatted.replace(/,0+$/, ''); // Only remove trailing zeros after decimal
+    }
+    
+    // For integers, just return the formatted number
+    return formatted;
+  }, []);
+
+  // Add a function to parse formatted currency back to number string
+  const parseCurrency = useCallback((formattedValue: string): string => {
+    // Remove all non-numeric characters
+    return formattedValue.replace(/[^0-9]/g, '');
+  }, []);
+
+  // Modify handleChange to handle currency formatting
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     
-    setFormData((prev) => ({
-      ...prev,
-      [id]: value,
-    }));
-  }, []);
+    if (id === 'valorUnitario') {
+      // Format the currency value
+      const formattedValue = formatCurrency(value);
+      const numericValue = parseCurrency(value);
+      
+      setFormData((prev) => ({
+        ...prev,
+        [id]: formattedValue,
+        // Store the numeric value for calculations
+        [`${id}Numeric`]: numericValue
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [id]: value,
+      }));
+    }
+  }, [formatCurrency, parseCurrency]);
 
-  // Optimización: useCallback para las funciones de manejo
+  // Update the useEffect to use numeric values for calculation
+  useEffect(() => {
+    // Only calculate if both fields have values
+    if (formData.cantidad && formData.valorUnitario) {
+      const cantidad = parseFloat(formData.cantidad);
+      const valorUnitario = parseFloat(parseCurrency(formData.valorUnitario));
+      
+      if (!isNaN(cantidad) && !isNaN(valorUnitario)) {
+        const total = cantidad * valorUnitario;
+        
+        // Format the total for display without trailing zeros
+        setFormData(prev => ({
+          ...prev,
+          valorUnitarioxUnidad: formatCurrencyWithoutTrailingZeros(total)
+        }));
+      }
+    }
+  }, [formData.cantidad, formData.valorUnitario, parseCurrency, formatCurrencyWithoutTrailingZeros]);
+
+  // Optimización: useCallback para evitar re-renders innecesarios
   const handleAddOrUpdateProduct = useCallback(async () => {
     const parsedCantidad = formData.cantidad === '' ? 0 : parseInt(formData.cantidad);
     const parsedMinimo = formData.minimo === '' ? 0 : parseInt(formData.minimo);
+    const parsedValorUnitario = formData.valorUnitario === '' ? 0 : parseInt(parseCurrency(formData.valorUnitario));
+    const parsedValorUnitarioxUnidad = formData.valorUnitarioxUnidad === '' ? 0 : parseInt(parseCurrency(formData.valorUnitarioxUnidad));
     
     if (!formData.nombre.trim() || !formData.unidadMedida.trim() || 
         (formData.cantidad !== '' && (isNaN(parsedCantidad) || parsedCantidad < 0)) ||
-        (formData.minimo !== '' && (isNaN(parsedMinimo) || parsedMinimo < 0))) {
+        (formData.minimo !== '' && (isNaN(parsedMinimo) || parsedMinimo < 0)) ||
+        (formData.valorUnitario !== '' && (isNaN(parsedValorUnitario) || parsedValorUnitario < 0))) {
       alert('Por favor, complete todos los campos obligatorios y asegúrese de que las cantidades sean números válidos.');
       return;
     }
@@ -251,7 +337,10 @@ export default function SuministroPage() {
         nombre_insumo: formData.nombre.trim(),
         unidad: formData.unidadMedida.trim(),
         cantidad_actual: parsedCantidad,
-        stock_minimo: parsedMinimo
+        stock_minimo: parsedMinimo,
+        valor_unitario: parsedValorUnitario,
+        valor_unitarioxunidad: parsedValorUnitarioxUnidad,
+        sitio_referencia: formData.sitioReferencia.trim()
       };
       
       let response;
@@ -301,7 +390,10 @@ export default function SuministroPage() {
             unidadMedida: formData.unidadMedida.trim(),
             cantidad: parsedCantidad,
             minimo: parsedMinimo,
-            estado
+            estado,
+            valorUnitario: parsedValorUnitario,
+            valorUnitarioxUnidad: parsedValorUnitarioxUnidad,
+            sitioReferencia: formData.sitioReferencia.trim()
           } : p)
         );
       } else {
@@ -313,12 +405,15 @@ export default function SuministroPage() {
           unidadMedida: formData.unidadMedida.trim(),
           cantidad: parsedCantidad,
           minimo: parsedMinimo,
-          estado
+          estado,
+          valorUnitario: parsedValorUnitario,
+          valorUnitarioxUnidad: parsedValorUnitarioxUnidad,
+          sitioReferencia: formData.sitioReferencia.trim()
         }]);
       }
       
       // Clear form and editing state
-      setFormData({ nombre: '', unidadMedida: '', cantidad: '', minimo: '' });
+      setFormData({ nombre: '', unidadMedida: '', cantidad: '', minimo: '', valorUnitario: '', valorUnitarioxUnidad: '', sitioReferencia: '' });
       setEditingId(null);
       
       // Refresh the products list from the server to ensure we have the latest data
@@ -334,17 +429,20 @@ export default function SuministroPage() {
     } finally {
       setLoading(false);
     }
-  }, [formData, editingId, categories, calculateEstado]);
+  }, [formData, editingId, categories, calculateEstado, parseCurrency]);
 
   const handleEditProduct = useCallback((producto: ConsumableProduct) => {
     setFormData({ 
       nombre: producto.nombre,
       unidadMedida: producto.unidadMedida,
       cantidad: String(producto.cantidad),
-      minimo: String(producto.minimo)
+      minimo: String(producto.minimo),
+      valorUnitario: formatCurrencyWithoutTrailingZeros(producto.valorUnitario),
+      valorUnitarioxUnidad: formatCurrencyWithoutTrailingZeros(producto.valorUnitarioxUnidad),
+      sitioReferencia: producto.sitioReferencia
     });
     setEditingId(producto.id);
-  }, []);
+  }, [formatCurrencyWithoutTrailingZeros]);
 
   const handleDeleteProduct = useCallback(async (id: number) => {
     try {
@@ -372,7 +470,7 @@ export default function SuministroPage() {
   }, []);
 
   const handleCancelEdit = useCallback(() => {
-    setFormData({ nombre: '', unidadMedida: '', cantidad: '', minimo: '' });
+    setFormData({ nombre: '', unidadMedida: '', cantidad: '', minimo: '', valorUnitario: '', valorUnitarioxUnidad: '', sitioReferencia: '' });
     setEditingId(null);
   }, []);
 
@@ -502,7 +600,7 @@ export default function SuministroPage() {
           {editingId ? 'Editar Producto' : 'Agregar Nuevo Producto'}
         </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-1">
               Nombre *
@@ -516,8 +614,6 @@ export default function SuministroPage() {
               placeholder="Nombre del producto"
             />
           </div>
-          
-
           
           <div>
             <label htmlFor="unidadMedida" className="block text-sm font-medium text-gray-700 mb-1">
@@ -567,6 +663,66 @@ export default function SuministroPage() {
               min="0"
             />
           </div>
+
+          <div>
+            <label htmlFor="valorUnitario" className="block text-sm font-medium text-gray-700 mb-1">
+              Valor Unitario
+            </label>
+            <div className="relative mt-1 rounded-md shadow-sm">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <span className="text-gray-500 text-base">$</span>
+              </div>
+              <input
+                type="text"
+                id="valorUnitario"
+                className="block w-full rounded-md border-gray-300 pl-7 pr-16 py-3 text-base focus:border-blue-500 focus:ring-blue-500"
+                value={formData.valorUnitario}
+                onChange={handleChange}
+                placeholder="0"
+                aria-describedby="price-currency"
+              />
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <span className="text-gray-500 text-base" id="price-currency">COP</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="valorUnitarioxUnidad" className="block text-sm font-medium text-gray-700 mb-1">
+              Valor Total
+            </label>
+            <div className="relative mt-1 rounded-md shadow-sm">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <span className="text-gray-500 text-base">$</span>
+              </div>
+              <input
+                type="text"
+                id="valorUnitarioxUnidad"
+                className="block w-full rounded-md border-gray-300 pl-7 pr-16 py-3 bg-gray-50 text-base focus:border-blue-500 focus:ring-blue-500"
+                value={formData.valorUnitarioxUnidad}
+                placeholder="Calculado automáticamente"
+                readOnly
+                aria-describedby="total-currency"
+              />
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <span className="text-gray-500 text-base" id="total-currency">COP</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="sitioReferencia" className="block text-sm font-medium text-gray-700 mb-1">
+              Sitio de Referencia
+            </label>
+            <input
+              type="text"
+              id="sitioReferencia"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={formData.sitioReferencia}
+              onChange={handleChange}
+              placeholder="Ej: Proveedor ABC"
+            />
+          </div>
         </div>
         
         <div className="mt-4 flex justify-end gap-2">
@@ -596,19 +752,21 @@ export default function SuministroPage() {
         </div>
       </Card>
 
-      <Card>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Listado de Productos ({productosConsumibles.length})
-        </h2>
-        
-        <input
-          type="text"
-          id="search"
-          className="block w-1/3 border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-6"
-          value={searchTerm}
-          onChange={handleSearchChange}
-          placeholder="Buscar por nombre, categoría o subcategoría..."
-        />
+      <Card className="overflow-hidden">
+        <div className="p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            Listado de Productos ({productosConsumibles.length})
+          </h2>
+
+          <input
+            type="text"
+            id="search"
+            className="block w-full md:w-1/3 border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            value={searchTerm}
+            onChange={handleSearchChange}
+            placeholder="Buscar por nombre..."
+          />
+        </div>
 
         {loadingProducts ? (
           <div className="flex justify-center items-center py-12">
@@ -618,58 +776,77 @@ export default function SuministroPage() {
             </div>
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-gray-500 p-6">
             No hay productos registrados. Agrega uno para comenzar.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="p-4 text-left font-semibold text-gray-600">
                     Nombre
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="p-4 text-left font-semibold text-gray-600">
                     Unidad
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="p-4 text-left font-semibold text-gray-600">
                     Cantidad
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="p-4 text-left font-semibold text-gray-600">
                     Mínimo
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="p-4 text-left font-semibold text-gray-600">
                     Estado
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="p-4 text-left font-semibold text-gray-600">
+                    Valor Unitario
+                  </th>
+                  <th className="p-4 text-left font-semibold text-gray-600">
+                    Valor Total
+                  </th>
+                  <th className="p-4 text-left font-semibold text-gray-600">
+                    Proveedor
+                  </th>
+                  <th className="p-4 text-left font-semibold text-gray-600">
                     Acciones
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {currentProducts.map((producto) => (
-                  <tr key={producto.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              <tbody>
+                {currentProducts.map((producto, index) => (
+                  <tr key={producto.id} className={`border-t border-gray-200 ${index % 2 !== 0 ? 'bg-gray-50' : ''}`}>
+                    <td className="p-4 font-medium text-gray-900">
                       {producto.nombre}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="p-4 text-gray-700">
                       {producto.unidadMedida}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="p-4 text-gray-700">
                       {producto.cantidad}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="p-4 text-gray-700">
                       {producto.minimo}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="p-4">
                       {getStockAlertBadge(producto.estado)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="p-4 text-gray-700">
+                      ${formatCurrencyWithoutTrailingZeros(producto.valorUnitario)}
+                    </td>
+                    <td className="p-4 text-gray-700">
+                      ${formatCurrencyWithoutTrailingZeros(producto.valorUnitarioxUnidad)}
+                    </td>
+                    <td className="p-4 text-gray-700">
+                      {producto.sitioReferencia}
+                    </td>
+                    <td className="p-4">
                       <div className="flex space-x-2">
                         <Button 
                           size="sm" 
                           onClick={() => handleEditProduct(producto)}
                           title="Editar producto"
+                          variant="secondary"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -695,8 +872,8 @@ export default function SuministroPage() {
         )}
 
         {filteredProducts.length > productsPerPage && (
-          <div className="flex justify-center mt-4">
-            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+          <div className="p-4 border-t border-gray-200 flex justify-center">
+            <nav className="inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
               <Button
                 onClick={() => paginate(currentPage - 1)}
                 disabled={currentPage === 1}

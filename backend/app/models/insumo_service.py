@@ -8,7 +8,8 @@ class InsumoService:
     
     @staticmethod
     def create_insumo(nombre_insumo: str, unidad: str, cantidad_actual: float = 0, 
-                     stock_minimo: float = 0) -> Optional[int]:
+                     stock_minimo: float = 0, valor_unitario: float = 0,
+                     valor_unitarioxunidad: float = 0, sitio_referencia: Optional[str] = None) -> Optional[int]:
         """Crear un nuevo insumo"""
         # Verificar si ya existe un insumo con el mismo nombre
         check_query = "SELECT id FROM insumos WHERE nombre_insumo = %s"
@@ -19,13 +20,15 @@ class InsumoService:
             raise ValueError(f"Ya existe un insumo con el nombre '{nombre_insumo}'")
             
         query = """
-        INSERT INTO insumos (nombre_insumo, unidad, cantidad_actual, stock_minimo)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO insumos (nombre_insumo, unidad, cantidad_actual, stock_minimo, 
+                           valor_unitario, valor_unitarioxunidad, sitio_referencia)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
         
         try:
-            print(f"Intentando crear insumo: {nombre_insumo}, {unidad}, {cantidad_actual}, {stock_minimo}")
-            result = execute_query(query, (nombre_insumo, unidad, cantidad_actual, stock_minimo))
+            print(f"Intentando crear insumo: {nombre_insumo}, {unidad}, {cantidad_actual}, {stock_minimo}, {valor_unitario}, {valor_unitarioxunidad}, {sitio_referencia}")
+            result = execute_query(query, (nombre_insumo, unidad, cantidad_actual, stock_minimo, 
+                                         valor_unitario, valor_unitarioxunidad, sitio_referencia))
             print(f"Resultado de execute_query: {result}")
             
             if result is not None:
@@ -94,6 +97,14 @@ class InsumoService:
         
         if "stock_minimo" in update_data and not isinstance(update_data["stock_minimo"], (int, float)):
             logger.error(f"Stock mínimo inválido: {update_data['stock_minimo']}")
+            return False
+        
+        if "valor_unitario" in update_data and not isinstance(update_data["valor_unitario"], (int, float)):
+            logger.error(f"Valor unitario inválido: {update_data['valor_unitario']}")
+            return False
+        
+        if "valor_unitarioxunidad" in update_data and not isinstance(update_data["valor_unitarioxunidad"], (int, float)):
+            logger.error(f"Valor unitario por unidad inválido: {update_data['valor_unitarioxunidad']}")
             return False
         
         # Construir la consulta dinámicamente solo con los campos que se van a actualizar

@@ -218,6 +218,9 @@ def create_tables():
                 unidad VARCHAR(20) NOT NULL,                -- Ej: gramos, litros, unidad
                 cantidad_actual DECIMAL(10,2) DEFAULT 0,    -- Stock actual
                 stock_minimo DECIMAL(10,2) DEFAULT 0,       -- Punto de reposición
+                valor_unitario DECIMAL(10,2) DEFAULT 0,     -- Valor por unidad
+                valor_unitarioxunidad DECIMAL(10,2) DEFAULT 0, -- Valor unitario por unidad
+                sitio_referencia VARCHAR(255),              -- Sitio de referencia (opcional)
                 creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );"""
 

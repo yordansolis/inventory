@@ -522,7 +522,10 @@ async def create_insumo(
     nombre_insumo: Optional[str] = None,
     unidad: Optional[str] = None,
     cantidad_actual: Optional[float] = None,
-    stock_minimo: Optional[float] = None
+    stock_minimo: Optional[float] = None,
+    valor_unitario: Optional[float] = None,
+    valor_unitarioxunidad: Optional[float] = None,
+    sitio_referencia: Optional[str] = None
 ):
     """Crear un nuevo insumo"""
     # Intentar obtener datos del cuerpo JSON si están disponibles
@@ -536,12 +539,18 @@ async def create_insumo(
             cantidad_actual = body["cantidad_actual"]
         if stock_minimo is None and "stock_minimo" in body:
             stock_minimo = body["stock_minimo"]
+        if valor_unitario is None and "valor_unitario" in body:
+            valor_unitario = body["valor_unitario"]
+        if valor_unitarioxunidad is None and "valor_unitarioxunidad" in body:
+            valor_unitarioxunidad = body["valor_unitarioxunidad"]
+        if sitio_referencia is None and "sitio_referencia" in body:
+            sitio_referencia = body["sitio_referencia"]
     except Exception as e:
         print(f"Error al procesar el cuerpo JSON: {str(e)}")
         # Si no hay cuerpo JSON o hay un error, usar los parámetros de consulta
         pass
     
-    print(f"Datos recibidos: nombre={nombre_insumo}, unidad={unidad}, cantidad={cantidad_actual}, min={stock_minimo}")
+    print(f"Datos recibidos: nombre={nombre_insumo}, unidad={unidad}, cantidad={cantidad_actual}, min={stock_minimo}, valor_unitario={valor_unitario}, valor_unitarioxunidad={valor_unitarioxunidad}, sitio_referencia={sitio_referencia}")
     
     # Validar que los campos obligatorios estén presentes
     if nombre_insumo is None:
@@ -560,6 +569,10 @@ async def create_insumo(
         cantidad_actual = 0
     if stock_minimo is None:
         stock_minimo = 0
+    if valor_unitario is None:
+        valor_unitario = 0
+    if valor_unitarioxunidad is None:
+        valor_unitarioxunidad = 0
     
     try:
         # Verificar si ya existe un insumo con el mismo nombre
@@ -577,7 +590,10 @@ async def create_insumo(
             nombre_insumo=nombre_insumo,
             unidad=unidad,
             cantidad_actual=cantidad_actual,
-            stock_minimo=stock_minimo
+            stock_minimo=stock_minimo,
+            valor_unitario=valor_unitario,
+            valor_unitarioxunidad=valor_unitarioxunidad,
+            sitio_referencia=sitio_referencia
         )
         
         print(f"ID del insumo creado: {insumo_id}")
@@ -679,6 +695,18 @@ async def update_insumo(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El stock mínimo debe ser un número"
+        )
+        
+    if "valor_unitario" in update_data and not isinstance(update_data["valor_unitario"], (int, float)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El valor unitario debe ser un número"
+        )
+    
+    if "valor_unitarioxunidad" in update_data and not isinstance(update_data["valor_unitarioxunidad"], (int, float)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El valor unitario por unidad debe ser un número"
         )
     
     # Intentar actualizar el insumo

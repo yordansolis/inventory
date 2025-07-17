@@ -467,6 +467,9 @@ POST /api/v1/insumos
 - unidad: "gramos"
 - cantidad_actual: 1000 (opcional, por defecto 0)
 - stock_minimo: 500 (opcional, por defecto 0)
+- valor_unitario: 8000 (opcional, por defecto 0)
+- valor_unitarioxunidad: 8 (opcional, por defecto 0)
+- sitio_referencia: "Proveedor ABC" (opcional)
 
 **Opción 2: Usando JSON en el cuerpo:**
 
@@ -475,7 +478,10 @@ POST /api/v1/insumos
   "nombre_insumo": "Fresas",
   "unidad": "gramos",
   "cantidad_actual": 1000,
-  "stock_minimo": 500
+  "stock_minimo": 500,
+  "valor_unitario": 8000,
+  "valor_unitarioxunidad": 8,
+  "sitio_referencia": "Proveedor ABC"
 }
 ```
 
@@ -511,7 +517,10 @@ PUT /api/v1/insumos/1
   "nombre_insumo": "Fresas frescas",
   "unidad": "gramos",
   "cantidad_actual": 1500,
-  "stock_minimo": 300
+  "stock_minimo": 300,
+  "valor_unitario": 8000,
+  "valor_unitarioxunidad": 8,
+  "sitio_referencia": "Proveedor ABC"
 }
 ```
 
@@ -528,6 +537,9 @@ PUT /api/v1/insumos/1
   "unidad": "gramos",
   "cantidad_actual": 1500.0,
   "stock_minimo": 300.0,
+  "valor_unitario": 8000.0,
+  "valor_unitarioxunidad": 8.0,
+  "sitio_referencia": "Proveedor ABC",
   "creado_en": "2023-07-15T10:30:00"
 }
 ```
@@ -538,6 +550,8 @@ PUT /api/v1/insumos/1
 - 400 Bad Request: "Error al procesar el cuerpo JSON: [detalle del error]"
 - 400 Bad Request: "La cantidad actual debe ser un número"
 - 400 Bad Request: "El stock mínimo debe ser un número"
+- 400 Bad Request: "El valor unitario debe ser un número"
+- 400 Bad Request: "El valor unitario por unidad debe ser un número"
 - 401 Unauthorized: "Token de autenticación no proporcionado"
 - 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
 - 404 Not Found: "Insumo con ID X no encontrado"
