@@ -214,15 +214,18 @@ def create_tables():
     insumos_table = """ 
             CREATE TABLE IF NOT EXISTS insumos (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                nombre_insumo VARCHAR(100) UNIQUE NOT NULL,        
-                unidad VARCHAR(20) NOT NULL,                -- Ej: gramos, litros, unidad
-                cantidad_actual DECIMAL(10,2) DEFAULT 0,    -- Stock actual
-                stock_minimo DECIMAL(10,2) DEFAULT 0,       -- Punto de reposición
-                valor_unitario DECIMAL(10,2) DEFAULT 0,     -- Valor por unidad
-                valor_unitarioxunidad DECIMAL(10,2) DEFAULT 0, -- Valor unitario por unidad
-                sitio_referencia VARCHAR(255),              -- Sitio de referencia (opcional)
+                nombre_insumo VARCHAR(100) UNIQUE NOT NULL,         -- vasos x 30 
+                unidad VARCHAR(20) NOT NULL,                         -- Ej: gramos, litros, unidad 
+                cantidad_unitaria DECIMAL(10,2) NOT NULL,        -- Cantidad total de la presentación (ej: 1000 unidades, 400 gramos)
+                precio_presentacion DECIMAL(10,2) NOT NULL,          -- Precio total de la presentación  185.000
+                valor_unitario DECIMAL(10,2) AS (precio_presentacion / cantidad_unitaria) STORED, -- Valor por unidad automáticamente calculado
+                cantidad_utilizada DECIMAL(10,2) DEFAULT 0,          -- Cuánto se usa por unidad del producto
+                valor_total DECIMAL(10,2) AS (valor_unitario * cantidad_utilizada) STORED,        -- Costo de esa cantidad usada
+                stock_minimo DECIMAL(10,2) DEFAULT 0,                -- Punto de reposición
+                sitio_referencia VARCHAR(255),                       -- Dónde se compró
                 creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );"""
+            );
+            """
 
     # Tabla de recetas de productos
     recipe_table = """

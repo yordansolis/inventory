@@ -48,37 +48,38 @@ class SalesService:
                 """
                 execute_query(update_stock_query, (quantity, product_id))
                 
-                # También actualizamos el stock de los insumos según la receta
-                SalesService._update_insumos_stock_from_recipe(product_id, quantity)
+                # COMENTADO: La actualización de stock de insumos ya no funciona porque cantidad_actual no existe
+                # SalesService._update_insumos_stock_from_recipe(product_id, quantity)
             
             return result > 0
         except Exception as e:
             logger.error(f"Error añadiendo detalle de venta: {e}")
             return False
     
-    @staticmethod
-    def _update_insumos_stock_from_recipe(product_id: int, quantity_sold: int) -> None:
-        """
-        Actualizar el stock de insumos basado en la receta del producto vendido
-        """
-        # Obtener la receta del producto
-        recipe_query = """
-        SELECT pr.insumo_id, pr.cantidad
-        FROM product_recipes pr
-        WHERE pr.product_id = %s
-        """
-        recipe_items = execute_query(recipe_query, (product_id,), fetch_all=True) or []
-        
-        # Actualizar el stock de cada insumo
-        for item in recipe_items:
-            total_quantity_to_subtract = item['cantidad'] * quantity_sold
-            
-            update_query = """
-            UPDATE insumos
-            SET cantidad_actual = cantidad_actual - %s
-            WHERE id = %s
-            """
-            execute_query(update_query, (total_quantity_to_subtract, item['insumo_id']))
+    # COMENTADO: Este método ya no funciona porque cantidad_actual no existe en la nueva estructura
+    # @staticmethod
+    # def _update_insumos_stock_from_recipe(product_id: int, quantity_sold: int) -> None:
+    #     """
+    #     Actualizar el stock de insumos basado en la receta del producto vendido
+    #     """
+    #     # Obtener la receta del producto
+    #     recipe_query = """
+    #     SELECT pr.insumo_id, pr.cantidad
+    #     FROM product_recipes pr
+    #     WHERE pr.product_id = %s
+    #     """
+    #     recipe_items = execute_query(recipe_query, (product_id,), fetch_all=True) or []
+    #     
+    #     # Actualizar el stock de cada insumo
+    #     for item in recipe_items:
+    #         total_quantity_to_subtract = item['cantidad'] * quantity_sold
+    #         
+    #         update_query = """
+    #         UPDATE insumos
+    #         SET cantidad_actual = cantidad_actual - %s
+    #         WHERE id = %s
+    #         """
+    #         execute_query(update_query, (total_quantity_to_subtract, item['insumo_id']))
     
     @staticmethod
     def get_sale_by_id(sale_id: int) -> Optional[Dict[str, Any]]:

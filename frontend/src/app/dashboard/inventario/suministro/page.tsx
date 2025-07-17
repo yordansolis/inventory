@@ -9,24 +9,26 @@ import { log } from 'console';
 interface ConsumableProduct {
   id: number;
   nombre: string;
-  tipo: string; // Keeping this to maintain compatibility with existing data structure
   unidadMedida: string;
-  cantidad: number;
+  cantidadUnitaria: number; // Changed from presentacionCantidad
+  precioPresentacion: number;
+  cantidadUtilizada: number;
   minimo: number;
-  estado: 'bien' | 'alerta' | 'critico';
-  valorUnitario: number;
-  valorUnitarioxUnidad: number;
+  valorUnitario: number; // Calculated field
+  valorUtilizado: number; // Calculated field
   sitioReferencia: string;
 }
 
 interface ProductFormData {
   nombre: string;
   unidadMedida: string;
-  cantidad: string;
+  cantidadUnitaria: string; // Changed from presentacionCantidad
+  precioPresentacion: string;
+  cantidadUtilizada: string;
   minimo: string;
-  valorUnitario: string;
-  valorUnitarioxUnidad: string;
   sitioReferencia: string;
+  valorUnitarioCalculado?: string;
+  valorUtilizadoCalculado?: string;
 }
 
 interface Category {
@@ -37,13 +39,13 @@ interface Category {
 interface ApiProduct {
   id: number;
   nombre_insumo: string;
-  // price: number;
-  // category_id: number;
   unidad: string;
-  cantidad_actual: number;
-  stock_minimo: number;
-  valor_unitario: number;
-  valor_unitarioxunidad: number;
+  cantidad_unitaria: number; // Changed from presentacion_cantidad
+  precio_presentacion: number;
+  valor_unitario: number; // Calculated by backend
+  cantidad_utilizada: number;
+  valor_utilizado: number; // Calculated by backend
+  stock_minimo: number; // Changed from cantidad_actual and stock_minimo
   sitio_referencia: string;
 }
 
@@ -64,11 +66,13 @@ export default function SuministroPage() {
   const [formData, setFormData] = useState<ProductFormData>({
     nombre: '',
     unidadMedida: '',
-    cantidad: '',
+    cantidadUnitaria: '',
+    precioPresentacion: '',
+    cantidadUtilizada: '',
     minimo: '',
-    valorUnitario: '',
-    valorUnitarioxUnidad: '',
-    sitioReferencia: ''
+    sitioReferencia: '',
+    valorUnitarioCalculado: '0',
+    valorUtilizadoCalculado: '0'
   });
 
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -83,12 +87,7 @@ export default function SuministroPage() {
   const [error, setError] = useState<string>('');
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
 
-  // Función para calcular el estado basado en cantidad y mínimo
-  const calculateEstado = useCallback((cantidad: number, minimo: number): ConsumableProduct['estado'] => {
-    if (cantidad <= minimo) return 'critico';
-    if (cantidad <= minimo * 1.5) return 'alerta';
-    return 'bien';
-  }, []);
+  // Function removed since we no longer track current stock levels
 
   // Extract fetch functions outside useEffect for reuse
   const fetchCategories = useCallback(async () => {
@@ -193,17 +192,16 @@ export default function SuministroPage() {
       
       // Transform API products to our ConsumableProduct format
       const transformedProducts: ConsumableProduct[] = data.map((product: ApiProduct) => {
-        const estado = calculateEstado(product.cantidad_actual, product.stock_minimo);
         return {
           id: product.id,
           nombre: product.nombre_insumo,
-          // tipo: categoryMapping[product.category_id] || `Categoría ${product.category_id}`,
           unidadMedida: product.unidad || 'unidad (u)',
-          cantidad: product.cantidad_actual,
+          cantidadUnitaria: product.cantidad_unitaria || 0,
+          precioPresentacion: product.precio_presentacion || 0,
+          cantidadUtilizada: product.cantidad_utilizada || 0,
           minimo: product.stock_minimo,
-          estado,
           valorUnitario: product.valor_unitario || 0,
-          valorUnitarioxUnidad: product.valor_unitarioxunidad || 0,
+          valorUtilizado: product.valor_utilizado || 0,
           sitioReferencia: product.sitio_referencia || ''
         };
       });
@@ -215,7 +213,7 @@ export default function SuministroPage() {
     } finally {
       setLoadingProducts(false);
     }
-  }, [calculateEstado]);
+  }, []);
 
   // Fetch categories and products on component mount
   useEffect(() => {
@@ -235,56 +233,106 @@ export default function SuministroPage() {
     }
   }, [router]);
 
-  // Add a function to format currency values
+  // Add a function to format currency values (Colombian format)
   const formatCurrency = useCallback((value: string): string => {
-    // Remove non-numeric characters
-    const numericValue = value.replace(/[^0-9]/g, '');
+    // Remove all characters except numbers and comma
+    const cleanValue = value.replace(/[^0-9,]/g, '');
     
-    if (!numericValue) return '';
+    if (!cleanValue) return '';
     
-    // Convert to number and format with thousands separators
-    const number = parseInt(numericValue, 10);
-    return number.toLocaleString('es-CO');
+    // Split by comma to handle decimals
+    const parts = cleanValue.split(',');
+    
+    // Format the integer part with dots as thousand separators
+    if (parts[0]) {
+      const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      
+      // If there's a decimal part, add it back with comma
+      if (parts.length > 1) {
+        // Limit decimal places to 2
+        const decimalPart = parts[1].substring(0, 2);
+        return `${integerPart},${decimalPart}`;
+      }
+      
+      return integerPart;
+    }
+    
+    return '';
   }, []);
 
   // Add a function to format currency without unnecessary trailing zeros
   const formatCurrencyWithoutTrailingZeros = useCallback((value: number): string => {
     if (value === 0) return '0';
     
-    // Format with thousands separators
-    const formatted = value.toLocaleString('es-CO');
+    // Format with thousands separators using Colombian locale
+    const formatted = value.toLocaleString('es-CO', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    });
     
-    // For integers, keep the format as is (with thousands separators)
-    // Only remove trailing zeros after decimal point if they exist
-    if (formatted.includes(',')) {
-      // If there's a decimal part
-      return formatted.replace(/,0+$/, ''); // Only remove trailing zeros after decimal
+    return formatted;
+  }, []);
+
+  // Add a function to format decimal numbers (Colombian format)
+  const formatDecimalNumber = useCallback((value: string): string => {
+    // Remove all characters except numbers, comma and dot
+    const cleanValue = value.replace(/[^0-9.,]/g, '');
+    
+    if (!cleanValue) return '';
+    
+    // Replace dots with commas if they appear to be decimal separators
+    let processedValue = cleanValue;
+    if (cleanValue.includes('.') && !cleanValue.includes(',')) {
+      processedValue = cleanValue.replace('.', ',');
     }
     
-    // For integers, just return the formatted number
-    return formatted;
+    // Split by comma to handle decimals
+    const parts = processedValue.split(',');
+    
+    // Format the integer part with dots as thousand separators
+    if (parts[0]) {
+      const integerPart = parts[0].replace(/\./g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      
+      // If there's a decimal part, add it back with comma
+      if (parts.length > 1) {
+        // Allow more decimal places for quantities
+        const decimalPart = parts[1].substring(0, 4);
+        return `${integerPart},${decimalPart}`;
+      }
+      
+      return integerPart;
+    }
+    
+    return '';
   }, []);
 
   // Add a function to parse formatted currency back to number string
   const parseCurrency = useCallback((formattedValue: string): string => {
-    // Remove all non-numeric characters
-    return formattedValue.replace(/[^0-9]/g, '');
+    // Replace comma with dot for decimal separator and remove thousand separators (dots)
+    return formattedValue
+      .replace(/\./g, '') // Remove thousand separators (dots)
+      .replace(',', '.'); // Replace comma with dot for decimal
   }, []);
 
-  // Modify handleChange to handle currency formatting
+  // Modify handleChange to handle currency and decimal formatting
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     
-    if (id === 'valorUnitario') {
+    if (id === 'precioPresentacion') {
       // Format the currency value
       const formattedValue = formatCurrency(value);
-      const numericValue = parseCurrency(value);
       
       setFormData((prev) => ({
         ...prev,
-        [id]: formattedValue,
-        // Store the numeric value for calculations
-        [`${id}Numeric`]: numericValue
+        [id]: formattedValue
+      }));
+    } else if (id === 'cantidadUnitaria' || id === 'cantidadUtilizada') {
+      // Format decimal numbers
+      const formattedValue = formatDecimalNumber(value);
+      
+      setFormData((prev) => ({
+        ...prev,
+        [id]: formattedValue
       }));
     } else {
       setFormData((prev) => ({
@@ -292,38 +340,83 @@ export default function SuministroPage() {
         [id]: value,
       }));
     }
-  }, [formatCurrency, parseCurrency]);
+  }, [formatCurrency, formatDecimalNumber]);
 
-  // Update the useEffect to use numeric values for calculation
+  // Calculate valor unitario automatically
   useEffect(() => {
-    // Only calculate if both fields have values
-    if (formData.cantidad && formData.valorUnitario) {
-      const cantidad = parseFloat(formData.cantidad);
-      const valorUnitario = parseFloat(parseCurrency(formData.valorUnitario));
+    console.log('Calculating valor unitario...', {
+      cantidadUnitaria: formData.cantidadUnitaria,
+      precioPresentacion: formData.precioPresentacion
+    });
+    
+    if (formData.cantidadUnitaria && formData.precioPresentacion) {
+      const cantidadUnitaria = parseFloat(parseCurrency(formData.cantidadUnitaria));
+      const precioPresentacion = parseFloat(parseCurrency(formData.precioPresentacion));
       
-      if (!isNaN(cantidad) && !isNaN(valorUnitario)) {
-        const total = cantidad * valorUnitario;
+      console.log('Parsed values:', {
+        cantidadUnitaria,
+        precioPresentacion
+      });
+      
+      if (!isNaN(cantidadUnitaria) && !isNaN(precioPresentacion) && cantidadUnitaria > 0) {
+        const valorUnitario = precioPresentacion / cantidadUnitaria;
+        console.log('Calculated valor unitario:', valorUnitario);
         
-        // Format the total for display without trailing zeros
         setFormData(prev => ({
           ...prev,
-          valorUnitarioxUnidad: formatCurrencyWithoutTrailingZeros(total)
+          valorUnitarioCalculado: formatCurrencyWithoutTrailingZeros(valorUnitario)
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          valorUnitarioCalculado: '0'
         }));
       }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        valorUnitarioCalculado: '0'
+      }));
     }
-  }, [formData.cantidad, formData.valorUnitario, parseCurrency, formatCurrencyWithoutTrailingZeros]);
+  }, [formData.cantidadUnitaria, formData.precioPresentacion, parseCurrency, formatCurrencyWithoutTrailingZeros]);
+
+  // Calculate valor utilizado automatically
+  useEffect(() => {
+    if (formData.valorUnitarioCalculado && formData.cantidadUtilizada) {
+      const valorUnitario = parseFloat(parseCurrency(formData.valorUnitarioCalculado));
+      const cantidadUtilizada = parseFloat(parseCurrency(formData.cantidadUtilizada));
+      
+      if (!isNaN(valorUnitario) && !isNaN(cantidadUtilizada)) {
+        const valorUtilizado = valorUnitario * cantidadUtilizada;
+        setFormData(prev => ({
+          ...prev,
+          valorUtilizadoCalculado: formatCurrencyWithoutTrailingZeros(valorUtilizado)
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          valorUtilizadoCalculado: '0'
+        }));
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        valorUtilizadoCalculado: '0'
+      }));
+    }
+  }, [formData.valorUnitarioCalculado, formData.cantidadUtilizada, parseCurrency, formatCurrencyWithoutTrailingZeros]);
 
   // Optimización: useCallback para evitar re-renders innecesarios
   const handleAddOrUpdateProduct = useCallback(async () => {
-    const parsedCantidad = formData.cantidad === '' ? 0 : parseInt(formData.cantidad);
     const parsedMinimo = formData.minimo === '' ? 0 : parseInt(formData.minimo);
-    const parsedValorUnitario = formData.valorUnitario === '' ? 0 : parseInt(parseCurrency(formData.valorUnitario));
-    const parsedValorUnitarioxUnidad = formData.valorUnitarioxUnidad === '' ? 0 : parseInt(parseCurrency(formData.valorUnitarioxUnidad));
+    const parsedCantidadUnitaria = formData.cantidadUnitaria === '' ? 0 : parseFloat(parseCurrency(formData.cantidadUnitaria));
+    const parsedPrecioPresentacion = formData.precioPresentacion === '' ? 0 : parseFloat(parseCurrency(formData.precioPresentacion));
+    const parsedCantidadUtilizada = formData.cantidadUtilizada === '' ? 0 : parseFloat(parseCurrency(formData.cantidadUtilizada));
     
     if (!formData.nombre.trim() || !formData.unidadMedida.trim() || 
-        (formData.cantidad !== '' && (isNaN(parsedCantidad) || parsedCantidad < 0)) ||
         (formData.minimo !== '' && (isNaN(parsedMinimo) || parsedMinimo < 0)) ||
-        (formData.valorUnitario !== '' && (isNaN(parsedValorUnitario) || parsedValorUnitario < 0))) {
+        (formData.cantidadUnitaria !== '' && (isNaN(parsedCantidadUnitaria) || parsedCantidadUnitaria <= 0)) ||
+        (formData.precioPresentacion !== '' && (isNaN(parsedPrecioPresentacion) || parsedPrecioPresentacion < 0))) {
       alert('Por favor, complete todos los campos obligatorios y asegúrese de que las cantidades sean números válidos.');
       return;
     }
@@ -336,10 +429,10 @@ export default function SuministroPage() {
       const productData = {
         nombre_insumo: formData.nombre.trim(),
         unidad: formData.unidadMedida.trim(),
-        cantidad_actual: parsedCantidad,
+        cantidad_unitaria: parsedCantidadUnitaria,
+        precio_presentacion: parsedPrecioPresentacion,
+        cantidad_utilizada: parsedCantidadUtilizada,
         stock_minimo: parsedMinimo,
-        valor_unitario: parsedValorUnitario,
-        valor_unitarioxunidad: parsedValorUnitarioxUnidad,
         sitio_referencia: formData.sitioReferencia.trim()
       };
       
@@ -378,21 +471,19 @@ export default function SuministroPage() {
         throw new Error(`Error al ${editingId ? 'actualizar' : 'crear'} producto. No se pudo obtener el ID del producto.`);
       }
       
-      const estado = calculateEstado(parsedCantidad, parsedMinimo);
-      
       if (editingId) {
         // Update product in state
         setProductosConsumibles(prev => 
           prev.map(p => p.id === editingId ? {
             id: savedProduct.id,
             nombre: formData.nombre.trim(),
-            tipo: '', // Set empty as we removed the field
             unidadMedida: formData.unidadMedida.trim(),
-            cantidad: parsedCantidad,
+            cantidadUnitaria: parsedCantidadUnitaria,
+            precioPresentacion: parsedPrecioPresentacion,
+            cantidadUtilizada: parsedCantidadUtilizada,
             minimo: parsedMinimo,
-            estado,
-            valorUnitario: parsedValorUnitario,
-            valorUnitarioxUnidad: parsedValorUnitarioxUnidad,
+            valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
+            valorUtilizado: savedProduct.valor_utilizado || 0,
             sitioReferencia: formData.sitioReferencia.trim()
           } : p)
         );
@@ -401,19 +492,29 @@ export default function SuministroPage() {
         setProductosConsumibles(prev => [...prev, {
           id: savedProduct.id,
           nombre: formData.nombre.trim(),
-          tipo: '', // Set empty as we removed the field
           unidadMedida: formData.unidadMedida.trim(),
-          cantidad: parsedCantidad,
+          cantidadUnitaria: parsedCantidadUnitaria,
+          precioPresentacion: parsedPrecioPresentacion,
+          cantidadUtilizada: parsedCantidadUtilizada,
           minimo: parsedMinimo,
-          estado,
-          valorUnitario: parsedValorUnitario,
-          valorUnitarioxUnidad: parsedValorUnitarioxUnidad,
+          valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
+          valorUtilizado: savedProduct.valor_utilizado || 0,
           sitioReferencia: formData.sitioReferencia.trim()
         }]);
       }
       
       // Clear form and editing state
-      setFormData({ nombre: '', unidadMedida: '', cantidad: '', minimo: '', valorUnitario: '', valorUnitarioxUnidad: '', sitioReferencia: '' });
+      setFormData({ 
+        nombre: '', 
+        unidadMedida: '', 
+        cantidadUnitaria: '', 
+        precioPresentacion: '', 
+        cantidadUtilizada: '', 
+        minimo: '', 
+        sitioReferencia: '',
+        valorUnitarioCalculado: '0',
+        valorUtilizadoCalculado: '0'
+      });
       setEditingId(null);
       
       // Refresh the products list from the server to ensure we have the latest data
@@ -429,20 +530,34 @@ export default function SuministroPage() {
     } finally {
       setLoading(false);
     }
-  }, [formData, editingId, categories, calculateEstado, parseCurrency]);
+  }, [formData, editingId, parseCurrency, fetchCategories, fetchProducts]);
 
   const handleEditProduct = useCallback((producto: ConsumableProduct) => {
+    // Calculate values for display
+    const valorUnitarioCalc = producto.cantidadUnitaria > 0 
+      ? formatCurrencyWithoutTrailingZeros(producto.precioPresentacion / producto.cantidadUnitaria)
+      : '0';
+    const valorUtilizadoCalc = producto.cantidadUtilizada > 0 && producto.cantidadUnitaria > 0
+      ? formatCurrencyWithoutTrailingZeros((producto.precioPresentacion / producto.cantidadUnitaria) * producto.cantidadUtilizada)
+      : '0';
+    
+    // Format decimal values for display with Colombian format
+    const cantidadUnitariaFormatted = producto.cantidadUnitaria.toString().replace('.', ',');
+    const cantidadUtilizadaFormatted = producto.cantidadUtilizada.toString().replace('.', ',');
+    
     setFormData({ 
       nombre: producto.nombre,
       unidadMedida: producto.unidadMedida,
-      cantidad: String(producto.cantidad),
+      cantidadUnitaria: formatDecimalNumber(cantidadUnitariaFormatted),
+      precioPresentacion: formatCurrencyWithoutTrailingZeros(producto.precioPresentacion),
+      cantidadUtilizada: formatDecimalNumber(cantidadUtilizadaFormatted),
       minimo: String(producto.minimo),
-      valorUnitario: formatCurrencyWithoutTrailingZeros(producto.valorUnitario),
-      valorUnitarioxUnidad: formatCurrencyWithoutTrailingZeros(producto.valorUnitarioxUnidad),
-      sitioReferencia: producto.sitioReferencia
+      sitioReferencia: producto.sitioReferencia,
+      valorUnitarioCalculado: valorUnitarioCalc,
+      valorUtilizadoCalculado: valorUtilizadoCalc
     });
     setEditingId(producto.id);
-  }, [formatCurrencyWithoutTrailingZeros]);
+  }, [formatCurrencyWithoutTrailingZeros, formatDecimalNumber]);
 
   const handleDeleteProduct = useCallback(async (id: number) => {
     try {
@@ -470,7 +585,17 @@ export default function SuministroPage() {
   }, []);
 
   const handleCancelEdit = useCallback(() => {
-    setFormData({ nombre: '', unidadMedida: '', cantidad: '', minimo: '', valorUnitario: '', valorUnitarioxUnidad: '', sitioReferencia: '' });
+    setFormData({ 
+      nombre: '', 
+      unidadMedida: '', 
+      cantidadUnitaria: '', 
+      precioPresentacion: '', 
+      cantidadUtilizada: '', 
+      minimo: '', 
+      sitioReferencia: '',
+      valorUnitarioCalculado: '0',
+      valorUtilizadoCalculado: '0'
+    });
     setEditingId(null);
   }, []);
 
@@ -516,39 +641,7 @@ export default function SuministroPage() {
     );
   }, []);
 
-  const Badge = useMemo(() => ({ children, variant = "default", size = "default" }: { children: React.ReactNode; variant?: "default" | "success" | "info" | "warning" | "danger"; size?: "default" | "lg" }) => {
-    const variants = {
-      default: "bg-gray-100 text-gray-800",
-      success: "bg-green-100 text-green-800",
-      info: "bg-blue-100 text-blue-800",
-      warning: "bg-yellow-100 text-yellow-800",
-      danger: "bg-red-100 text-red-800"
-    };
-
-    const sizes = {
-      default: "px-2 py-1 text-xs",
-      lg: "px-3 py-1 text-sm"
-    };
-
-    return (
-      <span className={`inline-flex items-center rounded-full font-medium ${variants[variant]} ${sizes[size]}`}>
-        {children}
-      </span>
-    );
-  }, []);
-
-  const getStockAlertBadge = useMemo(() => (estado: ConsumableProduct['estado']) => {
-    switch (estado) {
-      case 'bien':
-        return <Badge variant="success">Stock OK</Badge>;
-      case 'alerta':
-        return <Badge variant="warning">Alerta</Badge>;
-      case 'critico':
-        return <Badge variant="danger">Crítico</Badge>;
-      default:
-        return null;
-    }
-  }, [Badge]);
+  // Badge and getStockAlertBadge components removed since we no longer track stock status
 
   const filteredProducts = useMemo(() => {
     if (!searchTerm) {
@@ -634,21 +727,25 @@ export default function SuministroPage() {
             </select>
           </div>
           
+
+
           <div>
-            <label htmlFor="cantidad" className="block text-sm font-medium text-gray-700 mb-1">
-              Cantidad *
+            <label htmlFor="cantidadUnitaria" className="block text-sm font-medium text-gray-700 mb-1">
+              Cantidad de Presentación *
             </label>
             <input
-              type="number"
-              id="cantidad"
+              type="text"
+              id="cantidadUnitaria"
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={formData.cantidad}
+              value={formData.cantidadUnitaria}
               onChange={handleChange}
-              placeholder="Ej: 50"
-              min="0"
+              placeholder="Ej: 1000 o 0,5"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Cantidad de unidades en la presentación que compras
+            </p>
           </div>
-          
+
           <div>
             <label htmlFor="minimo" className="block text-sm font-medium text-gray-700 mb-1">
               Stock Mínimo *
@@ -659,14 +756,15 @@ export default function SuministroPage() {
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={formData.minimo}
               onChange={handleChange}
-              placeholder="Ej: 10"
+              placeholder="Ej: 500"
               min="0"
             />
           </div>
 
+
           <div>
-            <label htmlFor="valorUnitario" className="block text-sm font-medium text-gray-700 mb-1">
-              Valor Unitario
+            <label htmlFor="precioPresentacion" className="block text-sm font-medium text-gray-700 mb-1">
+              Precio de Presentación *
             </label>
             <div className="relative mt-1 rounded-md shadow-sm">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -674,9 +772,9 @@ export default function SuministroPage() {
               </div>
               <input
                 type="text"
-                id="valorUnitario"
-                className="block w-full rounded-md border-gray-300 pl-7 pr-16 py-3 text-base focus:border-blue-500 focus:ring-blue-500"
-                value={formData.valorUnitario}
+                id="precioPresentacion"
+                className="block w-full rounded-md border-gray-300 pl-7 pr-16 py-3 focus:border-blue-500 focus:ring-blue-500"
+                value={formData.precioPresentacion}
                 onChange={handleChange}
                 placeholder="0"
                 aria-describedby="price-currency"
@@ -687,9 +785,25 @@ export default function SuministroPage() {
             </div>
           </div>
 
+          {/* <div>
+            <label htmlFor="cantidad" className="block text-sm font-medium text-gray-700 mb-1">
+              Cantidad Actual *
+            </label>
+            <input
+              type="number"
+              id="cantidad"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={formData.cantidad}
+              onChange={handleChange}
+              placeholder="Ej: 1000"
+              min="0"
+            />
+          </div>
+           */}
+      
           <div>
-            <label htmlFor="valorUnitarioxUnidad" className="block text-sm font-medium text-gray-700 mb-1">
-              Valor Total
+            <label htmlFor="valorUnitarioCalculado" className="block text-sm font-medium text-gray-700 mb-1">
+              Valor Unitario (Calculado)
             </label>
             <div className="relative mt-1 rounded-md shadow-sm">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -697,15 +811,50 @@ export default function SuministroPage() {
               </div>
               <input
                 type="text"
-                id="valorUnitarioxUnidad"
+                id="valorUnitarioCalculado"
                 className="block w-full rounded-md border-gray-300 pl-7 pr-16 py-3 bg-gray-50 text-base focus:border-blue-500 focus:ring-blue-500"
-                value={formData.valorUnitarioxUnidad}
-                placeholder="Calculado automáticamente"
+                value={formData.valorUnitarioCalculado || '0'}
                 readOnly
-                aria-describedby="total-currency"
+                aria-describedby="unit-price-currency"
               />
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                <span className="text-gray-500 text-base" id="total-currency">COP</span>
+                <span className="text-gray-500 text-base" id="unit-price-currency">COP</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="cantidadUtilizada" className="block text-sm font-medium text-gray-700 mb-1">
+              Cantidad Utilizada por Unidad
+            </label>
+            <input
+              type="text"
+              id="cantidadUtilizada"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={formData.cantidadUtilizada}
+              onChange={handleChange}
+              placeholder="Ej: 50 o 0,5"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="valorUtilizadoCalculado" className="block text-sm font-medium text-gray-700 mb-1">
+              Valor Utilizado (Calculado)
+            </label>
+            <div className="relative mt-1 rounded-md shadow-sm">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <span className="text-gray-500 text-base">$</span>
+              </div>
+              <input
+                type="text"
+                id="valorUtilizadoCalculado"
+                className="block w-full rounded-md border-gray-300 pl-7 pr-16 py-3 bg-gray-50 text-base focus:border-blue-500 focus:ring-blue-500"
+                value={formData.valorUtilizadoCalculado || '0'}
+                readOnly
+                aria-describedby="used-value-currency"
+              />
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <span className="text-gray-500 text-base" id="used-value-currency">COP</span>
               </div>
             </div>
           </div>
@@ -791,19 +940,16 @@ export default function SuministroPage() {
                     Unidad
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
-                    Cantidad
+                    Presentación
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
-                    Mínimo
-                  </th>
-                  <th className="p-4 text-left font-semibold text-gray-600">
-                    Estado
+                    Precio Presentación
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
                     Valor Unitario
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
-                    Valor Total
+                    Stock Mínimo
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
                     Proveedor
@@ -823,19 +969,16 @@ export default function SuministroPage() {
                       {producto.unidadMedida}
                     </td>
                     <td className="p-4 text-gray-700">
-                      {producto.cantidad}
+                      {producto.cantidadUnitaria} {producto.unidadMedida}
                     </td>
                     <td className="p-4 text-gray-700">
-                      {producto.minimo}
-                    </td>
-                    <td className="p-4">
-                      {getStockAlertBadge(producto.estado)}
+                      ${formatCurrencyWithoutTrailingZeros(producto.precioPresentacion)}
                     </td>
                     <td className="p-4 text-gray-700">
                       ${formatCurrencyWithoutTrailingZeros(producto.valorUnitario)}
                     </td>
                     <td className="p-4 text-gray-700">
-                      ${formatCurrencyWithoutTrailingZeros(producto.valorUnitarioxUnidad)}
+                      {producto.minimo} {producto.unidadMedida}
                     </td>
                     <td className="p-4 text-gray-700">
                       {producto.sitioReferencia}

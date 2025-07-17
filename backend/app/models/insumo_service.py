@@ -7,9 +7,10 @@ logger = logging.getLogger(__name__)
 class InsumoService:
     
     @staticmethod
-    def create_insumo(nombre_insumo: str, unidad: str, cantidad_actual: float = 0, 
-                     stock_minimo: float = 0, valor_unitario: float = 0,
-                     valor_unitarioxunidad: float = 0, sitio_referencia: Optional[str] = None) -> Optional[int]:
+    def create_insumo(nombre_insumo: str, unidad: str, cantidad_unitaria: float, 
+                     precio_presentacion: float, cantidad_utilizada: float = 0,
+                     stock_minimo: float = 0, 
+                     sitio_referencia: Optional[str] = None) -> Optional[int]:
         """Crear un nuevo insumo"""
         # Verificar si ya existe un insumo con el mismo nombre
         check_query = "SELECT id FROM insumos WHERE nombre_insumo = %s"
@@ -20,15 +21,15 @@ class InsumoService:
             raise ValueError(f"Ya existe un insumo con el nombre '{nombre_insumo}'")
             
         query = """
-        INSERT INTO insumos (nombre_insumo, unidad, cantidad_actual, stock_minimo, 
-                           valor_unitario, valor_unitarioxunidad, sitio_referencia)
+        INSERT INTO insumos (nombre_insumo, unidad, cantidad_unitaria, precio_presentacion,
+                           cantidad_utilizada, stock_minimo, sitio_referencia)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
         
         try:
-            print(f"Intentando crear insumo: {nombre_insumo}, {unidad}, {cantidad_actual}, {stock_minimo}, {valor_unitario}, {valor_unitarioxunidad}, {sitio_referencia}")
-            result = execute_query(query, (nombre_insumo, unidad, cantidad_actual, stock_minimo, 
-                                         valor_unitario, valor_unitarioxunidad, sitio_referencia))
+            print(f"Intentando crear insumo: {nombre_insumo}, {unidad}, {cantidad_unitaria}, {precio_presentacion}, {cantidad_utilizada}, {stock_minimo}, {sitio_referencia}")
+            result = execute_query(query, (nombre_insumo, unidad, cantidad_unitaria, precio_presentacion,
+                                         cantidad_utilizada, stock_minimo, sitio_referencia))
             print(f"Resultado de execute_query: {result}")
             
             if result is not None:
@@ -66,8 +67,9 @@ class InsumoService:
             search_term = f"%{search}%"
             params.append(search_term)
         
-        if low_stock_only:
-            conditions.append("cantidad_actual <= stock_minimo")
+        # Comentado temporalmente porque cantidad_actual ya no existe en la nueva estructura
+        # if low_stock_only:
+        #     conditions.append("cantidad_actual <= stock_minimo")
         
         where_clause = " AND ".join(conditions)
         
@@ -91,28 +93,31 @@ class InsumoService:
             return False
         
         # Validar datos
-        if "cantidad_actual" in update_data and not isinstance(update_data["cantidad_actual"], (int, float)):
-            logger.error(f"Cantidad actual inválida: {update_data['cantidad_actual']}")
-            return False
-        
         if "stock_minimo" in update_data and not isinstance(update_data["stock_minimo"], (int, float)):
             logger.error(f"Stock mínimo inválido: {update_data['stock_minimo']}")
             return False
         
-        if "valor_unitario" in update_data and not isinstance(update_data["valor_unitario"], (int, float)):
-            logger.error(f"Valor unitario inválido: {update_data['valor_unitario']}")
+        if "cantidad_unitaria" in update_data and not isinstance(update_data["cantidad_unitaria"], (int, float)):
+            logger.error(f"Cantidad unitaria inválida: {update_data['cantidad_unitaria']}")
             return False
         
-        if "valor_unitarioxunidad" in update_data and not isinstance(update_data["valor_unitarioxunidad"], (int, float)):
-            logger.error(f"Valor unitario por unidad inválido: {update_data['valor_unitarioxunidad']}")
+        if "precio_presentacion" in update_data and not isinstance(update_data["precio_presentacion"], (int, float)):
+            logger.error(f"Precio presentación inválido: {update_data['precio_presentacion']}")
+            return False
+        
+        if "cantidad_utilizada" in update_data and not isinstance(update_data["cantidad_utilizada"], (int, float)):
+            logger.error(f"Cantidad utilizada inválida: {update_data['cantidad_utilizada']}")
             return False
         
         # Construir la consulta dinámicamente solo con los campos que se van a actualizar
         update_fields = []
         params = []
         
+        # Lista de campos que no se pueden actualizar directamente
+        readonly_fields = ['id', 'creado_en', 'valor_unitario', 'valor_total']
+        
         for field, value in update_data.items():
-            if field not in ['id', 'creado_en']:
+            if field not in readonly_fields:
                 update_fields.append(f"{field} = %s")
                 params.append(value)
         
@@ -175,73 +180,77 @@ class InsumoService:
             print(f"Error detallado al eliminar insumo {insumo_id}: {str(e)}")
             return False
     
-    @staticmethod
-    def update_stock(insumo_id: int, new_quantity: float) -> bool:
-        """Actualizar la cantidad de un insumo"""
-        query = """
-        UPDATE insumos
-        SET cantidad_actual = %s
-        WHERE id = %s
-        """
-        
-        try:
-            result = execute_query(query, (new_quantity, insumo_id))
-            return result > 0
-        except Exception as e:
-            logger.error(f"Error actualizando cantidad del insumo {insumo_id}: {e}")
-            return False
+    # COMENTADO: Este método ya no funciona porque cantidad_actual no existe en la nueva estructura
+    # @staticmethod
+    # def update_stock(insumo_id: int, new_quantity: float) -> bool:
+    #     """Actualizar la cantidad de un insumo"""
+    #     query = """
+    #     UPDATE insumos
+    #     SET cantidad_actual = %s
+    #     WHERE id = %s
+    #     """
+    #     
+    #     try:
+    #         result = execute_query(query, (new_quantity, insumo_id))
+    #         return result > 0
+    #     except Exception as e:
+    #         logger.error(f"Error actualizando cantidad del insumo {insumo_id}: {e}")
+    #         return False
     
-    @staticmethod
-    def add_stock(insumo_id: int, quantity_to_add: float) -> bool:
-        """Añadir cantidad a un insumo"""
-        query = """
-        UPDATE insumos
-        SET cantidad_actual = cantidad_actual + %s
-        WHERE id = %s
-        """
-        
-        try:
-            result = execute_query(query, (quantity_to_add, insumo_id))
-            return result > 0
-        except Exception as e:
-            logger.error(f"Error añadiendo cantidad al insumo {insumo_id}: {e}")
-            return False
+    # COMENTADO: Este método ya no funciona porque cantidad_actual no existe en la nueva estructura
+    # @staticmethod
+    # def add_stock(insumo_id: int, quantity_to_add: float) -> bool:
+    #     """Añadir cantidad a un insumo"""
+    #     query = """
+    #     UPDATE insumos
+    #     SET cantidad_actual = cantidad_actual + %s
+    #     WHERE id = %s
+    #     """
+    #     
+    #     try:
+    #         result = execute_query(query, (quantity_to_add, insumo_id))
+    #         return result > 0
+    #     except Exception as e:
+    #         logger.error(f"Error añadiendo cantidad al insumo {insumo_id}: {e}")
+    #         return False
     
-    @staticmethod
-    def subtract_stock(insumo_id: int, quantity_to_subtract: float) -> bool:
-        """Restar cantidad a un insumo"""
-        # Primero verificamos que haya suficiente stock
-        check_query = "SELECT cantidad_actual FROM insumos WHERE id = %s"
-        check_result = execute_query(check_query, (insumo_id,), fetch_one=True)
-        
-        if not check_result or check_result['cantidad_actual'] < quantity_to_subtract:
-            logger.error(f"No hay suficiente stock del insumo {insumo_id}")
-            return False
-        
-        # Si hay suficiente stock, procedemos a restar
-        query = """
-        UPDATE insumos
-        SET cantidad_actual = cantidad_actual - %s
-        WHERE id = %s
-        """
-        
-        try:
-            result = execute_query(query, (quantity_to_subtract, insumo_id))
-            return result > 0
-        except Exception as e:
-            logger.error(f"Error restando cantidad al insumo {insumo_id}: {e}")
-            return False
+    # COMENTADO: Este método ya no funciona porque cantidad_actual no existe en la nueva estructura
+    # @staticmethod
+    # def subtract_stock(insumo_id: int, quantity_to_subtract: float) -> bool:
+    #     """Restar cantidad a un insumo"""
+    #     # Primero verificamos que haya suficiente stock
+    #     check_query = "SELECT cantidad_actual FROM insumos WHERE id = %s"
+    #     check_result = execute_query(check_query, (insumo_id,), fetch_one=True)
+    #     
+    #     if not check_result or check_result['cantidad_actual'] < quantity_to_subtract:
+    #         logger.error(f"No hay suficiente stock del insumo {insumo_id}")
+    #         return False
+    #     
+    #     # Si hay suficiente stock, procedemos a restar
+    #     query = """
+    #     UPDATE insumos
+    #     SET cantidad_actual = cantidad_actual - %s
+    #     WHERE id = %s
+    #     """
+    #     
+    #     try:
+    #         result = execute_query(query, (quantity_to_subtract, insumo_id))
+    #         return result > 0
+    #     except Exception as e:
+    #         logger.error(f"Error restando cantidad al insumo {insumo_id}: {e}")
+    #         return False
     
-    @staticmethod
-    def get_low_stock_insumos() -> List[dict]:
-        """Obtener insumos con stock bajo"""
-        query = """
-        SELECT * FROM insumos
-        WHERE cantidad_actual <= stock_minimo
-        ORDER BY nombre_insumo
-        """
-        
-        return execute_query(query, fetch_all=True) or []
+    # COMENTADO: Este método ya no funciona porque cantidad_actual no existe en la nueva estructura
+    # @staticmethod
+    # def get_low_stock_insumos() -> List[dict]:
+    #     """Obtener insumos con stock bajo"""
+    #     query = """
+    #     SELECT * FROM insumos
+    #     WHERE cantidad_actual <= stock_minimo
+    #     ORDER BY nombre_insumo
+    #     """
+    #     
+    #     return execute_query(query, fetch_all=True) or []
     
     @staticmethod
     def search_insumos_by_name(search_term: str) -> List[dict]:

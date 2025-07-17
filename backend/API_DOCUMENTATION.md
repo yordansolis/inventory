@@ -438,6 +438,13 @@ DELETE /api/v1/products/1
 
 ## Gestión de Insumos (Ingredientes)
 
+**Campos Calculados Automáticamente:**
+
+- `valor_unitario`: Se calcula como `precio_presentacion / cantidad_unitaria`
+- `valor_total`: Se calcula como `valor_unitario * cantidad_utilizada`
+
+Estos campos no deben incluirse en las requests de creación o actualización, ya que se calculan automáticamente por la base de datos.
+
 ### Listar Insumos
 
 ```
@@ -463,13 +470,13 @@ POST /api/v1/insumos
 
 **Opción 1: Usando parámetros de consulta:**
 
-- nombre_insumo: "Fresas"
-- unidad: "gramos"
-- cantidad_actual: 1000 (opcional, por defecto 0)
-- stock_minimo: 500 (opcional, por defecto 0)
-- valor_unitario: 8000 (opcional, por defecto 0)
-- valor_unitarioxunidad: 8 (opcional, por defecto 0)
-- sitio_referencia: "Proveedor ABC" (opcional)
+- nombre_insumo: "Fresas" (obligatorio)
+- unidad: "gramos" (obligatorio)
+- cantidad_unitaria: 1000 (obligatorio - cantidad total de la presentación)
+- precio_presentacion: 185000 (obligatorio - precio total de la presentación)
+- cantidad_utilizada: 1 (opcional, por defecto 0 - cuánto se usa por unidad del producto)
+- stock_minimo: 10 (opcional, por defecto 0 - punto de reposición)
+- sitio_referencia: "Proveedor ABC" (opcional - dónde se compró)
 
 **Opción 2: Usando JSON en el cuerpo:**
 
@@ -477,13 +484,15 @@ POST /api/v1/insumos
 {
   "nombre_insumo": "Fresas",
   "unidad": "gramos",
-  "cantidad_actual": 1000,
-  "stock_minimo": 500,
-  "valor_unitario": 8000,
-  "valor_unitarioxunidad": 8,
+  "cantidad_unitaria": 1000,
+  "precio_presentacion": 185000,
+  "cantidad_utilizada": 1,
+  "stock_minimo": 10,
   "sitio_referencia": "Proveedor ABC"
 }
 ```
+
+**Nota:** Los campos `valor_unitario` (precio_presentacion / cantidad_unitaria) y `valor_total` (valor_unitario \* cantidad_utilizada) se calculan automáticamente y no deben incluirse en la request.
 
 **Headers:**
 
@@ -502,6 +511,10 @@ POST /api/v1/insumos
 
 - 400 Bad Request: "El nombre del insumo es obligatorio"
 - 400 Bad Request: "La unidad del insumo es obligatoria"
+- 400 Bad Request: "La cantidad unitaria es obligatoria"
+- 400 Bad Request: "El precio de presentación es obligatorio"
+- 400 Bad Request: "Ya existe un insumo con el nombre '{nombre}'"
+- 400 Bad Request: "Error en el formato de los datos: cantidad_unitaria y precio_presentacion deben ser números"
 - 500 Internal Server Error: "Error al crear el insumo"
 
 ### Actualizar un Insumo
@@ -516,10 +529,10 @@ PUT /api/v1/insumos/1
 {
   "nombre_insumo": "Fresas frescas",
   "unidad": "gramos",
-  "cantidad_actual": 1500,
-  "stock_minimo": 300,
-  "valor_unitario": 8000,
-  "valor_unitarioxunidad": 8,
+  "cantidad_unitaria": 1000,
+  "precio_presentacion": 185000,
+  "cantidad_utilizada": 1,
+  "stock_minimo": 10,
   "sitio_referencia": "Proveedor ABC"
 }
 ```
@@ -535,23 +548,29 @@ PUT /api/v1/insumos/1
   "id": 1,
   "nombre_insumo": "Fresas frescas",
   "unidad": "gramos",
-  "cantidad_actual": 1500.0,
-  "stock_minimo": 300.0,
-  "valor_unitario": 8000.0,
-  "valor_unitarioxunidad": 8.0,
+  "cantidad_unitaria": 1000.0,
+  "precio_presentacion": 185000.0,
+  "valor_unitario": 185.0,
+  "cantidad_utilizada": 1.0,
+  "valor_total": 185.0,
+  "stock_minimo": 10.0,
   "sitio_referencia": "Proveedor ABC",
   "creado_en": "2023-07-15T10:30:00"
 }
 ```
 
+**Nota:** Los campos `valor_unitario` y `valor_total` se calculan automáticamente y aparecen en la respuesta, pero no deben incluirse en la request de actualización.
+
 **Posibles errores:**
 
 - 400 Bad Request: "No se proporcionaron datos para actualizar"
 - 400 Bad Request: "Error al procesar el cuerpo JSON: [detalle del error]"
-- 400 Bad Request: "La cantidad actual debe ser un número"
+
 - 400 Bad Request: "El stock mínimo debe ser un número"
-- 400 Bad Request: "El valor unitario debe ser un número"
-- 400 Bad Request: "El valor unitario por unidad debe ser un número"
+- 400 Bad Request: "La cantidad unitaria debe ser un número"
+- 400 Bad Request: "El precio de presentación debe ser un número"
+- 400 Bad Request: "La cantidad utilizada debe ser un número"
+- 400 Bad Request: "No se pueden actualizar los campos calculados: valor_unitario, valor_total"
 - 401 Unauthorized: "Token de autenticación no proporcionado"
 - 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
 - 404 Not Found: "Insumo con ID X no encontrado"
@@ -692,6 +711,11 @@ GET /api/v1/sales
 
    - nombre_insumo: "Fresas"
    - unidad: "gramos"
+   - cantidad_unitaria: 1000
+   - precio_presentacion: 8000
+   - cantidad_utilizada: 50 (opcional)
+   - stock_minimo: 100 (opcional)
+   - sitio_referencia: "Mercado Central" (opcional)
 
 5. **Añadir recetas a los productos**:
 

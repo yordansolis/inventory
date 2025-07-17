@@ -521,10 +521,10 @@ async def create_insumo(
     request: Request,
     nombre_insumo: Optional[str] = None,
     unidad: Optional[str] = None,
-    cantidad_actual: Optional[float] = None,
+    cantidad_unitaria: Optional[float] = None,
+    precio_presentacion: Optional[float] = None,
+    cantidad_utilizada: Optional[float] = None,
     stock_minimo: Optional[float] = None,
-    valor_unitario: Optional[float] = None,
-    valor_unitarioxunidad: Optional[float] = None,
     sitio_referencia: Optional[str] = None
 ):
     """Crear un nuevo insumo"""
@@ -535,14 +535,14 @@ async def create_insumo(
             nombre_insumo = body["nombre_insumo"]
         if unidad is None and "unidad" in body:
             unidad = body["unidad"]
-        if cantidad_actual is None and "cantidad_actual" in body:
-            cantidad_actual = body["cantidad_actual"]
+        if cantidad_unitaria is None and "cantidad_unitaria" in body:
+            cantidad_unitaria = body["cantidad_unitaria"]
+        if precio_presentacion is None and "precio_presentacion" in body:
+            precio_presentacion = body["precio_presentacion"]
+        if cantidad_utilizada is None and "cantidad_utilizada" in body:
+            cantidad_utilizada = body["cantidad_utilizada"]
         if stock_minimo is None and "stock_minimo" in body:
             stock_minimo = body["stock_minimo"]
-        if valor_unitario is None and "valor_unitario" in body:
-            valor_unitario = body["valor_unitario"]
-        if valor_unitarioxunidad is None and "valor_unitarioxunidad" in body:
-            valor_unitarioxunidad = body["valor_unitarioxunidad"]
         if sitio_referencia is None and "sitio_referencia" in body:
             sitio_referencia = body["sitio_referencia"]
     except Exception as e:
@@ -550,7 +550,7 @@ async def create_insumo(
         # Si no hay cuerpo JSON o hay un error, usar los parámetros de consulta
         pass
     
-    print(f"Datos recibidos: nombre={nombre_insumo}, unidad={unidad}, cantidad={cantidad_actual}, min={stock_minimo}, valor_unitario={valor_unitario}, valor_unitarioxunidad={valor_unitarioxunidad}, sitio_referencia={sitio_referencia}")
+    print(f"Datos recibidos: nombre={nombre_insumo}, unidad={unidad}, cantidad_unitaria={cantidad_unitaria}, precio_presentacion={precio_presentacion}, cantidad_utilizada={cantidad_utilizada}, min={stock_minimo}, sitio_referencia={sitio_referencia}")
     
     # Validar que los campos obligatorios estén presentes
     if nombre_insumo is None:
@@ -563,16 +563,22 @@ async def create_insumo(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La unidad del insumo es obligatoria"
         )
+    if cantidad_unitaria is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La cantidad unitaria es obligatoria"
+        )
+    if precio_presentacion is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El precio de presentación es obligatorio"
+        )
     
     # Valores por defecto
-    if cantidad_actual is None:
-        cantidad_actual = 0
+    if cantidad_utilizada is None:
+        cantidad_utilizada = 0
     if stock_minimo is None:
         stock_minimo = 0
-    if valor_unitario is None:
-        valor_unitario = 0
-    if valor_unitarioxunidad is None:
-        valor_unitarioxunidad = 0
     
     try:
         # Verificar si ya existe un insumo con el mismo nombre
@@ -589,10 +595,10 @@ async def create_insumo(
         insumo_id = InsumoService.create_insumo(
             nombre_insumo=nombre_insumo,
             unidad=unidad,
-            cantidad_actual=cantidad_actual,
+            cantidad_unitaria=cantidad_unitaria,
+            precio_presentacion=precio_presentacion,
+            cantidad_utilizada=cantidad_utilizada,
             stock_minimo=stock_minimo,
-            valor_unitario=valor_unitario,
-            valor_unitarioxunidad=valor_unitarioxunidad,
             sitio_referencia=sitio_referencia
         )
         
@@ -685,28 +691,28 @@ async def update_insumo(
         )
     
     # Validar tipos de datos
-    if "cantidad_actual" in update_data and not isinstance(update_data["cantidad_actual"], (int, float)):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La cantidad actual debe ser un número"
-        )
-    
     if "stock_minimo" in update_data and not isinstance(update_data["stock_minimo"], (int, float)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El stock mínimo debe ser un número"
         )
         
-    if "valor_unitario" in update_data and not isinstance(update_data["valor_unitario"], (int, float)):
+    if "cantidad_unitaria" in update_data and not isinstance(update_data["cantidad_unitaria"], (int, float)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El valor unitario debe ser un número"
+            detail="La cantidad unitaria debe ser un número"
         )
     
-    if "valor_unitarioxunidad" in update_data and not isinstance(update_data["valor_unitarioxunidad"], (int, float)):
+    if "precio_presentacion" in update_data and not isinstance(update_data["precio_presentacion"], (int, float)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El valor unitario por unidad debe ser un número"
+            detail="El precio de presentación debe ser un número"
+        )
+    
+    if "cantidad_utilizada" in update_data and not isinstance(update_data["cantidad_utilizada"], (int, float)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La cantidad utilizada debe ser un número"
         )
     
     # Intentar actualizar el insumo
