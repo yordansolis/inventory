@@ -10,6 +10,16 @@ Esta documentación proporciona ejemplos de cómo utilizar la API del sistema de
    - Selecciona "Type" -> "Bearer Token"
    - Pega tu token en el campo "Token"
 
+## Importante: Orden de Creación de Entidades
+
+Para evitar errores de claves foráneas, crea las entidades en este orden:
+
+1. Categorías
+2. Productos
+3. Insumos
+4. Recetas
+5. Ventas
+
 ## Autenticación y Usuarios
 
 ### Registrar un Usuario
@@ -188,6 +198,92 @@ PUT /api/v1/admin/roles/4
 DELETE /api/v1/admin/roles/4
 ```
 
+## Gestión de Categorías
+
+### Listar Todas las Categorías
+
+```
+GET /api/v1/categories
+```
+
+### Obtener una Categoría por ID
+
+```
+GET /api/v1/categories/1
+```
+
+### Crear una Nueva Categoría
+
+```
+POST /api/v1/categories
+```
+
+**Opción 1: Usando parámetros de consulta:**
+
+- name: "Waffles" (debe ser único)
+
+**Opción 2: Usando JSON en el cuerpo:**
+
+```json
+{
+  "name": "Waffles"
+}
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 1,
+  "message": "Categoría creada exitosamente"
+}
+```
+
+**Posibles errores:**
+
+- 400 Bad Request: "Ya existe una categoría con el nombre 'Waffles'"
+
+### Actualizar una Categoría
+
+```
+PUT /api/v1/categories/1
+```
+
+**Opción 1: Usando parámetros de consulta:**
+
+- name: "Waffles Premium" (debe ser único)
+
+**Opción 2: Usando JSON en el cuerpo:**
+
+```json
+{
+  "name": "Waffles Premium"
+}
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Posibles errores:**
+
+- 400 Bad Request: "Ya existe otra categoría con el nombre 'Waffles Premium'"
+- 404 Not Found: "Categoría con ID 1 no encontrada"
+
+### Eliminar una Categoría
+
+```
+DELETE /api/v1/categories/1
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
 ## Gestión de Productos
 
 ### Listar Productos
@@ -216,7 +312,16 @@ GET /api/v1/products/1
 POST /api/v1/products
 ```
 
-**Body (raw JSON):**
+**Opción 1: Usando parámetros de consulta:**
+
+- nombre_producto: "Waffle con fresas"
+- price: 22000
+- category_id: 1
+- variante: "Grande" (opcional)
+- stock_quantity: 10 (opcional, por defecto 0)
+- min_stock: 5 (opcional, por defecto 5)
+
+**Opción 2: Usando JSON en el cuerpo:**
 
 ```json
 {
@@ -228,6 +333,108 @@ POST /api/v1/products
   "min_stock": 5
 }
 ```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 1,
+  "message": "Producto creado exitosamente"
+}
+```
+
+**Posibles errores:**
+
+- 400 Bad Request: "El nombre del producto es obligatorio"
+- 400 Bad Request: "El precio del producto es obligatorio"
+- 400 Bad Request: "La categoría del producto es obligatoria"
+- 400 Bad Request: "Error en el formato de los datos: price debe ser un número, category_id, stock_quantity y min_stock deben ser enteros"
+- 400 Bad Request: "La categoría con ID X no existe. Categorías disponibles: [lista de categorías]"
+- 400 Bad Request: "Error al procesar el cuerpo JSON: [detalle del error]"
+- 401 Unauthorized: "Token de autenticación no proporcionado"
+- 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
+- 401 Unauthorized: "Token inválido: error de decodificación"
+- 401 Unauthorized: "Usuario no encontrado"
+- 500 Internal Server Error: "Error al crear el producto. No se pudo obtener el ID del producto creado."
+- 500 Internal Server Error: "Error inesperado al crear el producto: [detalle del error]"
+
+### Actualizar un Producto
+
+```
+PUT /api/v1/products/1
+```
+
+**Body (raw JSON):**
+
+```json
+{
+  "nombre_producto": "Waffle con fresas y crema",
+  "price": 24000,
+  "category_id": 1,
+  "variante": "Extra Grande",
+  "stock_quantity": 15,
+  "min_stock": 3
+}
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 1,
+  "nombre_producto": "Waffle con fresas y crema",
+  "price": 24000,
+  "category_id": 1,
+  "categoria_nombre": "Waffles",
+  "variante": "Extra Grande",
+  "stock_quantity": 15,
+  "min_stock": 3,
+  "is_active": true,
+  "user_id": 1,
+  "creado_por": "admin",
+  "created_at": "2023-07-15T10:30:00",
+  "updated_at": "2023-07-15T14:45:00"
+}
+```
+
+**Posibles errores:**
+
+- 400 Bad Request: "No se proporcionaron datos para actualizar"
+- 400 Bad Request: "Error al procesar el cuerpo JSON: [detalle del error]"
+- 400 Bad Request: "La categoría con ID X no existe. Categorías disponibles: [lista de categorías]"
+- 401 Unauthorized: "Token de autenticación no proporcionado"
+- 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
+- 404 Not Found: "Producto con ID X no encontrado"
+- 500 Internal Server Error: "Error al actualizar el producto"
+
+### Eliminar un Producto
+
+```
+DELETE /api/v1/products/1
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+- Código de estado: 204 No Content (sin cuerpo de respuesta)
+
+**Posibles errores:**
+
+- 401 Unauthorized: "Token de autenticación no proporcionado"
+- 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
+- 404 Not Found: "Producto con ID X no encontrado"
+- 500 Internal Server Error: "Error al eliminar el producto con ID X"
 
 ## Gestión de Insumos (Ingredientes)
 
@@ -254,7 +461,14 @@ GET /api/v1/insumos/1
 POST /api/v1/insumos
 ```
 
-**Body (raw JSON):**
+**Opción 1: Usando parámetros de consulta:**
+
+- nombre_insumo: "Fresas"
+- unidad: "gramos"
+- cantidad_actual: 1000 (opcional, por defecto 0)
+- stock_minimo: 500 (opcional, por defecto 0)
+
+**Opción 2: Usando JSON en el cuerpo:**
 
 ```json
 {
@@ -264,6 +478,92 @@ POST /api/v1/insumos
   "stock_minimo": 500
 }
 ```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 1,
+  "message": "Insumo creado exitosamente"
+}
+```
+
+**Posibles errores:**
+
+- 400 Bad Request: "El nombre del insumo es obligatorio"
+- 400 Bad Request: "La unidad del insumo es obligatoria"
+- 500 Internal Server Error: "Error al crear el insumo"
+
+### Actualizar un Insumo
+
+```
+PUT /api/v1/insumos/1
+```
+
+**Body (raw JSON):**
+
+```json
+{
+  "nombre_insumo": "Fresas frescas",
+  "unidad": "gramos",
+  "cantidad_actual": 1500,
+  "stock_minimo": 300
+}
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 1,
+  "nombre_insumo": "Fresas frescas",
+  "unidad": "gramos",
+  "cantidad_actual": 1500.0,
+  "stock_minimo": 300.0,
+  "creado_en": "2023-07-15T10:30:00"
+}
+```
+
+**Posibles errores:**
+
+- 400 Bad Request: "No se proporcionaron datos para actualizar"
+- 400 Bad Request: "Error al procesar el cuerpo JSON: [detalle del error]"
+- 400 Bad Request: "La cantidad actual debe ser un número"
+- 400 Bad Request: "El stock mínimo debe ser un número"
+- 401 Unauthorized: "Token de autenticación no proporcionado"
+- 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
+- 404 Not Found: "Insumo con ID X no encontrado"
+- 500 Internal Server Error: "Error al actualizar el insumo"
+
+### Eliminar un Insumo
+
+```
+DELETE /api/v1/insumos/1
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+- Código de estado: 204 No Content (sin cuerpo de respuesta)
+
+**Posibles errores:**
+
+- 400 Bad Request: "No se puede eliminar el insumo porque está siendo utilizado en X recetas"
+- 401 Unauthorized: "Token de autenticación no proporcionado"
+- 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
+- 404 Not Found: "Insumo con ID X no encontrado"
+- 500 Internal Server Error: "Error al eliminar el insumo con ID X"
 
 ## Gestión de Recetas
 
@@ -352,25 +652,40 @@ GET /api/v1/sales
    - username: admin
    - password: Admin123,
 
-2. **Crear categorías y productos**:
+2. **Crear categorías**:
+
+   ```
+   POST /api/v1/categories
+   ```
+
+   - name: "Waffles"
+
+3. **Crear productos**:
 
    ```
    POST /api/v1/products
    ```
 
-3. **Crear insumos**:
+   - nombre_producto: "Waffle con fresas"
+   - price: 22000
+   - category_id: 1
+
+4. **Crear insumos**:
 
    ```
    POST /api/v1/insumos
    ```
 
-4. **Añadir recetas a los productos**:
+   - nombre_insumo: "Fresas"
+   - unidad: "gramos"
+
+5. **Añadir recetas a los productos**:
 
    ```
    POST /api/v1/products/1/recipe
    ```
 
-5. **Registrar ventas**:
+6. **Registrar ventas**:
    ```
    POST /api/v1/sales
    ```

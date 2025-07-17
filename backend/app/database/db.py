@@ -56,8 +56,10 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=False):
     """
     connection = get_db_connection()
     if not connection:
+        print("No se pudo establecer conexión con la base de datos")
         return None
     
+    cursor = None
     try:
         cursor = connection.cursor(pymysql.cursors.DictCursor)
         cursor.execute(query, params)
@@ -72,13 +74,67 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=False):
         connection.commit()
         return result
         
+    except pymysql.err.OperationalError as e:
+        error_code, error_message = e.args
+        print(f"Error operacional en la base de datos: [{error_code}] {error_message}")
+        print(f"Query: {query}")
+        print(f"Params: {params}")
+        
+        # Proporcionar mensajes más descriptivos para errores comunes
+        if error_code == 1054:  # Unknown column
+            print(f"Columna desconocida en la consulta. Verifique el nombre de la columna.")
+        elif error_code == 1064:  # Syntax error
+            print(f"Error de sintaxis en la consulta SQL.")
+        elif error_code == 1146:  # Table doesn't exist
+            print(f"La tabla no existe. Verifique el nombre de la tabla.")
+        elif error_code == 2003:  # Can't connect to MySQL server
+            print(f"No se puede conectar al servidor MySQL. Verifique que el servidor esté en ejecución.")
+        elif error_code == 1045:  # Access denied
+            print(f"Acceso denegado. Verifique las credenciales de la base de datos.")
+            
+        connection.rollback()
+        return None
+    except pymysql.err.IntegrityError as e:
+        error_code, error_message = e.args
+        print(f"Error de integridad en la base de datos: [{error_code}] {error_message}")
+        print(f"Query: {query}")
+        print(f"Params: {params}")
+        
+        # Proporcionar mensajes más descriptivos para errores comunes
+        if error_code == 1062:  # Duplicate entry
+            print(f"Entrada duplicada. El valor ya existe en la base de datos.")
+        elif error_code == 1452:  # Foreign key constraint fails
+            print(f"Error de clave foránea. El valor referenciado no existe.")
+        elif error_code == 1451:  # Cannot delete or update a parent row
+            print(f"No se puede eliminar o actualizar un registro padre. Hay registros dependientes.")
+            
+        connection.rollback()
+        return None
+    except pymysql.err.DataError as e:
+        error_code, error_message = e.args
+        print(f"Error de datos en la base de datos: [{error_code}] {error_message}")
+        print(f"Query: {query}")
+        print(f"Params: {params}")
+        
+        # Proporcionar mensajes más descriptivos para errores comunes
+        if error_code == 1264:  # Out of range value
+            print(f"Valor fuera de rango para la columna.")
+        elif error_code == 1366:  # Incorrect string value
+            print(f"Valor de cadena incorrecto para la columna.")
+            
+        connection.rollback()
+        return None
     except Exception as e:
-        print(f"Error ejecutando consulta: {e}")
+        print(f"Error ejecutando consulta: {type(e).__name__}: {e}")
+        print(f"Query: {query}")
+        print(f"Params: {params}")
         connection.rollback()
         return None
     finally:
-        cursor.close()
-        connection.close()
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 def create_tables():
     """
@@ -114,7 +170,7 @@ def create_tables():
     categories_table = """
     CREATE TABLE IF NOT EXISTS categories (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        nombre_categoria VARCHAR(100) NOT NULL,
+        nombre_categoria VARCHAR(100) UNIQUE NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
@@ -125,15 +181,13 @@ def create_tables():
     CREATE TABLE IF NOT EXISTS products (
         id INT AUTO_INCREMENT PRIMARY KEY,
         nombre_producto VARCHAR(200) NOT NULL,
-        categoria VARCHAR(50),
         category_id INT,
         variante VARCHAR(50),
         price DECIMAL(10, 2) NOT NULL,
-        id_categoria INT,   
         stock_quantity INT DEFAULT 0,
         min_stock INT DEFAULT 5,
         is_active BOOLEAN DEFAULT TRUE,
-        user_id INT,  /* Usuario que creó el producto */
+        user_id INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
@@ -142,6 +196,21 @@ def create_tables():
     """
     
     # Tabla de proveedores
+    suppliers_table = """
+    CREATE TABLE IF NOT EXISTS suppliers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        contact_person VARCHAR(100),
+        phone VARCHAR(20),
+        email VARCHAR(100),
+        address TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+    """
+    
+    # Tabla de insumos
     insumos_table = """ 
             CREATE TABLE IF NOT EXISTS insumos (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -219,6 +288,7 @@ def create_tables():
         roles_table,
         users_table,
         categories_table,
+        suppliers_table,
         products_table,
         insumos_table,
         recipe_table,

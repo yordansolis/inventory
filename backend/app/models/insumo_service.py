@@ -63,6 +63,23 @@ class InsumoService:
     @staticmethod
     def update_insumo(insumo_id: int, update_data: Dict[str, Any]) -> bool:
         """Actualizar un insumo"""
+        # Verificar que el insumo existe
+        check_query = "SELECT id FROM insumos WHERE id = %s"
+        existing_insumo = execute_query(check_query, (insumo_id,), fetch_one=True)
+        
+        if not existing_insumo:
+            logger.error(f"Insumo con ID {insumo_id} no encontrado")
+            return False
+        
+        # Validar datos
+        if "cantidad_actual" in update_data and not isinstance(update_data["cantidad_actual"], (int, float)):
+            logger.error(f"Cantidad actual inválida: {update_data['cantidad_actual']}")
+            return False
+        
+        if "stock_minimo" in update_data and not isinstance(update_data["stock_minimo"], (int, float)):
+            logger.error(f"Stock mínimo inválido: {update_data['stock_minimo']}")
+            return False
+        
         # Construir la consulta dinámicamente solo con los campos que se van a actualizar
         update_fields = []
         params = []
@@ -73,6 +90,7 @@ class InsumoService:
                 params.append(value)
         
         if not update_fields:
+            logger.warning("No se proporcionaron campos válidos para actualizar")
             return False
         
         query = f"""
@@ -84,20 +102,34 @@ class InsumoService:
         
         try:
             result = execute_query(query, params)
-            return result > 0
+            if result > 0:
+                logger.info(f"Insumo con ID {insumo_id} actualizado exitosamente")
+                return True
+            else:
+                logger.error(f"No se pudo actualizar el insumo con ID {insumo_id}")
+                return False
         except Exception as e:
             logger.error(f"Error actualizando insumo {insumo_id}: {e}")
+            print(f"Error detallado al actualizar insumo {insumo_id}: {str(e)}")
             return False
     
     @staticmethod
     def delete_insumo(insumo_id: int) -> bool:
         """Eliminar un insumo"""
-        # Primero verificamos si el insumo está en uso en alguna receta
+        # Verificar que el insumo existe
+        check_insumo_query = "SELECT id FROM insumos WHERE id = %s"
+        existing_insumo = execute_query(check_insumo_query, (insumo_id,), fetch_one=True)
+        
+        if not existing_insumo:
+            logger.error(f"Insumo con ID {insumo_id} no encontrado")
+            return False
+        
+        # Verificar si el insumo está en uso en alguna receta
         check_query = "SELECT COUNT(*) as count FROM product_recipes WHERE insumo_id = %s"
         check_result = execute_query(check_query, (insumo_id,), fetch_one=True)
         
         if check_result and check_result['count'] > 0:
-            logger.error(f"No se puede eliminar el insumo {insumo_id} porque está en uso en recetas")
+            logger.error(f"No se puede eliminar el insumo {insumo_id} porque está en uso en {check_result['count']} recetas")
             return False
         
         # Si no está en uso, procedemos a eliminarlo
@@ -105,9 +137,15 @@ class InsumoService:
         
         try:
             result = execute_query(query, (insumo_id,))
-            return result > 0
+            if result > 0:
+                logger.info(f"Insumo con ID {insumo_id} eliminado exitosamente")
+                return True
+            else:
+                logger.error(f"No se pudo eliminar el insumo con ID {insumo_id}")
+                return False
         except Exception as e:
             logger.error(f"Error eliminando insumo {insumo_id}: {e}")
+            print(f"Error detallado al eliminar insumo {insumo_id}: {str(e)}")
             return False
     
     @staticmethod
