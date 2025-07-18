@@ -309,6 +309,50 @@ def create_tables():
     )
     """
     
+    # Tabla de compras/facturas
+    purchases_table = """
+    CREATE TABLE IF NOT EXISTS purchases (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        invoice_number VARCHAR(50) UNIQUE NOT NULL,
+        invoice_date DATE NOT NULL,
+        invoice_time TIME NOT NULL,
+        client_name VARCHAR(100) NOT NULL,
+        seller_username VARCHAR(50) NOT NULL,
+        client_phone VARCHAR(20),
+        has_delivery BOOLEAN DEFAULT FALSE,
+        delivery_address VARCHAR(255),
+        delivery_person VARCHAR(100),
+        delivery_fee DECIMAL(10, 2) DEFAULT 0.00,
+        subtotal_products DECIMAL(10, 2) NOT NULL,
+        total_amount DECIMAL(10, 2) NOT NULL,
+        amount_paid DECIMAL(10, 2) NOT NULL,
+        change_returned DECIMAL(10, 2) NOT NULL,
+        payment_method VARCHAR(50) NOT NULL,
+        payment_reference VARCHAR(100),
+        is_cancelled BOOLEAN DEFAULT FALSE,
+        cancellation_reason VARCHAR(255),
+        cancelled_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (seller_username) REFERENCES users(username) ON DELETE RESTRICT
+    )
+    """
+    
+    # Tabla de detalles de compras
+    purchase_details_table = """
+    CREATE TABLE IF NOT EXISTS purchase_details (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        purchase_id INT NOT NULL,
+        product_name VARCHAR(200) NOT NULL,
+        product_variant VARCHAR(100),
+        quantity INT NOT NULL,
+        unit_price DECIMAL(10, 2) NOT NULL,
+        subtotal DECIMAL(10, 2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE
+    )
+    """
+    
     # Lista de tablas en orden de dependencia
     tables = [
         roles_table,
@@ -318,7 +362,9 @@ def create_tables():
         insumos_table,
         recipe_table,
         sales_table,
-        sale_details_table
+        sale_details_table,
+        purchases_table,
+        purchase_details_table
     ]
     
     try:
@@ -327,6 +373,8 @@ def create_tables():
         
         # Eliminar las tablas en orden inverso para manejar las dependencias
         drop_tables = [
+            "DROP TABLE IF EXISTS purchase_details;",
+            "DROP TABLE IF EXISTS purchases;",
             "DROP TABLE IF EXISTS sale_details;",
             "DROP TABLE IF EXISTS product_recipes;",
             "DROP TABLE IF EXISTS sales;",

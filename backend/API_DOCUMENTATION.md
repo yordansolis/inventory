@@ -711,6 +711,268 @@ GET /api/v1/sales/1
 GET /api/v1/sales
 ```
 
+## Gestión de Ventas
+
+### Crear una Nueva Venta
+
+```
+POST /api/v1/sales
+```
+
+**Body (raw JSON):**
+
+```json
+{
+  "items": [
+    {
+      "product_id": 1,
+      "quantity": 2,
+      "unit_price": 22000
+    },
+    {
+      "product_id": 2,
+      "quantity": 1,
+      "unit_price": 15000
+    }
+  ],
+  "payment_method": "efectivo",
+  "notes": "Cliente frecuente"
+}
+```
+
+### Obtener una Venta por ID
+
+```
+GET /api/v1/sales/1
+```
+
+### Obtener Ventas del Usuario Actual
+
+```
+GET /api/v1/sales
+```
+
+## Gestión de Compras/Facturas
+
+### Crear una Nueva Compra/Factura
+
+```
+POST /api/v1/services/purchases
+```
+
+**Body (raw JSON):**
+
+```json
+{
+  "invoice_number": "1752824978017",
+  "invoice_date": "18/7/2025",
+  "invoice_time": "2:49:38 a. m.",
+  "client_name": "lei",
+  "seller_username": "admin",
+  "client_phone": "3113634658",
+  "has_delivery": true,
+  "delivery_address": "Cra 5# 35-33 barrio cristorey",
+  "delivery_person": "Mena",
+  "delivery_fee": 3000,
+  "subtotal_products": 22000,
+  "total_amount": 25000,
+  "amount_paid": 100000,
+  "change_returned": 75000,
+  "payment_method": "Transferencia",
+  "payment_reference": "576874939002",
+  "products": [
+    {
+      "product_name": "FRESAS",
+      "product_variant": "FRESAS CON HELADO",
+      "quantity": 1,
+      "unit_price": 22000,
+      "subtotal": 22000
+    }
+  ]
+}
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "purchase_id": 1,
+  "invoice_number": "1752824978017",
+  "status": "success",
+  "message": "Compra registrada exitosamente"
+}
+```
+
+**Posibles errores:**
+
+- 400 Bad Request: "El vendedor 'username' no existe"
+- 400 Bad Request: "El número de factura es obligatorio"
+- 400 Bad Request: "La fecha de factura es obligatoria"
+- 400 Bad Request: "El formato de fecha es incorrecto. Use dd/mm/yyyy"
+- 500 Internal Server Error: "Error al crear la compra: [detalle del error]"
+
+### Obtener una Compra por Número de Factura
+
+```
+GET /api/v1/services/purchases/1752824978017
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 1,
+  "invoice_number": "1752824978017",
+  "invoice_date": "18/07/2025",
+  "invoice_time": "02:49:38",
+  "client_name": "lei",
+  "seller_username": "admin",
+  "seller_email": "marian@example.com",
+  "client_phone": "3113634658",
+  "has_delivery": true,
+  "delivery_address": "Cra 5# 35-33 barrio cristorey",
+  "delivery_person": "Mena",
+  "delivery_fee": 3000.0,
+  "subtotal_products": 22000.0,
+  "total_amount": 25000.0,
+  "amount_paid": 100000.0,
+  "change_returned": 75000.0,
+  "payment_method": "Transferencia",
+  "payment_reference": "576874939002",
+  "is_cancelled": false,
+  "created_at": "2023-08-15T10:30:00",
+  "products": [
+    {
+      "id": 1,
+      "purchase_id": 1,
+      "product_name": "FRESAS",
+      "product_variant": "FRESAS CON HELADO",
+      "quantity": 1,
+      "unit_price": 22000.0,
+      "subtotal": 22000.0,
+      "created_at": "2023-08-15T10:30:00"
+    }
+  ]
+}
+```
+
+### Obtener Compras por Rango de Fechas
+
+```
+GET /api/v1/services/purchases?start_date=2023-08-01&end_date=2023-08-15
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "start_date": "01/08/2023",
+  "end_date": "15/08/2023",
+  "total_purchases": 1,
+  "purchases": [
+    {
+      "id": 1,
+      "invoice_number": "1752824978017",
+      "invoice_date": "18/07/2025",
+      "invoice_time": "02:49:38",
+      "client_name": "lei",
+      "seller_username": "admin",
+      "seller_email": "marian@example.com",
+      "total_items": 1,
+      "total_quantity": 1,
+      "total_amount": 25000.0
+    }
+  ]
+}
+```
+
+### Obtener Resumen de Ventas por Período
+
+```
+GET /api/v1/services/purchases/summary/today
+```
+
+**Períodos disponibles:** `today`, `week`, `month`, `year`
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "period": "today",
+  "start_date": "15/08/2023",
+  "end_date": "15/08/2023",
+  "summary": {
+    "total_purchases": 1,
+    "total_items_sold": 1,
+    "total_quantity_sold": 1,
+    "total_products_revenue": 22000.0,
+    "total_delivery_revenue": 3000.0,
+    "total_revenue": 25000.0,
+    "average_purchase_value": 25000.0,
+    "unique_clients": 1,
+    "deliveries_count": 1
+  },
+  "payment_methods": [
+    {
+      "payment_method": "Transferencia",
+      "count": 1,
+      "total": 25000.0
+    }
+  ],
+  "top_products": [
+    {
+      "product_name": "FRESAS",
+      "product_variant": "FRESAS CON HELADO",
+      "total_quantity": 1,
+      "total_revenue": 22000.0,
+      "times_sold": 1
+    }
+  ]
+}
+```
+
+### Cancelar una Compra
+
+```
+DELETE /api/v1/services/purchases/1752824978017?reason=Cliente%20canceló%20el%20pedido
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "status": "success",
+  "message": "Factura 1752824978017 cancelada exitosamente",
+  "products_restored": 1
+}
+```
+
+**Posibles errores:**
+
+- 404 Not Found: "No se encontró la factura 1752824978017"
+- 400 Bad Request: "La razón de cancelación es obligatoria"
+- 500 Internal Server Error: "Error al cancelar la compra: [detalle del error]"
+
 ## Flujo de Trabajo Típico
 
 1. **Iniciar sesión como superusuario**:

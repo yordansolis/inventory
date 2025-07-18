@@ -1,6 +1,37 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from .stock_service import StockService
+from .purchase_service import PurchaseService
+from pydantic import BaseModel
+from typing import List, Dict
+from datetime import date
+
+# Modelos Pydantic para validación
+class ProductDetail(BaseModel):
+    product_name: str
+    product_variant: Optional[str] = None
+    quantity: int
+    unit_price: float
+    subtotal: float
+
+class PurchaseCreate(BaseModel):
+    invoice_number: str
+    invoice_date: str  # Formato: dd/mm/yyyy
+    invoice_time: str  # Formato: hh:mm:ss a.m./p.m.
+    client_name: str
+    seller_username: str
+    client_phone: Optional[str] = None
+    has_delivery: bool = False
+    delivery_address: Optional[str] = None
+    delivery_person: Optional[str] = None
+    delivery_fee: float = 0.0
+    subtotal_products: float
+    total_amount: float
+    amount_paid: float
+    change_returned: float
+    payment_method: str
+    payment_reference: Optional[str] = None
+    products: List[ProductDetail]
 
 router_services = APIRouter()
 
@@ -107,4 +138,123 @@ async def get_stock_summary():
         raise HTTPException(
             status_code=500,
             detail=f"Error al obtener resumen del stock: {str(e)}"
+        )
+
+# Endpoints para gestión de compras/facturas
+@router_services.post("/purchases")
+async def create_purchase(purchase_data: PurchaseCreate):
+    """
+    Crea una nueva compra/factura con todos sus detalles.
+    
+    Incluye información del cliente, vendedor, productos, domicilio (si aplica) y pago.
+    """
+    try:
+        result = PurchaseService.create_purchase(purchase_data.dict())
+        return result
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=400,
+            detail=str(ve)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al crear la compra: {str(e)}"
+        )
+
+@router_services.get("/purchases/{invoice_number}")
+async def get_purchase(invoice_number: str):
+    """
+    Obtiene los detalles completos de una compra por su número de factura.
+    """
+    try:
+        purchase = PurchaseService.get_purchase_by_invoice(invoice_number)
+        
+        if not purchase:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Factura {invoice_number} no encontrada"
+            )
+        
+        return purchase
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener la compra: {str(e)}"
+        )
+
+@router_services.get("/purchases")
+async def get_purchases_by_date(
+    start_date: date = Query(..., description="Fecha inicial (YYYY-MM-DD)"),
+    end_date: date = Query(..., description="Fecha final (YYYY-MM-DD)")
+):
+    """
+    Obtiene todas las compras realizadas en un rango de fechas.
+    """
+    try:
+        purchases = PurchaseService.get_purchases_by_date_range(start_date, end_date)
+        
+        return {
+            "start_date": start_date.strftime('%d/%m/%Y'),
+            "end_date": end_date.strftime('%d/%m/%Y'),
+            "total_purchases": len(purchases),
+            "purchases": purchases
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener las compras: {str(e)}"
+        )
+
+@router_services.get("/purchases/summary/{period}")
+async def get_sales_summary(period: str):
+    """
+    Obtiene un resumen de ventas para el período especificado.
+    
+    Args:
+        period: 'today', 'week', 'month' o 'year'
+    """
+    try:
+        # Validar el período
+        valid_periods = ["today", "week", "month", "year"]
+        if period not in valid_periods:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Período inválido. Debe ser uno de: {', '.join(valid_periods)}"
+            )
+        
+        summary = PurchaseService.get_sales_summary(period)
+        return summary
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener el resumen de ventas: {str(e)}"
+        )
+
+@router_services.delete("/purchases/{invoice_number}")
+async def cancel_purchase(
+    invoice_number: str,
+    reason: str = Query(..., description="Razón de la cancelación")
+):
+    """
+    Cancela una compra y restaura el stock de los productos.
+    
+    La compra no se elimina, solo se marca como cancelada en las notas.
+    """
+    try:
+        result = PurchaseService.cancel_purchase(invoice_number, reason)
+        return result
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=404,
+            detail=str(ve)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al cancelar la compra: {str(e)}"
         )
