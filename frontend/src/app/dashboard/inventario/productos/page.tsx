@@ -25,6 +25,7 @@ interface ConsumableItem {
   id: number;
   nombre: string;
   unidadMedida: string;
+  cantidad_utilizada?: number;
 }
 
 interface ProductRecipeItem {
@@ -267,7 +268,8 @@ export default function ProductsPage() {
       setAvailableConsumables(data.map((item: any) => ({
         id: item.id,
         nombre: item.nombre_insumo,
-        unidadMedida: item.unidad || 'unidad (u)'
+        unidadMedida: item.unidad || 'unidad (u)',
+        cantidad_utilizada: item.cantidad_utilizada || 0
       })));
     } catch (err: any) {
       console.error('Error fetching consumables:', err);
@@ -324,13 +326,17 @@ export default function ProductsPage() {
     }
   }, [displayPrice, formatPrice]);
 
-  const handleNewRecipeItemChange = useCallback((e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
-    const { id, value } = e.target;
+  const handleNewRecipeItemChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { value } = e.target;
+    
+    // Auto-complete quantity when consumable is selected
+    const selectedConsumable = availableConsumables.find(c => c.id === parseInt(value));
     setNewRecipeItem((prev) => ({
       ...prev,
-      [id]: value,
+      consumableId: value,
+      quantity: selectedConsumable ? String(selectedConsumable.cantidad_utilizada || '') : '',
     }));
-  }, []);
+  }, [availableConsumables]);
 
   const handleAddRecipeItem = useCallback(() => {
     const parsedConsumableId = parseInt(newRecipeItem.consumableId);
@@ -591,6 +597,7 @@ export default function ProductsPage() {
               >
                 <option value="">Seleccione una categoría</option>
                 {categorias.map(cat => (
+                  console.log(" #ID DEL PRODUCTO: ", cat.id),
                   <option key={cat.id} value={cat.id}>{cat.nombre_categoria}</option>
                 ))}
               </select>
@@ -613,28 +620,36 @@ export default function ProductsPage() {
                   <option value="">Seleccione un insumo</option>
                   {availableConsumables.map(consumable => (
                     <option key={consumable.id} value={consumable.id}>
-                      {consumable.nombre} ({consumable.unidadMedida})
+                      {consumable.nombre} - ({consumable.unidadMedida}) - #️⃣{consumable.cantidad_utilizada}
                     </option>
                   ))}
                 </select>
               </div>
+
               <div>
                 <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
-                  Cantidad Requerida
+                  Cantidad (Predefinida)
                 </label>
                 <input
                   type="number"
                   id="quantity"
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 text-gray-700 cursor-not-allowed"
                   value={newRecipeItem.quantity}
-                  onChange={handleNewRecipeItemChange}
-                  placeholder="Ej: 0.5, 1, 10"
-                  min="0"
-                  step="0.01"
+                  placeholder={newRecipeItem.consumableId ? "Cantidad automática del insumo" : "Seleccione primero un insumo"}
+                  readOnly
+                  disabled={!newRecipeItem.consumableId}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  {newRecipeItem.consumableId ? "Cantidad predefinida del insumo. No se puede modificar." : "La cantidad se completará automáticamente al seleccionar un insumo"}
+                </p>
               </div>
+
               <div className="flex items-end justify-end">
-                <Button onClick={handleAddRecipeItem} className="w-full md:w-auto">
+                <Button 
+                  onClick={handleAddRecipeItem} 
+                  className="w-full md:w-auto"
+                  disabled={!newRecipeItem.consumableId || !newRecipeItem.quantity || parseFloat(newRecipeItem.quantity) <= 0}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Agregar Insumo
                 </Button>

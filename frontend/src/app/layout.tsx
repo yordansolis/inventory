@@ -1,8 +1,10 @@
-
 import "./globals.css";
+import type { Metadata } from "next";
 
-
-import { ThemeModeScript } from 'flowbite-react';
+export const metadata: Metadata = {
+  title: "Sistema de Inventario",
+  description: "Sistema de gestión de inventario",
+};
 
 export default function RootLayout({
   children,
@@ -10,13 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html suppressHydrationWarning lang="en" >
-                  <head>
-                <ThemeModeScript />
-            </head>
-      <body
-        // className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="es" suppressHydrationWarning>
+      <body className="min-h-screen bg-white">
         {children}
       </body>
     </html>

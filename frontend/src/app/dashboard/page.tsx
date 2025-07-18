@@ -65,7 +65,7 @@ export default function InventoryDashboard() {
 
   // Componente Card personalizado
   const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-    <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 ${className}`}>
+    <div className={`bg-white rounded-lg shadow-md border border-gray-200 p-6 ${className}`}>
       {children}
     </div>
   );
@@ -95,8 +95,8 @@ export default function InventoryDashboard() {
   // Componente Button personalizado
   const Button = ({ children, variant = "default", size = "default", className = "", ...props }: { children: React.ReactNode; variant?: "default" | "danger"; size?: "default" | "sm"; className?: string; [key: string]: any }) => {
     const variants = {
-      default: "bg-gray-900 text-white hover:bg-gray-800",
-      danger: "bg-red-600 text-white hover:bg-red-700"
+      default: "bg-primary-600 text-white hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2",
+      danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
     };
 
     const sizes = {
@@ -206,7 +206,7 @@ export default function InventoryDashboard() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {ventasRecientes.map((venta) => (
-                <tr key={venta.id}>
+                <tr key={venta.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{venta.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{venta.cliente}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{venta.producto}</td>

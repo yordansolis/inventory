@@ -318,8 +318,6 @@ POST /api/v1/products
 - price: 22000
 - category_id: 1
 - variante: "Grande" (opcional)
-- stock_quantity: 10 (opcional, por defecto 0)
-- min_stock: 5 (opcional, por defecto 5)
 
 **Opción 2: Usando JSON en el cuerpo:**
 
@@ -328,11 +326,11 @@ POST /api/v1/products
   "nombre_producto": "Waffle con fresas",
   "price": 22000,
   "category_id": 1,
-  "variante": "Grande",
-  "stock_quantity": 10,
-  "min_stock": 5
+  "variante": "Grande"
 }
 ```
+
+**Nota importante:** Los productos se crean automáticamente con `stock_quantity = -1`, lo que indica que están disponibles bajo demanda. Esto es ideal para una heladería donde los productos se preparan al momento. El control de inventario se realiza a través de los insumos asociados a cada producto mediante recetas.
 
 **Headers:**
 
@@ -343,7 +341,8 @@ POST /api/v1/products
 ```json
 {
   "id": 1,
-  "message": "Producto creado exitosamente"
+  "message": "Producto creado exitosamente",
+  "note": "Este producto está configurado como disponible bajo demanda. El control de inventario se realiza a través de los insumos."
 }
 ```
 
@@ -352,7 +351,7 @@ POST /api/v1/products
 - 400 Bad Request: "El nombre del producto es obligatorio"
 - 400 Bad Request: "El precio del producto es obligatorio"
 - 400 Bad Request: "La categoría del producto es obligatoria"
-- 400 Bad Request: "Error en el formato de los datos: price debe ser un número, category_id, stock_quantity y min_stock deben ser enteros"
+- 400 Bad Request: "Error en el formato de los datos: price debe ser un número, category_id debe ser entero"
 - 400 Bad Request: "La categoría con ID X no existe. Categorías disponibles: [lista de categorías]"
 - 400 Bad Request: "Error al procesar el cuerpo JSON: [detalle del error]"
 - 401 Unauthorized: "Token de autenticación no proporcionado"
@@ -633,6 +632,44 @@ POST /api/v1/products/1/recipe
 GET /api/v1/products/1/recipe
 ```
 
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+[
+  {
+    "id": 1,
+    "product_id": 1,
+    "insumo_id": 1,
+    "cantidad": 100.0,
+    "created_at": "2023-07-15T10:30:00",
+    "updated_at": "2023-07-15T10:30:00",
+    "nombre_insumo": "Fresas frescas",
+    "unidad": "gramos"
+  },
+  {
+    "id": 2,
+    "product_id": 1,
+    "insumo_id": 2,
+    "cantidad": 50.0,
+    "created_at": "2023-07-15T10:30:00",
+    "updated_at": "2023-07-15T10:30:00",
+    "nombre_insumo": "Harina de trigo",
+    "unidad": "gramos"
+  }
+]
+```
+
+**Posibles errores:**
+
+- 401 Unauthorized: "Token de autenticación no proporcionado"
+- 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
+- 404 Not Found: "Producto con ID X no encontrado"
+- 500 Internal Server Error: "Error al obtener la receta del producto"
+
 ## Gestión de Ventas
 
 ### Crear una Nueva Venta
@@ -733,9 +770,141 @@ GET /api/v1/sales
 - Los endpoints de administración (`/api/v1/admin/...`) solo son accesibles para usuarios con rol de superusuario.
 - Al crear una venta, el sistema automáticamente:
   - Descuenta el stock del producto vendido
-  - Descuenta el stock de los ingredientes según la receta
+  - Incrementa la cantidad utilizada de los insumos según la receta del producto
   - Registra qué usuario realizó la venta
+- La cantidad utilizada de insumos (`cantidad_utilizada`) se incrementa cada vez que se vende un producto, permitiendo:
+  - Seguimiento del consumo real de insumos
+  - Cálculo automático del valor total utilizado (`valor_total = valor_unitario * cantidad_utilizada`)
+  - Planificación de compras basada en el consumo histórico
 - El superusuario predeterminado tiene las siguientes credenciales:
   - Username: admin
   - Email: marian@example.com
   - Password: Admin123,
+
+## Guía de Uso del Sistema
+
+Esta guía explica paso a paso cómo utilizar el sistema de inventario, especialmente la relación entre productos e insumos.
+
+### 1. Configuración Inicial
+
+#### 1.1 Iniciar sesión
+
+- Acceder con las credenciales de superusuario (admin/Admin123,) o con tu usuario asignado
+- Navegar al dashboard principal
+
+#### 1.2 Crear categorías
+
+- Ir a **Inventario > Categorías**
+- Crear categorías para organizar los productos (ej: "Waffles", "Bebidas", "Postres")
+- Esto permitirá clasificar los productos para una mejor organización
+
+### 2. Gestión de Insumos
+
+#### 2.1 Crear insumos
+
+- Ir a **Inventario > Suministro**
+- Crear los insumos con la siguiente información:
+  - **Nombre del insumo**: Identificador único (ej: "Harina de trigo")
+  - **Unidad**: Unidad de medida (ej: "gramos", "litros", "unidades")
+  - **Cantidad unitaria**: Cantidad en la presentación que compras (ej: 1000 si compras 1kg)
+  - **Precio presentación**: Precio de compra de esa presentación (ej: 5000)
+  - **Stock mínimo**: Nivel mínimo antes de necesitar reabastecimiento (ej: 500)
+  - **Sitio referencia**: Opcional, proveedor o lugar de compra
+
+#### 2.2 Monitorear insumos
+
+- El sistema calculará automáticamente:
+  - **Valor unitario**: Precio presentación ÷ Cantidad unitaria
+  - **Valor total**: Valor unitario × Cantidad utilizada
+- Revisar periódicamente para identificar insumos con bajo stock
+
+### 3. Gestión de Productos
+
+#### 3.1 Crear productos
+
+- Ir a **Inventario > Productos**
+- Crear productos con la siguiente información:
+  - **Nombre del producto**: Identificador único (ej: "Waffle con fresas")
+  - **Variante**: Opcional, para variaciones del mismo producto
+  - **Precio**: Precio de venta al público
+  - **Categoría**: Seleccionar de las categorías creadas previamente
+
+**Nota importante:** Los productos se crean automáticamente como "disponibles bajo demanda" (`stock_quantity = -1`), lo que significa que:
+
+- No hay un límite de stock para estos productos
+- Se pueden vender siempre que haya insumos disponibles
+- El sistema controla el inventario a través de los insumos, no de los productos terminados
+- Este modelo es ideal para una heladería donde los productos se preparan al momento
+
+#### 3.2 Crear recetas
+
+- Ir a **Inventario > Recetas**
+- Para cada producto:
+  - Seleccionar el producto
+  - Añadir los insumos necesarios uno por uno
+  - Especificar la cantidad de cada insumo que se utiliza
+  - Guardar la receta
+
+**Importante:** Las recetas son fundamentales en este sistema, ya que:
+
+- Definen qué insumos se consumen al vender un producto
+- Permiten calcular el costo real de cada producto
+- Controlan el inventario a través de los insumos utilizados
+
+### 4. Registro de Ventas
+
+#### 4.1 Crear una venta
+
+- Ir a **Factura** o **Ventas**
+- Seleccionar los productos a vender
+- Indicar la cantidad de cada producto
+- Completar la información de pago
+- Finalizar la venta
+
+#### 4.2 Efectos automáticos
+
+Al registrar una venta, el sistema automáticamente:
+
+- **No descuenta stock de productos** (ya que están configurados como disponibles bajo demanda)
+- **Sí incrementa la cantidad utilizada de cada insumo** según la receta
+- Actualiza el valor total utilizado de cada insumo
+- Alerta si algún insumo cae por debajo de su nivel mínimo
+
+Este comportamiento es ideal para una heladería, donde:
+
+- Los productos se preparan al momento según demanda
+- Lo importante es controlar el inventario de insumos, no de productos terminados
+- Se necesita saber cuándo reabastecer ingredientes, no productos
+
+### 5. Monitoreo y Análisis
+
+#### 5.1 Verificar consumo de insumos
+
+- Ir a **Inventario > Consumo**
+- Revisar qué insumos se están utilizando más
+- Analizar el valor total utilizado para controlar costos
+
+#### 5.2 Alertas de stock
+
+- El dashboard mostrará alertas cuando un insumo esté por debajo del stock mínimo
+- Usar esta información para planificar compras
+
+#### 5.3 Estadísticas
+
+- Revisar las estadísticas de ventas y consumo
+- Identificar productos más vendidos y su impacto en el inventario
+
+### 6. Flujo Completo de Ejemplo
+
+1. **Crear insumos**: "Fresas" (unidad: gramos, cantidad unitaria: 1000, precio: 8000)
+2. **Crear categoría**: "Postres"
+3. **Crear producto**: "Waffle con fresas" (precio: 22000, categoría: Postres)
+   - El producto se crea con `stock_quantity = -1` (disponible bajo demanda)
+4. **Crear receta**: Asignar 100g de fresas al producto "Waffle con fresas" mediante una llamada separada a la API de recetas
+5. **Registrar venta**: Vender 2 "Waffle con fresas"
+6. **Verificar**:
+   - El stock del producto no cambia (sigue siendo -1)
+   - La cantidad utilizada de "Fresas" habrá aumentado en 200g
+   - El sistema alerta si el stock de fresas cae por debajo del mínimo
+
+Este flujo demuestra cómo el sistema mantiene actualizado el inventario de insumos automáticamente basado en las ventas realizadas, sin preocuparse por el stock de productos terminados, lo cual es ideal para un negocio como una heladería donde los productos se preparan al momento.

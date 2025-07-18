@@ -181,13 +181,13 @@ def create_tables():
     CREATE TABLE IF NOT EXISTS products (
         id INT AUTO_INCREMENT PRIMARY KEY,
         nombre_producto VARCHAR(200) NOT NULL,
-        category_id INT,
         variante VARCHAR(50),
         price DECIMAL(10, 2) NOT NULL,
+        category_id INT,
+        user_id INT,
         stock_quantity INT DEFAULT 0,
         min_stock INT DEFAULT 5,
         is_active BOOLEAN DEFAULT TRUE,
-        user_id INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
@@ -195,37 +195,23 @@ def create_tables():
     )
     """
     
-    # Tabla de proveedores
-    suppliers_table = """
-    CREATE TABLE IF NOT EXISTS suppliers (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        contact_person VARCHAR(100),
-        phone VARCHAR(20),
-        email VARCHAR(100),
-        address TEXT,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-    """
-    
     # Tabla de insumos
     insumos_table = """ 
-            CREATE TABLE IF NOT EXISTS insumos (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                nombre_insumo VARCHAR(100) UNIQUE NOT NULL,         -- vasos x 30 
-                unidad VARCHAR(20) NOT NULL,                         -- Ej: gramos, litros, unidad 
-                cantidad_unitaria DECIMAL(10,2) NOT NULL,        -- Cantidad total de la presentación (ej: 1000 unidades, 400 gramos)
-                precio_presentacion DECIMAL(10,2) NOT NULL,          -- Precio total de la presentación  185.000
-                valor_unitario DECIMAL(10,2) AS (precio_presentacion / cantidad_unitaria) STORED, -- Valor por unidad automáticamente calculado
-                cantidad_utilizada DECIMAL(10,2) DEFAULT 0,          -- Cuánto se usa por unidad del producto
-                valor_total DECIMAL(10,2) AS (valor_unitario * cantidad_utilizada) STORED,        -- Costo de esa cantidad usada
-                stock_minimo DECIMAL(10,2) DEFAULT 0,                -- Punto de reposición
-                sitio_referencia VARCHAR(255),                       -- Dónde se compró
-                creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            """
+    CREATE TABLE IF NOT EXISTS insumos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nombre_insumo VARCHAR(100) UNIQUE NOT NULL,
+        unidad VARCHAR(20) NOT NULL,
+        cantidad_unitaria DECIMAL(10,2) NOT NULL,
+        precio_presentacion DECIMAL(10,2) NOT NULL,
+        valor_unitario DECIMAL(10,2) AS (precio_presentacion / cantidad_unitaria) STORED,
+        stock_actual DECIMAL(10,2) DEFAULT 0,
+        cantidad_utilizada DECIMAL(10,2) DEFAULT 0,
+        valor_total DECIMAL(10,2) AS (valor_unitario * cantidad_utilizada) STORED,
+        stock_minimo DECIMAL(10,2) DEFAULT 0,
+        sitio_referencia VARCHAR(255),
+        creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """
 
     # Tabla de recetas de productos
     recipe_table = """
@@ -245,7 +231,7 @@ def create_tables():
     sales_table = """
     CREATE TABLE IF NOT EXISTS sales (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,  /* Usuario que realizó la venta */
+        user_id INT NOT NULL,
         total_amount DECIMAL(10, 2) NOT NULL,
         sale_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         payment_method VARCHAR(50),
@@ -270,49 +256,47 @@ def create_tables():
     )
     """
     
-    # Tabla de compras/suministros
-    purchases_table = """
-    CREATE TABLE IF NOT EXISTS purchases (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        supplier_id INT,
-        total_amount DECIMAL(12, 2) NOT NULL,
-        purchase_date DATE NOT NULL,
-        status ENUM('PENDING', 'RECEIVED', 'CANCELLED') DEFAULT 'PENDING',
-        notes TEXT,
-        user_id INT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-    )
-    """
-    
-    # Tabla de detalles de compras
-
-    
+    # Lista de tablas en orden de dependencia
     tables = [
         roles_table,
         users_table,
         categories_table,
-        suppliers_table,
         products_table,
         insumos_table,
         recipe_table,
         sales_table,
-        sale_details_table,
-        purchases_table,
+        sale_details_table
     ]
     
     try:
+        # Primero asegurarnos de que la base de datos existe
         create_database_if_not_exists()
         
+        # Eliminar las tablas en orden inverso para manejar las dependencias
+        drop_tables = [
+            "DROP TABLE IF EXISTS sale_details;",
+            "DROP TABLE IF EXISTS product_recipes;",
+            "DROP TABLE IF EXISTS sales;",
+            "DROP TABLE IF EXISTS products;",
+            "DROP TABLE IF EXISTS insumos;",
+            "DROP TABLE IF EXISTS categories;",
+            "DROP TABLE IF EXISTS users;",
+            "DROP TABLE IF EXISTS roles;"
+        ]
+        
+        for drop_query in drop_tables:
+            execute_query(drop_query)
+            print(f"Tabla eliminada: {drop_query}")
+        
+        # Crear las tablas en el orden correcto
         for table_query in tables:
             execute_query(table_query)
+            print(f"Tabla creada: {table_query[:50]}...")
         
-        # Crear roles predeterminados si no existen
+        # Crear roles predeterminados
         create_default_roles()
         
-        # Crear superusuario si no existe
+        # Crear superusuario
         create_superuser()
             
         print("Todas las tablas han sido creadas exitosamente")

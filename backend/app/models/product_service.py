@@ -46,17 +46,17 @@ class ProductService:
             return None
         
         query = """
-        INSERT INTO products (nombre_producto, price, category_id, user_id, variante, stock_quantity, min_stock)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO products (nombre_producto, price, category_id, user_id, variante, stock_quantity, min_stock, is_active)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
         
         try:
             print(f"Ejecutando consulta SQL: {query}")
-            print(f"Parámetros: {(nombre_producto, price, category_id, user_id, variante, stock_quantity, min_stock)}")
+            print(f"Parámetros: {(nombre_producto, price, category_id, user_id, variante, True)}")
             
             result = execute_query(
                 query, 
-                (nombre_producto, price, category_id, user_id, variante, stock_quantity, min_stock)
+                (nombre_producto, price, category_id, user_id, variante, stock_quantity, min_stock, True)
             )
             
             if result:

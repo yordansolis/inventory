@@ -1,10 +1,55 @@
 from database.db import execute_query
 from typing import List, Optional, Dict, Any
 import logging
+from models.insumo_service import InsumoService
 
 logger = logging.getLogger(__name__)
 
 class SalesService:
+    
+    @staticmethod
+    def check_insumos_availability(product_id: int, quantity: int) -> Dict[str, Any]:
+        """
+        Verifica si hay suficientes insumos disponibles para producir la cantidad solicitada de un producto
+        
+        Args:
+            product_id: ID del producto a verificar
+            quantity: Cantidad del producto que se desea vender
+            
+        Returns:
+            Dict con 'available' (bool) y 'missing_insumos' (lista de insumos insuficientes)
+        """
+        # Obtener la receta del producto
+        recipe_query = """
+        SELECT pr.insumo_id, pr.cantidad, i.nombre_insumo, i.stock_actual, i.unidad
+        FROM product_recipes pr
+        JOIN insumos i ON pr.insumo_id = i.id
+        WHERE pr.product_id = %s
+        """
+        recipe_items = execute_query(recipe_query, (product_id,), fetch_all=True) or []
+        
+        missing_insumos = []
+        
+        # Verificar cada insumo
+        for item in recipe_items:
+            total_needed = item['cantidad'] * quantity
+            stock_actual = item['stock_actual'] or 0
+            
+            # Si el stock actual es menor que lo necesario, añadir a la lista de faltantes
+            if stock_actual < total_needed:
+                missing_insumos.append({
+                    'insumo_id': item['insumo_id'],
+                    'nombre_insumo': item['nombre_insumo'],
+                    'needed': total_needed,
+                    'available': stock_actual,
+                    'missing': total_needed - stock_actual,
+                    'unidad': item['unidad']
+                })
+        
+        return {
+            'available': len(missing_insumos) == 0,
+            'missing_insumos': missing_insumos
+        }
     
     @staticmethod
     def create_sale(user_id: int, total_amount: float, payment_method: str = None, notes: str = None) -> Optional[int]:
@@ -31,6 +76,14 @@ class SalesService:
     @staticmethod
     def add_sale_detail(sale_id: int, product_id: int, quantity: int, unit_price: float) -> bool:
         """Añadir un detalle a una venta"""
+        # Verificar si hay suficiente stock de insumos
+        availability = SalesService.check_insumos_availability(product_id, quantity)
+        if not availability['available']:
+            logger.error(f"No hay suficiente stock de insumos para el producto {product_id}")
+            for insumo in availability['missing_insumos']:
+                logger.error(f"Insumo: {insumo['nombre_insumo']}, Necesario: {insumo['needed']}, Disponible: {insumo['available']}")
+            return False
+        
         query = """
         INSERT INTO sale_details (sale_id, product_id, quantity, unit_price)
         VALUES (%s, %s, %s, %s)
@@ -39,47 +92,41 @@ class SalesService:
         try:
             result = execute_query(query, (sale_id, product_id, quantity, unit_price))
             
-            # Si se añade correctamente, actualizamos el stock del producto
+            # Si se añade correctamente, actualizamos los insumos utilizados
             if result:
-                update_stock_query = """
-                UPDATE products 
-                SET stock_quantity = stock_quantity - %s 
-                WHERE id = %s
-                """
-                execute_query(update_stock_query, (quantity, product_id))
-                
-                # COMENTADO: La actualización de stock de insumos ya no funciona porque cantidad_actual no existe
-                # SalesService._update_insumos_stock_from_recipe(product_id, quantity)
+                # Actualizar la cantidad utilizada de insumos basado en la receta
+                SalesService._update_insumos_stock_from_recipe(product_id, quantity)
             
             return result > 0
         except Exception as e:
             logger.error(f"Error añadiendo detalle de venta: {e}")
             return False
     
-    # COMENTADO: Este método ya no funciona porque cantidad_actual no existe en la nueva estructura
-    # @staticmethod
-    # def _update_insumos_stock_from_recipe(product_id: int, quantity_sold: int) -> None:
-    #     """
-    #     Actualizar el stock de insumos basado en la receta del producto vendido
-    #     """
-    #     # Obtener la receta del producto
-    #     recipe_query = """
-    #     SELECT pr.insumo_id, pr.cantidad
-    #     FROM product_recipes pr
-    #     WHERE pr.product_id = %s
-    #     """
-    #     recipe_items = execute_query(recipe_query, (product_id,), fetch_all=True) or []
-    #     
-    #     # Actualizar el stock de cada insumo
-    #     for item in recipe_items:
-    #         total_quantity_to_subtract = item['cantidad'] * quantity_sold
-    #         
-    #         update_query = """
-    #         UPDATE insumos
-    #         SET cantidad_actual = cantidad_actual - %s
-    #         WHERE id = %s
-    #         """
-    #         execute_query(update_query, (total_quantity_to_subtract, item['insumo_id']))
+    @staticmethod
+    def _update_insumos_stock_from_recipe(product_id: int, quantity_sold: int) -> None:
+        """
+        Actualizar la cantidad utilizada de insumos basado en la receta del producto vendido
+        
+        Args:
+            product_id: ID del producto vendido
+            quantity_sold: Cantidad vendida del producto
+        """
+        # Obtener la receta del producto
+        recipe_query = """
+        SELECT pr.insumo_id, pr.cantidad
+        FROM product_recipes pr
+        WHERE pr.product_id = %s
+        """
+        recipe_items = execute_query(recipe_query, (product_id,), fetch_all=True) or []
+        
+        # Actualizar la cantidad utilizada de cada insumo
+        for item in recipe_items:
+            total_quantity_to_add = item['cantidad'] * quantity_sold
+            
+            # Usar el método de InsumoService para actualizar la cantidad utilizada
+            InsumoService.update_cantidad_utilizada(item['insumo_id'], total_quantity_to_add)
+            
+            logger.info(f"Insumo {item['insumo_id']} actualizado: +{total_quantity_to_add} unidades utilizadas")
     
     @staticmethod
     def get_sale_by_id(sale_id: int) -> Optional[Dict[str, Any]]:
@@ -152,6 +199,15 @@ class SalesService:
         
         items: Lista de diccionarios con {product_id, quantity, unit_price}
         """
+        # Verificar si hay suficiente stock de insumos para todos los productos
+        for item in items:
+            availability = SalesService.check_insumos_availability(item['product_id'], item['quantity'])
+            if not availability['available']:
+                logger.error(f"No hay suficiente stock de insumos para el producto {item['product_id']}")
+                for insumo in availability['missing_insumos']:
+                    logger.error(f"Insumo: {insumo['nombre_insumo']}, Necesario: {insumo['needed']}, Disponible: {insumo['available']}")
+                return None
+        
         # Calcular el total de la venta
         total_amount = sum(item['quantity'] * item['unit_price'] for item in items)
         

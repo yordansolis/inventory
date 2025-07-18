@@ -1,17 +1,18 @@
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, HTTPException, Depends, status, Request, APIRouter, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
 from api.v1.router import router_user
-from database.db import create_tables
-import os
+from api.v1.auth_service.login import get_current_active_user
+from database.db import create_tables, execute_query
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException, status, Request
 from models.product_service import ProductService
 from models.insumo_service import InsumoService
-from typing import List, Dict, Any, Optional
-from api.v1.auth_service.login import get_current_active_user
 from models.sales_service import SalesService
-from database.db import execute_query
+from schemas import schemas
+import json
 
 # Cargar variables de entorno
 load_dotenv('.env.dev')
@@ -251,80 +252,14 @@ router_products = APIRouter()
 
 @router_products.post("/", status_code=status.HTTP_201_CREATED)
 async def create_product(
-    request: Request,
-    nombre_producto: Optional[str] = None,
-    price: Optional[float] = None,
-    category_id: Optional[int] = None,
-    variante: Optional[str] = None,
-    stock_quantity: Optional[int] = None,
-    min_stock: Optional[int] = None,
+    product: schemas.ProductCreate,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Crear un nuevo producto"""
+    """Crear un nuevo producto para heladería (bajo demanda)"""
     try:
-        # Intentar obtener datos del cuerpo JSON si están disponibles
-        body = {}
-        try:
-            body = await request.json()
-            if nombre_producto is None and "nombre_producto" in body:
-                nombre_producto = body["nombre_producto"]
-            if price is None and "price" in body:
-                price = body["price"]
-            if category_id is None and "category_id" in body:
-                category_id = body["category_id"]
-            if variante is None and "variante" in body:
-                variante = body["variante"]
-            if stock_quantity is None and "stock_quantity" in body:
-                stock_quantity = body["stock_quantity"]
-            if min_stock is None and "min_stock" in body:
-                min_stock = body["min_stock"]
-        except Exception as e:
-            # Si hay un error al procesar el JSON, proporcionar un mensaje claro
-            print(f"Error al procesar el cuerpo JSON: {str(e)}")
-            if request.headers.get("content-type") == "application/json":
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Error al procesar el cuerpo JSON: {str(e)}"
-                )
-            # Si no hay cuerpo JSON o hay un error, usar los parámetros de consulta
-            pass
-        
-        # Validar que los campos obligatorios estén presentes
-        if nombre_producto is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El nombre del producto es obligatorio"
-            )
-        if price is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El precio del producto es obligatorio"
-            )
-        if category_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="La categoría del producto es obligatoria"
-            )
-        
-        # Validar tipos de datos
-        try:
-            if price is not None:
-                price = float(price)
-            if category_id is not None:
-                category_id = int(category_id)
-            if stock_quantity is not None:
-                stock_quantity = int(stock_quantity)
-            if min_stock is not None:
-                min_stock = int(min_stock)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Error en el formato de los datos: price debe ser un número, category_id, stock_quantity y min_stock deben ser enteros"
-            )
-        
-        # Verificar que la categoría existe
+        # Validar que la categoría existe
         check_category_query = "SELECT id FROM categories WHERE id = %s"
-        existing_category = execute_query(check_category_query, (category_id,), fetch_one=True)
+        existing_category = execute_query(check_category_query, (product.categoria_id,), fetch_one=True)
         
         if not existing_category:
             # Listar categorías disponibles
@@ -336,61 +271,104 @@ async def create_product(
             
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"La categoría con ID {category_id} no existe. Categorías disponibles:\n{categories_info}"
+                detail=f"La categoría con ID {product.categoria_id} no existe. Categorías disponibles:\n{categories_info}"
             )
         
-        # Valores por defecto
-        if stock_quantity is None:
-            stock_quantity = 0
-        if min_stock is None:
-            min_stock = 5
+        # Intentar crear el producto directamente con una consulta SQL
+        query = """
+        INSERT INTO products (nombre_producto, price, category_id, user_id, variante, is_active, stock_quantity, min_stock)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """
         
-        # Intentar crear el producto
-        product_id = ProductService.create_product(
-            nombre_producto=nombre_producto,
-            price=price,
-            category_id=category_id,
-            user_id=current_user["id"],
-            variante=variante,
-            stock_quantity=stock_quantity,
-            min_stock=min_stock
-        )
-        
-        # Si no se pudo obtener el ID del producto, intentar obtenerlo directamente
-        if not product_id:
-            # Verificar si el producto se creó correctamente
-            check_query = """
-            SELECT id FROM products 
-            WHERE nombre_producto = %s 
-            AND price = %s 
-            AND category_id = %s 
-            AND user_id = %s 
-            ORDER BY created_at DESC 
-            LIMIT 1
-            """
-            check_result = execute_query(
-                check_query, 
-                (nombre_producto, price, category_id, current_user["id"]), 
-                fetch_one=True
-            )
+        try:
+            print(f"Intentando insertar producto directamente: {product.nombre_producto}, {product.precio_cop}, {product.categoria_id}, {product.user_id}, {product.variante}, {product.is_active}")
             
-            if check_result:
-                product_id = check_result["id"]
-                return {"id": product_id, "message": "Producto creado exitosamente"}
+            # Verificar si la tabla products existe
+            check_table_query = "SHOW TABLES LIKE 'products'"
+            table_exists = execute_query(check_table_query, fetch_one=True)
+            if not table_exists:
+                print("La tabla 'products' no existe")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="La tabla 'products' no existe en la base de datos"
+                )
+            
+            # Verificar la estructura de la tabla
+            describe_query = "DESCRIBE products"
+            columns = execute_query(describe_query, fetch_all=True)
+            print("Estructura de la tabla 'products':")
+            for column in columns:
+                print(f"- {column['Field']} ({column['Type']})")
+            
+            # Establecer stock_quantity en -1 para indicar disponibilidad bajo demanda
+            stock_quantity = -1  # -1 indica disponibilidad bajo demanda
+            min_stock = 0  # 0 para productos bajo demanda
+            
+            # Ejecutar la inserción
+            result = execute_query(query, (
+                product.nombre_producto, 
+                product.precio_cop,
+                product.categoria_id,
+                product.user_id,
+                product.variante,
+                product.is_active,
+                stock_quantity,
+                min_stock
+            ))
+            
+            if result is None:
+                print("La ejecución de la consulta devolvió None")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Error al insertar el producto en la base de datos"
+                )
+            
+            # Obtener el ID del producto recién creado
+            id_query = "SELECT LAST_INSERT_ID() as id"
+            id_result = execute_query(id_query, fetch_one=True)
+            product_id = id_result['id'] if id_result else None
+            
+            if not product_id:
+                print("No se pudo obtener el ID del producto creado")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Error al crear el producto: no se pudo obtener el ID"
+                )
+            
+            return {
+                "id": product_id, 
+                "message": "Producto creado exitosamente",
+                "note": "Este producto está configurado como disponible bajo demanda. El control de inventario se realiza a través de los insumos."
+            }
+        except Exception as e:
+            error_msg = str(e)
+            print(f"Error al insertar producto directamente: {error_msg}")
+            
+            # Intentar obtener más información sobre el error
+            if "Unknown column" in error_msg:
+                column_name = error_msg.split("'")[1] if "'" in error_msg else "desconocida"
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error al crear el producto: la columna '{column_name}' no existe en la tabla"
+                )
+            elif "Duplicate entry" in error_msg:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Ya existe un producto con ese nombre o identificador"
+                )
             else:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Error al crear el producto. No se pudo obtener el ID del producto creado."
+                    detail=f"Error al crear el producto: {error_msg}"
                 )
-        
-        return {"id": product_id, "message": "Producto creado exitosamente"}
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error inesperado al crear producto: {str(e)}")
+        error_msg = str(e)
+        print(f"Error inesperado al crear producto: {error_msg}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error inesperado al crear el producto: {str(e)}"
+            detail=f"Error inesperado al crear el producto: {error_msg}"
         )
 
 @router_products.get("/{product_id}")
@@ -980,7 +958,7 @@ async def simple_create_product(
     request: Request,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Crear un producto de forma simplificada"""
+    """Crear un producto de forma simplificada para heladería (bajo demanda)"""
     from database.db import execute_query
     
     try:
@@ -994,8 +972,8 @@ async def simple_create_product(
         
         # Extraer datos opcionales
         variante = body.get("variante")
-        stock_quantity = body.get("stock_quantity", 0)
-        min_stock = body.get("min_stock", 5)
+        stock_quantity = body.get("stock_quantity", -1)  # -1 indica disponibilidad bajo demanda
+        min_stock = body.get("min_stock", 0)  # 0 para productos bajo demanda
         
         # Validar datos obligatorios
         if not nombre_producto or not price or not category_id:
@@ -1042,7 +1020,11 @@ async def simple_create_product(
                 id_result = execute_query(id_query, fetch_one=True)
                 product_id = id_result['id'] if id_result else None
                 
-                return {"id": product_id, "message": "Producto creado exitosamente"}
+                return {
+                    "id": product_id, 
+                    "message": "Producto creado exitosamente",
+                    "note": "Este producto está configurado como disponible bajo demanda. Recuerde asociarle una receta para controlar el inventario de insumos."
+                }
             else:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

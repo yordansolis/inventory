@@ -83,6 +83,12 @@ class SupplierResponse(SupplierBase):
     class Config:
         from_attributes = True
 
+# Esquema para insumos en recetas de productos
+class Insumo(BaseModel):
+    nombre: str
+    cantidad: float
+    unidad: str
+
 # Esquemas de Producto
 class ProductBase(BaseModel):
     name: str
@@ -93,8 +99,15 @@ class ProductBase(BaseModel):
     min_stock: int = 5
     barcode: Optional[str] = None
 
-class ProductCreate(ProductBase):
-    stock_quantity: int = 0
+class ProductCreate(BaseModel):
+    nombre_producto: str
+    variante: Optional[str] = None
+    precio_cop: float
+    user_id: int
+    categoria_id: int
+    is_active: bool = True
+    # No incluimos stock_quantity ni min_stock aquí porque se establecerán
+    # automáticamente como -1 y 0 respectivamente para productos bajo demanda
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
