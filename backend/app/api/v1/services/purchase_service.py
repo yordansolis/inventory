@@ -159,7 +159,7 @@ class PurchaseService:
             products: Lista de productos a vender
             
         Returns:
-            Dict con 'is_valid' (bool) y 'errors' (lista de errores)
+            Dict con 'is_valid' (bool) y 'errors' (lista de errores),
         """
         errors = []
         insumos_needed = {}  # Diccionario para acumular necesidades totales por insumo
