@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 
 import {
   ShoppingCart,
@@ -26,150 +26,7 @@ import {
 import { Card, Badge, Button } from "./ui";
 import ItemListDisplay from "./ItemListDisplay";
 
-// Datos de ejemplo basados en tu estructura
-const productosVendibles = [
-  {
-    id: 1,
-    nombre: "BOLA DE HELADO DE VAINILLA",
-    tipo: "HELADO",
-    precio: 1000,
-    stock: 25,
-    minimo: 10,
-    estado: "bien",
-  },
-  {
-    id: 2,
-    nombre: "BOLA DE HELADO DE FRESA",
-    tipo: "HELADO",
-    precio: 1500,
-    stock: 8,
-    minimo: 5,
-    estado: "bien",
-  },
-  {
-    id: 3,
-    nombre: "BOLA DE ESPUMA",
-    tipo: "ESPUMA",
-    precio: 5000,
-    stock: 3,
-    minimo: 10,
-    estado: "bajo",
-  },
-  {
-    id: 4,
-    nombre: "MINI PANCAKES",
-    tipo: "PANCAKES",
-    precio: 1000,
-    stock: 100,
-    minimo: 10,
-    estado: "bien",
-  },
-  {
-    id: 5,
-    nombre: "MINI DONAS X12",
-    tipo: "DONAS",
-    precio: 3000,
-    stock: 300,
-    minimo: 10,
-    estado: "bien",
-  },
-  {
-    id: 6,
-    nombre: "MALTEADA DE VAINILLA",
-    tipo: "MALTEADA",
-    precio: 4000,
-    stock: 15,
-    minimo: 5,
-    estado: "bien",
-  },
-  {
-    id: 7,
-    nombre: "WAFFLE TRADICIONAL",
-    tipo: "WAFFLE",
-    precio: 3500,
-    stock: 20,
-    minimo: 5,
-    estado: "bien",
-  },
-];
-
-// Nuevos datos para adiciones
-const adicionesDisponibles = [
-  {
-    id: 101,
-    nombre: "CREMA CHANTILLY",
-    tipo: "TOPPING",
-    precio: 500,
-    stock: 50,
-    minimo: 10,
-    estado: "bien",
-  },
-  {
-    id: 102,
-    nombre: "AREQUIPE",
-    tipo: "TOPPING",
-    precio: 800,
-    stock: 30,
-    minimo: 5,
-    estado: "bien",
-  },
-  {
-    id: 103,
-    nombre: "CHISPAS DE CHOCOLATE",
-    tipo: "TOPPING",
-    precio: 300,
-    stock: 100,
-    minimo: 20,
-    estado: "bien",
-  },
-  {
-    id: 104,
-    nombre: "FRESAS NATURALES",
-    tipo: "FRUTA",
-    precio: 1000,
-    stock: 15,
-    minimo: 5,
-    estado: "bien",
-  },
-  {
-    id: 105,
-    nombre: "BANANO",
-    tipo: "FRUTA",
-    precio: 700,
-    stock: 25,
-    minimo: 10,
-    estado: "bien",
-  },
-  {
-    id: 106,
-    nombre: "SALSA DE CHOCOLATE",
-    tipo: "SALSA",
-    precio: 600,
-    stock: 40,
-    minimo: 10,
-    estado: "bien",
-  },
-  {
-    id: 107,
-    nombre: "SALSA DE FRESA",
-    tipo: "SALSA",
-    precio: 600,
-    stock: 35,
-    minimo: 10,
-    estado: "bien",
-  },
-  {
-    id: 108,
-    nombre: "GRANOLA",
-    tipo: "CEREAL",
-    precio: 400,
-    stock: 60,
-    minimo: 15,
-    estado: "bien",
-  },
-];
-
-export default function FacturacionSection() {
+export default function FacturacionSection({ productosVendibles, productosConsumibles }) {
   // Estados para facturación
   const [carrito, setCarrito] = useState([]);
   const [cliente, setCliente] = useState("");
@@ -217,12 +74,8 @@ export default function FacturacionSection() {
 
   // Filtrar adiciones según búsqueda
   const adicionesFiltradas = useMemo(() => {
-    if (!busquedaProducto) return adicionesDisponibles;
-    return adicionesDisponibles.filter(
-      (adicion) =>
-        adicion.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-        adicion.tipo.toLowerCase().includes(busquedaProducto.toLowerCase())
-    );
+    // Since we don't have adicionesDisponibles anymore, use an empty array
+    return [];
   }, [busquedaProducto]);
 
   // Funciones para facturación
@@ -347,9 +200,8 @@ export default function FacturacionSection() {
       errores.push("El nombre del cliente es obligatorio");
     }
 
-    if (!vendedor.trim()) {
-      errores.push("El nombre del vendedor es obligatorio");
-    }
+    // Ya no validamos el campo vendedor porque se establece automáticamente
+    // y es de solo lectura
 
     if (domicilio && !direccion.trim()) {
       errores.push("La dirección es obligatoria para domicilios");
@@ -408,6 +260,51 @@ export default function FacturacionSection() {
     setUltimaFactura(factura);
     setMostrarFactura(true);
   };
+
+  // Obtener el nombre de usuario al cargar el componente
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (typeof window !== 'undefined') {
+        try {
+          // Primero intentamos obtener el nombre de usuario del localStorage
+          const username = localStorage.getItem('username') || '';
+          if (username) {
+            setVendedor(username);
+          }
+          
+          // Luego intentamos obtener más información del usuario desde la API
+          const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://localhost:8000';
+          const token = localStorage.getItem('authToken');
+          
+          if (token) {
+            const headers = {
+              'Authorization': `bearer ${token}`,
+              'Content-Type': 'application/json'
+            };
+            
+            const response = await fetch(`${apiUrl}/api/v1/users/auth/me`, {
+              method: 'GET',
+              headers
+            });
+            
+            if (response.ok) {
+              const userData = await response.json();
+              // Si hay un nombre completo disponible, lo usamos
+              if (userData && userData.full_name) {
+                setVendedor(userData.full_name);
+              } else if (userData && userData.username && userData.username !== username) {
+                setVendedor(userData.username);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error al obtener datos del usuario:", error);
+        }
+      }
+    };
+
+    fetchUserData();
+  }, []);
 
   return (
     <div>
@@ -626,15 +523,20 @@ export default function FacturacionSection() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Vendedor *
+                  Vendedor <span className="text-xs text-gray-500">(Tu nombre de usuario)</span>
                 </label>
-                <input
-                  type="text"
-                  value={vendedor}
-                  onChange={(e) => setVendedor(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nombre del vendedor"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={vendedor}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
+                    placeholder="Nombre del vendedor"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                    <User className="h-4 w-4 text-gray-500" />
+                  </div>
+                </div>
               </div>
 
               <div>

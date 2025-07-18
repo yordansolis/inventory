@@ -20,7 +20,11 @@ const ItemListDisplay = ({ items, onAddItem, formatPrice, badgeVariant }) => {
                 {item.tipo}
               </Badge>
             </div>
-            <Button size="sm" onClick={() => onAddItem(item)} disabled={item.stock <= 0}>
+            <Button 
+              size="sm" 
+              onClick={() => onAddItem(item)} 
+              disabled={item.stock === 0 || (typeof item.stock === 'number' && item.stock <= 0)}
+            >
               <Plus className="h-4 w-4 mr-1" />
               Agregar
             </Button>

@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { Card, Button } from '../../../../../components/ui'; // Adjust path as needed
-import { getAuthHeaders } from '../../../utils/auth';
+import { getAuthHeaders, getUserId } from '../../../utils/auth';
 import {
   useReactTable,
   getCoreRowModel,
@@ -380,7 +380,7 @@ export default function ProductsPage() {
         variante: formData.variante.trim() || null,
         price: parsedPrecio, // Usar precio_cop como en el esquema ProductCreate
         category_id: parsedIdCategoria, // Usar categoria_id como en el esquema ProductCreate
-        user_id: 1, // Asumimos que el ID del usuario actual es 1
+        user_id: getUserId(), // Obtener el ID del usuario de la sesión
         is_active: true
       };
       
@@ -414,7 +414,7 @@ export default function ProductsPage() {
             variante: formData.variante.trim() || null,
             precio_cop: parsedPrecio,
             categoria_id: parseInt(formData.id_categoria),
-            user_id: 1,
+            user_id: getUserId(),
             is_active: true
           })
         });
