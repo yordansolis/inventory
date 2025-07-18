@@ -273,9 +273,129 @@ export default function FacturacionSection({ productosVendibles, productosConsum
       cambioDevuelto: montoPagado - (calcularTotal + (domicilio ? tarifaDomicilio : 0)),
     };
 
+    // Enviar la factura al backend
+    enviarFacturaAlBackend(factura);
+
     setUltimaFactura(factura);
     setMostrarFactura(true);
     setAlertDialogOpen(false);
+  };
+
+  // Función para enviar la factura al backend
+  const enviarFacturaAlBackend = async (factura) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://localhost:8000';
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        console.error("No se encontró token de autenticación");
+        return;
+      }
+      
+      const headers = {
+        'Authorization': `bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      // Preparar los datos para el backend
+      // Opción 1: Formato para /api/v1/sales
+      const salesData = {
+        items: factura.productos.map(item => ({
+          product_id: item.id,
+          quantity: item.cantidad,
+          unit_price: item.precio
+        })),
+        payment_method: factura.metodoPago,
+        notes: `Cliente: ${factura.cliente}${factura.domicilio ? `, Domicilio: ${factura.direccion}` : ''}`
+      };
+      
+      // Opción 2: Formato para /api/v1/services/purchases
+      const purchaseData = {
+        invoice_number: factura.id,
+        invoice_date: new Date().toLocaleDateString('en-US', {day: '2-digit', month: '2-digit', year: 'numeric'}).replace(/(\d+)\/(\d+)\/(\d+)/, '$2/$1/$3'),
+        invoice_time: new Date().toLocaleTimeString('en-US'),
+        client_name: factura.cliente,
+        seller_username: factura.vendedor,
+        client_phone: factura.telefono || "",
+        has_delivery: factura.domicilio,
+        delivery_address: factura.direccion || "",
+        delivery_person: factura.nombreDomiciliario || "",
+        delivery_fee: factura.tarifaDomicilio || 0,
+        subtotal_products: factura.subtotal,
+        total_amount: factura.total + (factura.domicilio ? factura.tarifaDomicilio : 0),
+        amount_paid: factura.montoPagado,
+        change_returned: factura.cambioDevuelto,
+        payment_method: factura.metodoPago,
+        payment_reference: factura.cuentaReferencia || "",
+        products: factura.productos.map(item => ({
+          product_name: item.nombre,
+          product_variant: item.variante || "",
+          quantity: item.cantidad,
+          unit_price: item.precio,
+          subtotal: item.cantidad * item.precio
+        }))
+      };
+      
+      console.log("Intentando enviar factura al backend...");
+      
+      // Primero intentamos con el endpoint de purchases
+      try {
+        const purchaseResponse = await fetch(`${apiUrl}/api/v1/services/purchases`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(purchaseData)
+        });
+        
+        if (purchaseResponse.ok) {
+          const responseData = await purchaseResponse.json();
+          console.log("Factura guardada exitosamente como compra:", responseData);
+          
+          // Actualizar el ID de la factura con el ID generado por el backend
+          if (responseData && responseData.purchase_id) {
+            setUltimaFactura(prev => ({
+              ...prev,
+              id: responseData.purchase_id
+            }));
+          }
+          return;
+        } else {
+          console.warn("No se pudo guardar como compra, intentando como venta...");
+        }
+      } catch (purchaseError) {
+        console.warn("Error al intentar guardar como compra:", purchaseError);
+      }
+      
+      // Si falla, intentamos con el endpoint de sales
+      const salesResponse = await fetch(`${apiUrl}/api/v1/sales`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(salesData)
+      });
+      
+      if (!salesResponse.ok) {
+        const errorData = await salesResponse.json().catch(() => ({}));
+        console.error("Error al enviar factura:", salesResponse.status, errorData);
+        // Opcional: Mostrar notificación de error
+        alert(`Error al guardar la factura en el sistema: ${salesResponse.status}`);
+        return;
+      }
+      
+      const responseData = await salesResponse.json();
+      console.log("Factura guardada exitosamente como venta:", responseData);
+      
+      // Actualizar el ID de la factura con el ID generado por el backend
+      if (responseData && responseData.id) {
+        setUltimaFactura(prev => ({
+          ...prev,
+          id: responseData.id
+        }));
+      }
+      
+    } catch (error) {
+      console.error("Error al procesar la factura:", error);
+      // Opcional: Mostrar notificación de error
+      alert("Error al procesar la factura: " + error.message);
+    }
   };
 
   // Obtener el nombre de usuario al cargar el componente
