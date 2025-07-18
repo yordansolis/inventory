@@ -21,34 +21,17 @@ class SalesService:
         """
         # Obtener la receta del producto
         recipe_query = """
-        SELECT pr.insumo_id, pr.cantidad, i.nombre_insumo, i.stock_actual, i.unidad
+        SELECT pr.insumo_id, pr.cantidad, i.nombre_insumo, i.unidad
         FROM product_recipes pr
         JOIN insumos i ON pr.insumo_id = i.id
         WHERE pr.product_id = %s
         """
         recipe_items = execute_query(recipe_query, (product_id,), fetch_all=True) or []
         
-        missing_insumos = []
-        
-        # Verificar cada insumo
-        for item in recipe_items:
-            total_needed = item['cantidad'] * quantity
-            stock_actual = item['stock_actual'] or 0
-            
-            # Si el stock actual es menor que lo necesario, añadir a la lista de faltantes
-            if stock_actual < total_needed:
-                missing_insumos.append({
-                    'insumo_id': item['insumo_id'],
-                    'nombre_insumo': item['nombre_insumo'],
-                    'needed': total_needed,
-                    'available': stock_actual,
-                    'missing': total_needed - stock_actual,
-                    'unidad': item['unidad']
-                })
-        
+        # Asumimos que hay disponibilidad ya que no estamos usando stock_actual
         return {
-            'available': len(missing_insumos) == 0,
-            'missing_insumos': missing_insumos
+            'available': True,
+            'missing_insumos': []
         }
     
     @staticmethod
@@ -76,14 +59,7 @@ class SalesService:
     @staticmethod
     def add_sale_detail(sale_id: int, product_id: int, quantity: int, unit_price: float) -> bool:
         """Añadir un detalle a una venta"""
-        # Verificar si hay suficiente stock de insumos
-        availability = SalesService.check_insumos_availability(product_id, quantity)
-        if not availability['available']:
-            logger.error(f"No hay suficiente stock de insumos para el producto {product_id}")
-            for insumo in availability['missing_insumos']:
-                logger.error(f"Insumo: {insumo['nombre_insumo']}, Necesario: {insumo['needed']}, Disponible: {insumo['available']}")
-            return False
-        
+        # Ya no verificamos stock_actual
         query = """
         INSERT INTO sale_details (sale_id, product_id, quantity, unit_price)
         VALUES (%s, %s, %s, %s)
@@ -199,14 +175,7 @@ class SalesService:
         
         items: Lista de diccionarios con {product_id, quantity, unit_price}
         """
-        # Verificar si hay suficiente stock de insumos para todos los productos
-        for item in items:
-            availability = SalesService.check_insumos_availability(item['product_id'], item['quantity'])
-            if not availability['available']:
-                logger.error(f"No hay suficiente stock de insumos para el producto {item['product_id']}")
-                for insumo in availability['missing_insumos']:
-                    logger.error(f"Insumo: {insumo['nombre_insumo']}, Necesario: {insumo['needed']}, Disponible: {insumo['available']}")
-                return None
+        # Ya no verificamos stock_actual
         
         # Calcular el total de la venta
         total_amount = sum(item['quantity'] * item['unit_price'] for item in items)

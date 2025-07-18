@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from api.v1.router import router_user
+from api.v1.services.service import router_services
 from api.v1.auth_service.login import get_current_active_user
 from database.db import create_tables, execute_query
 from dotenv import load_dotenv
@@ -46,6 +47,7 @@ def read_root():
 
 # Incluir las rutas de la API
 app.include_router(router_user, prefix="/api/v1/users", tags=["usuarios"])
+app.include_router(router_services, prefix="/api/v1/services", tags=["services"])
 
 # Incluir rutas de gestión de usuarios y roles
 from api.v1.crud_users.router_users import router_crud_users

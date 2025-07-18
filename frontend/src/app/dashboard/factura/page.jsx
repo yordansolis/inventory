@@ -16,10 +16,10 @@ export default function InventoryDashboard() {
       try {
         // Try different ports based on the README.md
         const possiblePorts = [8000, 8081, 8089, 8052];
-        let productsData = [];
+        let stockData = null;
         let insumosData = [];
         let apiUrl = '';
-        let productsResponse = null;
+        let stockResponse = null;
         let insumosResponse = null;
         let success = false;
         
@@ -30,13 +30,15 @@ export default function InventoryDashboard() {
           const headers = getAuthHeaders();
           
           try {
-            productsResponse = await fetch(`${apiUrl}/api/v1/products`, {
+            // Fetch stock data from the new endpoint
+            stockResponse = await fetch(`${apiUrl}/api/v1/services/stock`, {
               method: 'GET',
               headers
             });
             
-            if (productsResponse.ok) {
-              productsData = await productsResponse.json();
+            if (stockResponse.ok) {
+              const stockResult = await stockResponse.json();
+              stockData = stockResult.productos || [];
               
               insumosResponse = await fetch(`${apiUrl}/api/v1/insumos`, {
                 method: 'GET',
@@ -62,15 +64,17 @@ export default function InventoryDashboard() {
             const headers = getAuthHeaders();
             
             try {
-              productsResponse = await fetch(`${apiUrl}/api/v1/products`, {
+              // Fetch stock data from the new endpoint
+              stockResponse = await fetch(`${apiUrl}/api/v1/services/stock`, {
                 method: 'GET',
                 headers
               });
               
-              console.log(`Port ${port} products status:`, productsResponse.status);
+              console.log(`Port ${port} stock status:`, stockResponse.status);
               
-              if (productsResponse.ok) {
-                productsData = await productsResponse.json();
+              if (stockResponse.ok) {
+                const stockResult = await stockResponse.json();
+                stockData = stockResult.productos || [];
                 
                 insumosResponse = await fetch(`${apiUrl}/api/v1/insumos`, {
                   method: 'GET',
@@ -95,12 +99,12 @@ export default function InventoryDashboard() {
           throw new Error('No se pudo conectar a la API en ninguno de los puertos probados');
         }
         
-        console.log("Products data:", productsData);
+        console.log("Stock data:", stockData);
         console.log("Insumos data:", insumosData);
         
-        // Use default data if the API returns an empty array
-        if (!productsData || productsData.length === 0) {
-          console.warn("No products found in API response, using default data");
+        // Process stock data
+        if (!stockData || stockData.length === 0) {
+          console.warn("No stock data found in API response, using default data");
           setProductosVendibles([
             {
               id: 1,
@@ -122,23 +126,24 @@ export default function InventoryDashboard() {
             }
           ]);
         } else {
-          // Transform products data to match the expected format
-          const formattedProducts = productsData.map(product => ({
-            id: product.id,
-            nombre: product.nombre_producto,
+          // Transform stock data to match the expected format
+          const formattedProducts = stockData.map(product => ({
+            id: product.producto_id,
+            nombre: product.nombre_producto + (product.variante ? ` - ${product.variante}` : ''),
             tipo: product.categoria_nombre || "Sin categoría",
-            precio: product.price,
-            stock: product.stock_quantity === -1 ? "Bajo demanda" : product.stock_quantity,
-            minimo: product.min_stock || 0,
-            estado: product.stock_quantity === -1 ? "bien" : 
-                   (product.stock_quantity < product.min_stock ? "bajo" : "bien"),
+            precio: product.precio,
+            stock: product.stock_disponible,
+            stockCalculado: product.stock_disponible, // Nueva propiedad para mostrar el stock calculado
+            minimo: 0,
+            estado: product.stock_disponible === 0 ? "agotado" : 
+                   (product.stock_disponible <= 5 ? "bajo" : "bien"),
             variante: product.variante || ""
           }));
           
           setProductosVendibles(formattedProducts);
         }
         
-        // Use default data if the API returns an empty array
+        // Process insumos data
         if (!insumosData || insumosData.length === 0) {
           console.warn("No insumos found in API response, using default data");
           setProductosConsumibles([
@@ -150,9 +155,9 @@ export default function InventoryDashboard() {
           const formattedInsumos = insumosData.map(insumo => ({
             id: insumo.id,
             nombre: insumo.nombre_insumo,
-            cantidad: insumo.cantidad_utilizada || 0,
+            cantidad: insumo.cantidad_unitaria || 0,
             minimo: insumo.stock_minimo || 0,
-            estado: (insumo.cantidad_utilizada < insumo.stock_minimo) ? "bajo" : "bien",
+            estado: (insumo.cantidad_unitaria < insumo.stock_minimo) ? "bajo" : "bien",
             unidad: insumo.unidad
           }));
           
@@ -161,9 +166,9 @@ export default function InventoryDashboard() {
         
         setDebug({
           apiUrl,
-          productsStatus: productsResponse?.status,
+          stockStatus: stockResponse?.status,
           insumosStatus: insumosResponse?.status,
-          productCount: productsData?.length || 0,
+          productCount: stockData?.length || 0,
           insumoCount: insumosData?.length || 0
         });
         

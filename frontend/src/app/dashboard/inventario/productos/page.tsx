@@ -85,12 +85,17 @@ export default function ProductsPage() {
   const [globalFilter, setGlobalFilter] = useState('');
 
   const formatPrice = useCallback((price: number) => {
-    return new Intl.NumberFormat('es-CO', {
+    // First format with standard currency formatting
+    const formatted = new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
-      minimumFractionDigits: 2,
+      minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(price);
+    
+    // Remove trailing zeros after decimal point
+    // If the price has no meaningful decimal part (e.g. 10.00), remove the decimal part entirely
+    return formatted.replace(/,00($|\s)/g, '$1');
   }, []);
 
   const formatDateToDDMMYYYY = useCallback((dateString: string) => {
@@ -301,22 +306,40 @@ export default function ProductsPage() {
   }, []);
 
   const handlePriceInputFocus = useCallback(() => {
+    // When focusing, show the raw value without formatting
     const rawValue = formData.precio;
     setDisplayPrice(rawValue);
   }, [formData.precio]);
 
   const handlePriceInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
-    setDisplayPrice(inputValue);
+    // Allow only numbers, commas, dots, and ensure only one decimal separator
+    const sanitizedValue = inputValue.replace(/[^\d.,]/g, '');
+    setDisplayPrice(sanitizedValue);
   }, []);
 
   const handlePriceInputBlur = useCallback(() => {
+    // Process the input value when the field loses focus
     const rawInputForProcessing = displayPrice;
-    const cleanedForInternalState = rawInputForProcessing.replace(/[^0-9.,]/g, '');
-    const standardizedValue = cleanedForInternalState.replace(/,/g, '.');
+    
+    // Clean the input: remove all non-numeric, non-decimal characters
+    const cleanedForInternalState = rawInputForProcessing.replace(/[^\d.,]/g, '');
+    
+    // Standardize to use period as decimal separator
+    let standardizedValue = cleanedForInternalState.replace(/,/g, '.');
+    
+    // Ensure only one decimal point exists
+    const decimalPoints = standardizedValue.match(/\./g);
+    if (decimalPoints && decimalPoints.length > 1) {
+      // Keep only the first decimal point
+      const parts = standardizedValue.split('.');
+      standardizedValue = parts[0] + '.' + parts.slice(1).join('');
+    }
 
+    // Store the standardized value in the form data
     setFormData(prev => ({ ...prev, precio: standardizedValue }));
 
+    // Format for display
     const numericPrice = parseFloat(standardizedValue);
     if (!isNaN(numericPrice) && standardizedValue.trim() !== '') {
       setDisplayPrice(formatPrice(numericPrice));
@@ -362,6 +385,7 @@ export default function ProductsPage() {
   }, []);
 
   const handleAddOrUpdateProducto = useCallback(async () => {
+    // Parse the price value, ensuring we get a valid number with decimals
     const parsedPrecio = parseFloat(formData.precio);
     const parsedIdCategoria = formData.id_categoria === '' ? null : parseInt(formData.id_categoria);
 
@@ -374,11 +398,14 @@ export default function ProductsPage() {
       const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8052';
       const headers = getAuthHeaders();
       
+      // Ensure price is properly rounded to 2 decimal places for consistency
+      const finalPrice = Math.round(parsedPrecio * 100) / 100;
+      
       // Crear el producto con stock_quantity = -1 para indicar disponibilidad bajo demanda
       const productData = {
         nombre_producto: formData.nombre_producto.trim(),
         variante: formData.variante.trim() || null,
-        price: parsedPrecio, // Usar precio_cop como en el esquema ProductCreate
+        price: finalPrice, // Usar precio_cop como en el esquema ProductCreate
         category_id: parsedIdCategoria, // Usar categoria_id como en el esquema ProductCreate
         user_id: getUserId(), // Obtener el ID del usuario de la sesión
         is_active: true
@@ -412,7 +439,7 @@ export default function ProductsPage() {
           body: JSON.stringify({
             nombre_producto: formData.nombre_producto.trim(),
             variante: formData.variante.trim() || null,
-            precio_cop: parsedPrecio,
+            precio_cop: finalPrice,
             categoria_id: parseInt(formData.id_categoria),
             user_id: getUserId(),
             is_active: true

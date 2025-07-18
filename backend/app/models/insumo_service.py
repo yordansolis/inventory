@@ -9,7 +9,7 @@ class InsumoService:
     @staticmethod
     def create_insumo(nombre_insumo: str, unidad: str, cantidad_unitaria: float, 
                      precio_presentacion: float, cantidad_utilizada: float = 0,
-                     stock_minimo: float = 0, stock_actual: float = 0,
+                     stock_minimo: float = 0, 
                      sitio_referencia: Optional[str] = None) -> Optional[int]:
         """Crear un nuevo insumo"""
         # Verificar si ya existe un insumo con el mismo nombre
@@ -22,14 +22,14 @@ class InsumoService:
             
         query = """
         INSERT INTO insumos (nombre_insumo, unidad, cantidad_unitaria, precio_presentacion,
-                           cantidad_utilizada, stock_minimo, stock_actual, sitio_referencia)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                           cantidad_utilizada, stock_minimo, sitio_referencia)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
         
         try:
-            print(f"Intentando crear insumo: {nombre_insumo}, {unidad}, {cantidad_unitaria}, {precio_presentacion}, {cantidad_utilizada}, {stock_minimo}, {stock_actual}, {sitio_referencia}")
+            print(f"Intentando crear insumo: {nombre_insumo}, {unidad}, {cantidad_unitaria}, {precio_presentacion}, {cantidad_utilizada}, {stock_minimo},  {sitio_referencia}")
             result = execute_query(query, (nombre_insumo, unidad, cantidad_unitaria, precio_presentacion,
-                                         cantidad_utilizada, stock_minimo, stock_actual, sitio_referencia))
+                                         cantidad_utilizada, stock_minimo,  sitio_referencia))
             print(f"Resultado de execute_query: {result}")
             
             if result is not None:
@@ -183,7 +183,7 @@ class InsumoService:
     @staticmethod
     def update_cantidad_utilizada(insumo_id: int, cantidad_a_incrementar: float) -> bool:
         """
-        Incrementar la cantidad utilizada de un insumo y reducir el stock actual
+        Incrementar la cantidad utilizada de un insumo
         
         Args:
             insumo_id: ID del insumo a actualizar
@@ -192,25 +192,16 @@ class InsumoService:
         Returns:
             bool: True si la actualización fue exitosa, False en caso contrario
         """
-        # Verificar que hay suficiente stock
-        check_query = "SELECT stock_actual FROM insumos WHERE id = %s"
-        check_result = execute_query(check_query, (insumo_id,), fetch_one=True)
-        
-        if not check_result or check_result['stock_actual'] < cantidad_a_incrementar:
-            logger.error(f"Stock insuficiente para el insumo {insumo_id}. Disponible: {check_result['stock_actual'] if check_result else 0}, Necesario: {cantidad_a_incrementar}")
-            return False
-        
         query = """
         UPDATE insumos
-        SET cantidad_utilizada = cantidad_utilizada + %s,
-            stock_actual = stock_actual - %s
+        SET cantidad_utilizada = cantidad_utilizada + %s
         WHERE id = %s
         """
         
         try:
-            result = execute_query(query, (cantidad_a_incrementar, cantidad_a_incrementar, insumo_id))
+            result = execute_query(query, (cantidad_a_incrementar, insumo_id))
             if result > 0:
-                logger.info(f"Insumo {insumo_id}: cantidad utilizada +{cantidad_a_incrementar}, stock actual -{cantidad_a_incrementar}")
+                logger.info(f"Insumo {insumo_id}: cantidad utilizada +{cantidad_a_incrementar}")
                 return True
             else:
                 logger.error(f"No se pudo actualizar el insumo {insumo_id}")
@@ -240,33 +231,17 @@ class InsumoService:
     @staticmethod
     def add_stock(insumo_id: int, cantidad_a_agregar: float) -> bool:
         """
-        Incrementar el stock actual de un insumo
+        Método mantenido por compatibilidad, pero ya no modifica stock_actual
         
         Args:
             insumo_id: ID del insumo a actualizar
-            cantidad_a_agregar: Cantidad a agregar al stock actual
+            cantidad_a_agregar: Cantidad a agregar (ya no se usa)
             
         Returns:
-            bool: True si la actualización fue exitosa, False en caso contrario
+            bool: True siempre, para mantener compatibilidad
         """
-        query = """
-        UPDATE insumos
-        SET stock_actual = stock_actual + %s
-        WHERE id = %s
-        """
-        
-        try:
-            result = execute_query(query, (cantidad_a_agregar, insumo_id))
-            if result > 0:
-                logger.info(f"Stock actual del insumo {insumo_id} incrementado en {cantidad_a_agregar}")
-                return True
-            else:
-                logger.error(f"No se pudo actualizar el stock del insumo {insumo_id}")
-                return False
-        except Exception as e:
-            logger.error(f"Error actualizando stock del insumo {insumo_id}: {e}")
-            print(f"Error detallado al actualizar stock del insumo {insumo_id}: {str(e)}")
-            return False
+        logger.info(f"Método add_stock llamado pero ya no modifica stock_actual")
+        return True
     
     # COMENTADO: Este método ya no funciona porque cantidad_actual no existe en la nueva estructura
     # @staticmethod
