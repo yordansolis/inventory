@@ -821,7 +821,7 @@ export default function ProductsPage() {
                             key={cell.id}
                             className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
                           >
-                            {cell.getValue() as string}
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>
                         ))}
                       </tr>
