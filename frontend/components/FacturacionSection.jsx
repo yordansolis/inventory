@@ -36,6 +36,12 @@ import {
 } from "./ui/alert-dialog";
 import ItemListDisplay from "./ItemListDisplay";
 
+// Verificar que React está disponible
+console.log("React disponible:", typeof React);
+console.log("useState disponible:", typeof useState);
+console.log("useEffect disponible:", typeof useEffect);
+console.log("useMemo disponible:", typeof useMemo);
+
 export default function FacturacionSection({ productosVendibles, productosConsumibles }) {
   // Estados para facturación
   const [carrito, setCarrito] = useState([]);
@@ -63,6 +69,34 @@ export default function FacturacionSection({ productosVendibles, productosConsum
   const [tarifaDomicilio, setTarifaDomicilio] = useState(0);
   const [displayTarifaDomicilio, setDisplayTarifaDomicilio] = useState("");
 
+  // Console log to debug product data
+  useEffect(() => {
+    console.log("ProductosVendibles recibidos:", productosVendibles);
+    console.log("ProductosConsumibles recibidos:", productosConsumibles);
+    console.log("Tipo de productosVendibles:", typeof productosVendibles);
+    console.log("¿Es array productosVendibles?:", Array.isArray(productosVendibles));
+  }, [productosVendibles, productosConsumibles]);
+
+  // Función de prueba simple
+  const testFunction = () => {
+    console.log("TEST: Función de prueba ejecutada correctamente");
+    alert("Función de prueba funciona!");
+  };
+
+  // Test para agregar al carrito
+  const testAgregarCarrito = () => {
+    console.log("TEST: Agregando producto de prueba al carrito");
+    const productoTest = {
+      id: 999,
+      nombre: "PRODUCTO DE PRUEBA",
+      precio: 1000,
+      stock: 10,
+      tipo: "TEST"
+    };
+    setCarrito([...carrito, { ...productoTest, cantidad: 1 }]);
+    console.log("TEST: Carrito después de agregar:", [...carrito, { ...productoTest, cantidad: 1 }]);
+  };
+
   const formatPrice = (price) => {
     return new Intl.NumberFormat("es-CO", {
       style: "currency",
@@ -73,24 +107,25 @@ export default function FacturacionSection({ productosVendibles, productosConsum
 
   // Filtrar productos según búsqueda
   const productosFiltrados = useMemo(() => {
-    if (!busquedaProducto) return productosVendibles;
-    return productosVendibles.filter(
+    if (!busquedaProducto) return productosVendibles || [];
+    return (productosVendibles || []).filter(
       (producto) =>
         producto.nombre
           .toLowerCase()
           .includes(busquedaProducto.toLowerCase()) ||
         producto.tipo.toLowerCase().includes(busquedaProducto.toLowerCase())
     );
-  }, [busquedaProducto]);
+  }, [busquedaProducto, productosVendibles]);
 
   // Filtrar adiciones según búsqueda
   const adicionesFiltradas = useMemo(() => {
-    // Since we don't have adicionesDisponibles anymore, use an empty array
+    // Use an empty array since we don't have adicionesDisponibles
     return [];
   }, [busquedaProducto]);
 
   // Funciones para facturación
   const agregarAlCarrito = (producto) => {
+    console.log("Intentando agregar al carrito:", producto);
     const itemExistente = carrito.find((item) => item.id === producto.id);
     if (itemExistente) {
       setCarrito(
@@ -103,6 +138,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
     } else {
       setCarrito([...carrito, { ...producto, cantidad: 1 }]);
     }
+    console.log("Carrito después de agregar:", [...carrito, { ...producto, cantidad: 1 }]);
   };
 
   const agregarAdicion = (adicion) => {
@@ -202,6 +238,13 @@ export default function FacturacionSection({ productosVendibles, productosConsum
 
   const validarFormulario = () => {
     const errores = [];
+    console.log("Validando formulario...");
+    console.log("Carrito:", carrito);
+    console.log("Adiciones:", adicionesCarrito);
+    console.log("Cliente:", cliente);
+    console.log("Domicilio:", domicilio, "Dirección:", direccion);
+    console.log("Teléfono:", telefono);
+    console.log("Monto pagado:", montoPagado, "Total:", calcularTotal + (domicilio ? tarifaDomicilio : 0));
 
     if (carrito.length === 0 && adicionesCarrito.length === 0) {
       errores.push("Debe agregar al menos un producto o adición al carrito");
@@ -211,25 +254,30 @@ export default function FacturacionSection({ productosVendibles, productosConsum
       errores.push("El nombre del cliente es obligatorio");
     }
 
-    // Ya no validamos el campo vendedor porque se establece automáticamente
-    // y es de solo lectura
-
     if (domicilio && !direccion.trim()) {
       errores.push("La dirección es obligatoria para domicilios");
     }
 
-    if (telefono && !/^\d{10}$/.test(telefono.replace(/\s/g, ""))) {
-      errores.push("El teléfono debe tener 10 dígitos");
+    // Validación de teléfono más flexible
+    if (telefono && telefono.trim() !== "" && !/^\d{7,10}$/.test(telefono.replace(/\s/g, ""))) {
+      errores.push("El teléfono debe tener entre 7 y 10 dígitos");
     }
 
-    if (montoPagado < (calcularTotal + (domicilio ? tarifaDomicilio : 0))) {
-      errores.push("El monto pagado no puede ser menor al total de la factura");
+    // Solo validamos el monto pagado si hay productos en el carrito
+    // y si no es efectivo (para permitir pago exacto después)
+    if ((carrito.length > 0 || adicionesCarrito.length > 0) && metodoPago !== "efectivo") {
+      const totalAPagar = calcularTotal + (domicilio ? tarifaDomicilio : 0);
+      if (montoPagado < totalAPagar) {
+        errores.push(`El monto pagado (${formatPrice(montoPagado)}) no puede ser menor al total de la factura (${formatPrice(totalAPagar)})`);
+      }
     }
 
+    console.log("Errores de validación:", errores);
     return errores;
   };
 
   const procesarFactura = () => {
+    console.log("Intentando procesar factura");
     const errores = validarFormulario();
 
     if (errores.length > 0) {
@@ -237,11 +285,23 @@ export default function FacturacionSection({ productosVendibles, productosConsum
       return;
     }
 
+    // Si el monto pagado es 0 y es efectivo, establecer automáticamente el monto como el total
+    if (montoPagado === 0 && metodoPago === "efectivo") {
+      setMontoPagado(calcularTotal + (domicilio ? tarifaDomicilio : 0));
+      setDisplayMontoPagado(formatPrice(calcularTotal + (domicilio ? tarifaDomicilio : 0)));
+    }
+
     // Abrir el diálogo de confirmación
     setAlertDialogOpen(true);
   };
 
   const confirmarProcesarFactura = () => {
+    // Asegurarse de que el monto pagado esté establecido correctamente
+    let montoFinal = montoPagado;
+    if (montoFinal === 0 && metodoPago === "efectivo") {
+      montoFinal = calcularTotal + (domicilio ? tarifaDomicilio : 0);
+    }
+    
     const factura = {
       id: Date.now().toString(),
       fecha: new Date().toLocaleDateString("es-CO"),
@@ -269,8 +329,8 @@ export default function FacturacionSection({ productosVendibles, productosConsum
       cuentaReferencia: metodoPago !== "efectivo" ? cuentaReferencia : "",
       nombreDomiciliario: domicilio ? nombreDomiciliario : "",
       tarifaDomicilio: domicilio ? tarifaDomicilio : 0,
-      montoPagado: montoPagado,
-      cambioDevuelto: montoPagado - (calcularTotal + (domicilio ? tarifaDomicilio : 0)),
+      montoPagado: montoFinal,
+      cambioDevuelto: montoFinal - (calcularTotal + (domicilio ? tarifaDomicilio : 0)),
     };
 
     // Enviar la factura al backend
@@ -289,6 +349,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
       
       if (!token) {
         console.error("No se encontró token de autenticación");
+        alert("Error: No se encontró token de autenticación. Por favor, inicie sesión nuevamente.");
         return;
       }
       
@@ -298,18 +359,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
       };
       
       // Preparar los datos para el backend
-      // Opción 1: Formato para /api/v1/sales
-      const salesData = {
-        items: factura.productos.map(item => ({
-          product_id: item.id,
-          quantity: item.cantidad,
-          unit_price: item.precio
-        })),
-        payment_method: factura.metodoPago,
-        notes: `Cliente: ${factura.cliente}${factura.domicilio ? `, Domicilio: ${factura.direccion}` : ''}`
-      };
-      
-      // Opción 2: Formato para /api/v1/services/purchases
+      // Formato para /api/v1/services/purchases
       const purchaseData = {
         invoice_number: factura.id,
         invoice_date: new Date().toLocaleDateString('en-US', {day: '2-digit', month: '2-digit', year: 'numeric'}).replace(/(\d+)\/(\d+)\/(\d+)/, '$2/$1/$3'),
@@ -337,8 +387,8 @@ export default function FacturacionSection({ productosVendibles, productosConsum
       };
       
       console.log("Intentando enviar factura al backend...");
+      console.log("Datos de la factura:", purchaseData);
       
-      // Primero intentamos con el endpoint de purchases
       try {
         const purchaseResponse = await fetch(`${apiUrl}/api/v1/services/purchases`, {
           method: 'POST',
@@ -357,6 +407,9 @@ export default function FacturacionSection({ productosVendibles, productosConsum
               id: responseData.purchase_id
             }));
           }
+          
+          // Limpiar el formulario después de un envío exitoso
+          limpiarFormulario();
           return;
         } else {
           // Manejar errores del backend
@@ -370,41 +423,55 @@ export default function FacturacionSection({ productosVendibles, productosConsum
             return;
           }
           
+          // Si el error no es de validación, intentar con el endpoint de ventas
           console.warn("No se pudo guardar como compra, intentando como venta...");
+          throw new Error("No se pudo guardar como compra");
         }
       } catch (purchaseError) {
         console.warn("Error al intentar guardar como compra:", purchaseError);
-      }
-      
-      // Si falla, intentamos con el endpoint de sales
-      const salesResponse = await fetch(`${apiUrl}/api/v1/sales`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(salesData)
-      });
-      
-      if (!salesResponse.ok) {
-        const errorData = await salesResponse.json().catch(() => ({}));
-        console.error("Error al enviar factura:", salesResponse.status, errorData);
-        // Opcional: Mostrar notificación de error
-        alert(`Error al guardar la factura en el sistema: ${salesResponse.status}`);
-        return;
-      }
-      
-      const responseData = await salesResponse.json();
-      console.log("Factura guardada exitosamente como venta:", responseData);
-      
-      // Actualizar el ID de la factura con el ID generado por el backend
-      if (responseData && responseData.id) {
-        setUltimaFactura(prev => ({
-          ...prev,
-          id: responseData.id
-        }));
+        
+        // Formato alternativo para /api/v1/sales
+        const salesData = {
+          items: factura.productos.map(item => ({
+            product_id: item.id,
+            quantity: item.cantidad,
+            unit_price: item.precio
+          })),
+          payment_method: factura.metodoPago,
+          notes: `Cliente: ${factura.cliente}${factura.domicilio ? `, Domicilio: ${factura.direccion}` : ''}`
+        };
+        
+        // Intentar con el endpoint de ventas
+        const salesResponse = await fetch(`${apiUrl}/api/v1/sales`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(salesData)
+        });
+        
+        if (!salesResponse.ok) {
+          const errorData = await salesResponse.json().catch(() => ({}));
+          console.error("Error al enviar factura como venta:", salesResponse.status, errorData);
+          alert(`Error al guardar la factura en el sistema: ${salesResponse.status}`);
+          return;
+        }
+        
+        const responseData = await salesResponse.json();
+        console.log("Factura guardada exitosamente como venta:", responseData);
+        
+        // Actualizar el ID de la factura con el ID generado por el backend
+        if (responseData && responseData.id) {
+          setUltimaFactura(prev => ({
+            ...prev,
+            id: responseData.id
+          }));
+        }
+        
+        // Limpiar el formulario después de un envío exitoso
+        limpiarFormulario();
       }
       
     } catch (error) {
       console.error("Error al procesar la factura:", error);
-      // Opcional: Mostrar notificación de error
       alert("Error al procesar la factura: " + error.message);
     }
   };
@@ -456,6 +523,36 @@ export default function FacturacionSection({ productosVendibles, productosConsum
 
   return (
     <div>
+      {/* Sección de depuración - TEMPORAL */}
+      <div className="mb-4 p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
+        <h3 className="text-lg font-bold text-yellow-800 mb-2">🔧 DEPURACIÓN - TEMPORAL</h3>
+        <div className="flex flex-wrap gap-2 mb-2">
+          <button 
+            onClick={testFunction}
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Test Función Simple
+          </button>
+          <button 
+            onClick={testAgregarCarrito}
+            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            Test Agregar Carrito
+          </button>
+          <button 
+            onClick={() => console.log("TEST: Estado actual del carrito:", carrito)}
+            className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
+          >
+            Ver Carrito en Console
+          </button>
+        </div>
+        <div className="text-sm text-yellow-700">
+          <p>Productos disponibles: {productosVendibles?.length || 0}</p>
+          <p>Items en carrito: {carrito.length}</p>
+          <p>Cliente: "{cliente}"</p>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Facturar</h1>
@@ -638,7 +735,35 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                 ? "Adiciones Disponibles"
                 : "Productos Disponibles"}
             </h2>
-            {/* Replace with ItemListDisplay component */}
+            
+            {/* Lista simplificada para depuración */}
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <h4 className="font-semibold mb-2">Lista Simplificada (DEPURACIÓN):</h4>
+              {(productosFiltrados || []).map((producto, index) => (
+                <div key={producto.id || index} className="flex justify-between items-center py-2 border-b">
+                  <div>
+                    <span className="font-medium">{producto.nombre}</span>
+                    <span className="text-sm text-gray-600 ml-2">
+                      Stock: {producto.stock} | Precio: {formatPrice(producto.precio)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      console.log("SIMPLE: Clic en agregar producto:", producto);
+                      agregarAlCarrito(producto);
+                    }}
+                    className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                  >
+                    + Agregar Simple
+                  </button>
+                </div>
+              ))}
+              {(!productosFiltrados || productosFiltrados.length === 0) && (
+                <p className="text-gray-500 text-center py-4">No hay productos disponibles</p>
+              )}
+            </div>
+
+            {/* Componente original */}
             <ItemListDisplay
               items={mostrarAdiciones ? adicionesFiltradas : productosFiltrados}
               onAddItem={mostrarAdiciones ? agregarAdicion : agregarAlCarrito}
@@ -876,6 +1001,28 @@ export default function FacturacionSection({ productosVendibles, productosConsum
 
           {/* Botones de acción */}
           <div className="flex space-x-4">
+            {/* Botón de prueba simplificado */}
+            <button
+              onClick={() => {
+                console.log("SIMPLE: Intentando procesar factura simple");
+                console.log("SIMPLE: Carrito actual:", carrito);
+                console.log("SIMPLE: Cliente actual:", cliente);
+                if (carrito.length === 0) {
+                  alert("No hay productos en el carrito");
+                  return;
+                }
+                if (!cliente.trim()) {
+                  alert("Falta el nombre del cliente");
+                  return;
+                }
+                alert("Factura simple procesada correctamente!");
+              }}
+              className="flex-1 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              disabled={carrito.length === 0}
+            >
+              🧪 Procesar Simple
+            </button>
+
             <AlertDialog open={alertDialogOpen} onOpenChange={setAlertDialogOpen}>
               <Button
                 onClick={procesarFactura}

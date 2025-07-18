@@ -166,25 +166,59 @@ class PurchaseService:
         
         # Primero, calcular cuánto se necesita de cada insumo
         for product in products:
-            # Buscar el producto en la base de datos
+            db_product = None
+            
+            # Buscar el producto en la base de datos - Método 1: Búsqueda exacta
             if product.get('product_variant'):
                 query = """
-                SELECT id, nombre_producto FROM products 
+                SELECT id, nombre_producto, variante FROM products 
                 WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
                 """
                 params = (product['product_name'], product['product_variant'])
+                cursor.execute(query, params)
+                db_product = cursor.fetchone()
             else:
+                # Buscar sin variante
                 query = """
-                SELECT id, nombre_producto FROM products 
+                SELECT id, nombre_producto, variante FROM products 
                 WHERE nombre_producto = %s AND (variante IS NULL OR variante = '') AND is_active = TRUE
                 """
                 params = (product['product_name'],)
+                cursor.execute(query, params)
+                db_product = cursor.fetchone()
             
-            cursor.execute(query, params)
-            db_product = cursor.fetchone()
+            # Método 2: Si no encontró, intentar separar por " - " 
+            if not db_product and ' - ' in product['product_name']:
+                parts = product['product_name'].split(' - ', 1)
+                if len(parts) == 2:
+                    nombre_base = parts[0].strip()
+                    variante_base = parts[1].strip()
+                    
+                    query = """
+                    SELECT id, nombre_producto, variante FROM products 
+                    WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
+                    """
+                    cursor.execute(query, (nombre_base, variante_base))
+                    db_product = cursor.fetchone()
+                    
+                    if db_product:
+                        print(f"Producto encontrado separando '{product['product_name']}' en '{nombre_base}' + '{variante_base}'")
+            
+            # Método 3: Búsqueda más flexible usando LIKE
+            if not db_product:
+                query = """
+                SELECT id, nombre_producto, variante FROM products 
+                WHERE CONCAT(nombre_producto, IFNULL(CONCAT(' - ', variante), '')) = %s AND is_active = TRUE
+                """
+                cursor.execute(query, (product['product_name'],))
+                db_product = cursor.fetchone()
+                
+                if db_product:
+                    print(f"Producto encontrado con búsqueda flexible: {db_product}")
             
             if not db_product:
-                # Si no encuentra el producto, agregar error
+                # Si no encuentra el producto después de todos los intentos, agregar error
+                print(f"ERROR: No se encontró el producto '{product['product_name']}' con variante '{product.get('product_variant', 'NULL')}'")
                 errors.append({
                     'product_name': product['product_name'],
                     'insumo_name': 'Producto no encontrado',
@@ -193,6 +227,8 @@ class PurchaseService:
                     'available': 0
                 })
                 continue
+                
+            print(f"Producto encontrado: ID={db_product['id']}, nombre='{db_product['nombre_producto']}', variante='{db_product.get('variante', 'NULL')}')")
                 
             # Obtener la receta del producto
             recipe_query = """
@@ -263,22 +299,46 @@ class PurchaseService:
             variant: Variante del producto (opcional)
             quantity: Cantidad vendida
         """
-        # Buscar el producto
+        product = None
+        
+        # Buscar el producto - Método 1: Búsqueda exacta
         if variant:
             query = """
             SELECT id, stock_quantity FROM products 
             WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
             """
-            params = (product_name, variant)
+            cursor.execute(query, (product_name, variant))
+            product = cursor.fetchone()
         else:
             query = """
             SELECT id, stock_quantity FROM products 
             WHERE nombre_producto = %s AND (variante IS NULL OR variante = '') AND is_active = TRUE
             """
-            params = (product_name,)
+            cursor.execute(query, (product_name,))
+            product = cursor.fetchone()
         
-        cursor.execute(query, params)
-        product = cursor.fetchone()
+        # Método 2: Si no encontró, intentar separar por " - " 
+        if not product and ' - ' in product_name:
+            parts = product_name.split(' - ', 1)
+            if len(parts) == 2:
+                nombre_base = parts[0].strip()
+                variante_base = parts[1].strip()
+                
+                query = """
+                SELECT id, stock_quantity FROM products 
+                WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
+                """
+                cursor.execute(query, (nombre_base, variante_base))
+                product = cursor.fetchone()
+        
+        # Método 3: Búsqueda más flexible
+        if not product:
+            query = """
+            SELECT id, stock_quantity FROM products 
+            WHERE CONCAT(nombre_producto, IFNULL(CONCAT(' - ', variante), '')) = %s AND is_active = TRUE
+            """
+            cursor.execute(query, (product_name,))
+            product = cursor.fetchone()
         
         if product:
             # Si el producto tiene stock_quantity = -1, es bajo demanda y no se actualiza
@@ -548,19 +608,46 @@ class PurchaseService:
             
             # Restaurar stock de productos
             for detail in details:
-                # Buscar el producto
-                product_query = """
-                SELECT id, stock_quantity FROM products 
-                WHERE nombre_producto = %s 
-                AND ((%s IS NULL AND variante IS NULL) OR variante = %s)
-                AND is_active = TRUE
-                """
-                cursor.execute(product_query, (
-                    detail['product_name'], 
-                    detail['product_variant'],
-                    detail['product_variant']
-                ))
-                product = cursor.fetchone()
+                product = None
+                
+                # Buscar el producto - Método 1: Búsqueda exacta
+                if detail['product_variant']:
+                    product_query = """
+                    SELECT id, stock_quantity FROM products 
+                    WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
+                    """
+                    cursor.execute(product_query, (detail['product_name'], detail['product_variant']))
+                    product = cursor.fetchone()
+                else:
+                    product_query = """
+                    SELECT id, stock_quantity FROM products 
+                    WHERE nombre_producto = %s AND (variante IS NULL OR variante = '') AND is_active = TRUE
+                    """
+                    cursor.execute(product_query, (detail['product_name'],))
+                    product = cursor.fetchone()
+                
+                # Método 2: Si no encontró, intentar separar por " - " 
+                if not product and ' - ' in detail['product_name']:
+                    parts = detail['product_name'].split(' - ', 1)
+                    if len(parts) == 2:
+                        nombre_base = parts[0].strip()
+                        variante_base = parts[1].strip()
+                        
+                        product_query = """
+                        SELECT id, stock_quantity FROM products 
+                        WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
+                        """
+                        cursor.execute(product_query, (nombre_base, variante_base))
+                        product = cursor.fetchone()
+                
+                # Método 3: Búsqueda más flexible
+                if not product:
+                    product_query = """
+                    SELECT id, stock_quantity FROM products 
+                    WHERE CONCAT(nombre_producto, IFNULL(CONCAT(' - ', variante), '')) = %s AND is_active = TRUE
+                    """
+                    cursor.execute(product_query, (detail['product_name'],))
+                    product = cursor.fetchone()
                 
                 if product:
                     # Restaurar stock

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from .stock_service import StockService
 from .purchase_service import PurchaseService
+from .dashboard_service import router_dashboard
 from pydantic import BaseModel
 from typing import List, Dict
 from datetime import date
@@ -36,6 +37,9 @@ class PurchaseCreate(BaseModel):
     products: List[ProductDetail]
 
 router_services = APIRouter()
+
+# Incluir el router de dashboard
+router_services.include_router(router_dashboard, prefix="/dashboard", tags=["dashboard"])
 
 @router_services.get("/")
 async def get_services():

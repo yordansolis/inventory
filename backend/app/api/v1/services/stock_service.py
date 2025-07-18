@@ -26,7 +26,7 @@ class StockService:
             p.variante,
             p.price AS precio,
             c.nombre_categoria AS categoria_nombre,
-            COALESCE(FLOOR(MIN(i.cantidad_unitaria / pr.cantidad)), 0) AS stock_disponible
+            COALESCE(FLOOR(MIN((i.cantidad_unitaria - i.cantidad_utilizada) / pr.cantidad)), 0) AS stock_disponible
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN product_recipes pr ON p.id = pr.product_id
@@ -78,7 +78,7 @@ class StockService:
                 p.price AS precio,
                 c.nombre_categoria AS categoria_nombre,
                 p.min_stock,
-                COALESCE(FLOOR(MIN(i.cantidad_unitaria / pr.cantidad)), 0) AS stock_disponible
+                COALESCE(FLOOR(MIN((i.cantidad_unitaria - i.cantidad_utilizada) / pr.cantidad)), 0) AS stock_disponible
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN product_recipes pr ON p.id = pr.product_id
@@ -144,9 +144,9 @@ class StockService:
             i.id AS insumo_id,
             i.nombre_insumo,
             i.unidad,
-            i.cantidad_unitaria AS cantidad_disponible,
+            (i.cantidad_unitaria - i.cantidad_utilizada) AS cantidad_disponible,
             pr.cantidad AS cantidad_requerida,
-            FLOOR(i.cantidad_unitaria / pr.cantidad) AS unidades_posibles
+            FLOOR((i.cantidad_unitaria - i.cantidad_utilizada) / pr.cantidad) AS unidades_posibles
         FROM product_recipes pr
         JOIN insumos i ON pr.insumo_id = i.id
         WHERE pr.product_id = %s
@@ -202,7 +202,7 @@ class StockService:
             SELECT
                 p.id AS producto_id,
                 p.min_stock,
-                COALESCE(FLOOR(MIN(i.cantidad_unitaria / pr.cantidad)), 0) AS stock_disponible
+                COALESCE(FLOOR(MIN((i.cantidad_unitaria - i.cantidad_utilizada) / pr.cantidad)), 0) AS stock_disponible
             FROM products p
             LEFT JOIN product_recipes pr ON p.id = pr.product_id
             LEFT JOIN insumos i ON pr.insumo_id = i.id
