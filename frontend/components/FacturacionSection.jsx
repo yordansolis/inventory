@@ -24,6 +24,16 @@ import {
 } from "lucide-react";
 
 import { Card, Badge, Button } from "./ui";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import ItemListDisplay from "./ItemListDisplay";
 
 export default function FacturacionSection({ productosVendibles, productosConsumibles }) {
@@ -38,6 +48,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
   const [descuento, setDescuento] = useState(0);
   const [mostrarFactura, setMostrarFactura] = useState(false);
   const [ultimaFactura, setUltimaFactura] = useState(null);
+  const [alertDialogOpen, setAlertDialogOpen] = useState(false);
 
   // Nuevos estados para la búsqueda y filtros
   const [busquedaProducto, setBusquedaProducto] = useState("");
@@ -226,6 +237,11 @@ export default function FacturacionSection({ productosVendibles, productosConsum
       return;
     }
 
+    // Abrir el diálogo de confirmación
+    setAlertDialogOpen(true);
+  };
+
+  const confirmarProcesarFactura = () => {
     const factura = {
       id: Date.now().toString(),
       fecha: new Date().toLocaleDateString("es-CO"),
@@ -259,6 +275,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
 
     setUltimaFactura(factura);
     setMostrarFactura(true);
+    setAlertDialogOpen(false);
   };
 
   // Obtener el nombre de usuario al cargar el componente
@@ -728,14 +745,30 @@ export default function FacturacionSection({ productosVendibles, productosConsum
 
           {/* Botones de acción */}
           <div className="flex space-x-4">
-            <Button
-              onClick={procesarFactura}
-              className="flex-1"
-              disabled={carrito.length === 0 && adicionesCarrito.length === 0}
-            >
-              <DollarSign className="h-4 w-4 mr-2" />
-              Procesar Factura
-            </Button>
+            <AlertDialog open={alertDialogOpen} onOpenChange={setAlertDialogOpen}>
+              <Button
+                onClick={procesarFactura}
+                className="flex-1"
+                disabled={carrito.length === 0 && adicionesCarrito.length === 0}
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Procesar Factura
+              </Button>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Confirmar factura?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción procesará la factura actual. ¿Está seguro de continuar?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmarProcesarFactura}>
+                    Confirmar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Button variant="danger" onClick={limpiarFormulario}>
               Limpiar
             </Button>
