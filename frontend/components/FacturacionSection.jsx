@@ -359,6 +359,17 @@ export default function FacturacionSection({ productosVendibles, productosConsum
           }
           return;
         } else {
+          // Manejar errores del backend
+          const errorData = await purchaseResponse.json().catch(() => ({}));
+          console.error("Error del backend:", purchaseResponse.status, errorData);
+          
+          // Si es error 400, probablemente es validación de insumos
+          if (purchaseResponse.status === 400 && errorData.detail) {
+            // El backend envía el mensaje de error detallado
+            alert(errorData.detail);
+            return;
+          }
+          
           console.warn("No se pudo guardar como compra, intentando como venta...");
         }
       } catch (purchaseError) {

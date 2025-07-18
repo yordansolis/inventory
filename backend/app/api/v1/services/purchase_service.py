@@ -1,5 +1,5 @@
 from typing import Dict, List, Optional
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timedelta
 from decimal import Decimal
 from database.db  import execute_query, execute_insert_and_get_id, get_db_connection
 import pymysql
@@ -25,6 +25,30 @@ class PurchaseService:
         cursor = None
         try:
             cursor = connection.cursor(pymysql.cursors.DictCursor)
+            
+            # PRIMERO: Validar disponibilidad de insumos para todos los productos
+            if 'products' in purchase_data and purchase_data['products']:
+                print(f"Validando disponibilidad de insumos para {len(purchase_data['products'])} productos...")
+                validation_result = PurchaseService._validate_insumos_availability(
+                    cursor, 
+                    purchase_data['products']
+                )
+                
+                if not validation_result['is_valid']:
+                    error_messages = []
+                    for error in validation_result['errors']:
+                        error_messages.append(
+                            f"Producto '{error['product_name']}': Falta {error['insumo_name']} "
+                            f"(necesario: {error['required']:.2f} {error['unit']}, "
+                            f"disponible: {error['available']:.2f} {error['unit']})"
+                        )
+                    
+                    error_text = "No hay suficientes insumos para completar la venta:\n" + "\n".join(error_messages)
+                    print(f"ERROR DE VALIDACIÓN: {error_text}")
+                    raise ValueError(error_text)
+            
+            # Si la validación pasa, iniciar transacción
+            print("Validación de insumos exitosa, iniciando transacción...")
             connection.begin()
             
             # Validar que el vendedor existe
@@ -126,9 +150,112 @@ class PurchaseService:
                 connection.close()
     
     @staticmethod
+    def _validate_insumos_availability(cursor, products: List[Dict]) -> Dict:
+        """
+        Valida que haya suficientes insumos disponibles para todos los productos
+        
+        Args:
+            cursor: Cursor de la base de datos
+            products: Lista de productos a vender
+            
+        Returns:
+            Dict con 'is_valid' (bool) y 'errors' (lista de errores)
+        """
+        errors = []
+        insumos_needed = {}  # Diccionario para acumular necesidades totales por insumo
+        
+        # Primero, calcular cuánto se necesita de cada insumo
+        for product in products:
+            # Buscar el producto en la base de datos
+            if product.get('product_variant'):
+                query = """
+                SELECT id, nombre_producto FROM products 
+                WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
+                """
+                params = (product['product_name'], product['product_variant'])
+            else:
+                query = """
+                SELECT id, nombre_producto FROM products 
+                WHERE nombre_producto = %s AND (variante IS NULL OR variante = '') AND is_active = TRUE
+                """
+                params = (product['product_name'],)
+            
+            cursor.execute(query, params)
+            db_product = cursor.fetchone()
+            
+            if not db_product:
+                # Si no encuentra el producto, agregar error
+                errors.append({
+                    'product_name': product['product_name'],
+                    'insumo_name': 'Producto no encontrado',
+                    'unit': 'N/A',
+                    'required': 0,
+                    'available': 0
+                })
+                continue
+                
+            # Obtener la receta del producto
+            recipe_query = """
+            SELECT pr.insumo_id, pr.cantidad, i.nombre_insumo, i.unidad,
+                   i.cantidad_unitaria, i.cantidad_utilizada,
+                   (i.cantidad_unitaria - i.cantidad_utilizada) as disponible
+            FROM product_recipes pr
+            JOIN insumos i ON pr.insumo_id = i.id
+            WHERE pr.product_id = %s
+            """
+            cursor.execute(recipe_query, (db_product['id'],))
+            recipe_items = cursor.fetchall()
+            
+            # Si el producto no tiene receta, no necesita insumos
+            if not recipe_items:
+                print(f"Advertencia: El producto '{product['product_name']}' no tiene receta definida")
+                continue
+                
+            # Acumular necesidades por insumo
+            for item in recipe_items:
+                insumo_id = item['insumo_id']
+                needed = float(item['cantidad']) * float(product['quantity'])
+                disponible = float(item['disponible'])
+                
+                if insumo_id not in insumos_needed:
+                    insumos_needed[insumo_id] = {
+                        'nombre': item['nombre_insumo'],
+                        'unidad': item['unidad'],
+                        'disponible': disponible,
+                        'necesario': 0,
+                        'product_name': product['product_name']
+                    }
+                
+                insumos_needed[insumo_id]['necesario'] += needed
+        
+        # Verificar si hay suficientes insumos
+        for insumo_id, data in insumos_needed.items():
+            if data['necesario'] > data['disponible']:
+                errors.append({
+                    'insumo_id': insumo_id,
+                    'insumo_name': data['nombre'],
+                    'unit': data['unidad'],
+                    'required': data['necesario'],
+                    'available': data['disponible'],
+                    'product_name': data['product_name']
+                })
+        
+        # Debug para verificar
+        print(f"Validación de insumos: {'EXITOSA' if len(errors) == 0 else 'FALLIDA'}")
+        if errors:
+            print(f"Errores encontrados: {len(errors)}")
+            for error in errors:
+                print(f"- {error['product_name']}: Falta {error['insumo_name']} (necesario: {error['required']:.2f} {error['unit']}, disponible: {error['available']:.2f} {error['unit']})")
+        
+        return {
+            'is_valid': len(errors) == 0,
+            'errors': errors
+        }
+    
+    @staticmethod
     def _update_product_stock(cursor, product_name: str, variant: Optional[str], quantity: int):
         """
-        Actualiza el stock del producto después de una venta
+        Actualiza el stock del producto y los insumos después de una venta
         
         Args:
             cursor: Cursor de la base de datos
@@ -154,12 +281,69 @@ class PurchaseService:
         product = cursor.fetchone()
         
         if product:
-            # Actualizar stock
-            new_stock = max(0, product['stock_quantity'] - quantity)
-            update_query = """
-            UPDATE products SET stock_quantity = %s WHERE id = %s
-            """
-            cursor.execute(update_query, (new_stock, product['id']))
+            # Si el producto tiene stock_quantity = -1, es bajo demanda y no se actualiza
+            if product['stock_quantity'] >= 0:
+                # Actualizar stock del producto
+                new_stock = max(0, product['stock_quantity'] - quantity)
+                update_query = """
+                UPDATE products SET stock_quantity = %s WHERE id = %s
+                """
+                cursor.execute(update_query, (new_stock, product['id']))
+            
+            # Actualizar los insumos según la receta del producto
+            PurchaseService._update_insumos_from_recipe(cursor, product['id'], quantity)
+    
+    @staticmethod
+    def _update_insumos_from_recipe(cursor, product_id: int, quantity_sold: int):
+        """
+        Actualiza la cantidad utilizada de insumos basado en la receta del producto vendido
+        
+        Args:
+            cursor: Cursor de la base de datos
+            product_id: ID del producto vendido
+            quantity_sold: Cantidad vendida del producto
+        """
+        # Obtener la receta del producto
+        recipe_query = """
+        SELECT pr.insumo_id, pr.cantidad, i.nombre_insumo, i.cantidad_utilizada
+        FROM product_recipes pr
+        JOIN insumos i ON pr.insumo_id = i.id
+        WHERE pr.product_id = %s
+        """
+        cursor.execute(recipe_query, (product_id,))
+        recipe_items = cursor.fetchall()
+        
+        if recipe_items:
+            print(f"Actualizando insumos para producto ID {product_id}, cantidad vendida: {quantity_sold}")
+            
+            # Actualizar la cantidad utilizada de cada insumo
+            for item in recipe_items:
+                insumo_id = item['insumo_id']
+                cantidad_actual = float(item['cantidad_utilizada'])
+                total_quantity_to_add = float(item['cantidad']) * float(quantity_sold)
+                nueva_cantidad = cantidad_actual + total_quantity_to_add
+                
+                # Actualizar cantidad_utilizada del insumo
+                update_insumo_query = """
+                UPDATE insumos 
+                SET cantidad_utilizada = %s
+                WHERE id = %s
+                """
+                cursor.execute(update_insumo_query, (nueva_cantidad, insumo_id))
+                
+                print(f"Insumo '{item['nombre_insumo']}' (ID: {insumo_id}): "
+                      f"Cantidad anterior: {cantidad_actual}, "
+                      f"Incremento: +{total_quantity_to_add}, "
+                      f"Nueva cantidad: {nueva_cantidad}")
+                
+                # Verificar que se actualizó correctamente
+                verify_query = "SELECT cantidad_utilizada FROM insumos WHERE id = %s"
+                cursor.execute(verify_query, (insumo_id,))
+                verify_result = cursor.fetchone()
+                if verify_result:
+                    print(f"Verificación: Insumo {insumo_id} ahora tiene cantidad_utilizada = {verify_result['cantidad_utilizada']}")
+        else:
+            print(f"Advertencia: El producto ID {product_id} no tiene receta definida")
     
     @staticmethod
     def get_purchase_by_invoice(invoice_number: str) -> Optional[Dict]:
@@ -413,7 +597,110 @@ class PurchaseService:
                 cursor.close()
             if connection:
                 connection.close()
-
-
-# Importar timedelta para el resumen de ventas
-from datetime import timedelta 
+    
+    @staticmethod
+    def get_inventory_status() -> Dict:
+        """
+        Obtiene el estado actual del inventario de insumos
+        
+        Returns:
+            Dict con el estado de los insumos
+        """
+        # Query para obtener insumos con bajo stock
+        low_stock_query = """
+        SELECT 
+            id,
+            nombre_insumo,
+            unidad,
+            cantidad_unitaria,
+            cantidad_utilizada,
+            (cantidad_unitaria - cantidad_utilizada) as cantidad_disponible,
+            stock_minimo,
+            valor_unitario,
+            valor_total,
+            CASE 
+                WHEN (cantidad_unitaria - cantidad_utilizada) <= stock_minimo THEN 'BAJO'
+                WHEN (cantidad_unitaria - cantidad_utilizada) <= stock_minimo * 2 THEN 'MEDIO'
+                ELSE 'NORMAL'
+            END as estado_stock
+        FROM insumos
+        ORDER BY estado_stock ASC, cantidad_disponible ASC
+        """
+        
+        insumos = execute_query(low_stock_query, fetch_all=True)
+        
+        # Calcular estadísticas
+        total_insumos = len(insumos) if insumos else 0
+        insumos_bajo_stock = sum(1 for i in insumos if i['estado_stock'] == 'BAJO') if insumos else 0
+        valor_total_inventario = sum(i['valor_total'] for i in insumos) if insumos else 0
+        
+        return {
+            'total_insumos': total_insumos,
+            'insumos_bajo_stock': insumos_bajo_stock,
+            'valor_total_inventario': float(valor_total_inventario),
+            'insumos': insumos if insumos else []
+        }
+    
+    @staticmethod
+    def get_sales_by_product(start_date: date, end_date: date) -> List[Dict]:
+        """
+        Obtiene las ventas agrupadas por producto en un rango de fechas
+        
+        Args:
+            start_date: Fecha inicial
+            end_date: Fecha final
+            
+        Returns:
+            Lista de productos con sus ventas
+        """
+        query = """
+        SELECT 
+            pd.product_name,
+            pd.product_variant,
+            COUNT(DISTINCT p.id) as numero_ventas,
+            SUM(pd.quantity) as cantidad_total,
+            SUM(pd.subtotal) as ingreso_total,
+            AVG(pd.unit_price) as precio_promedio,
+            MIN(p.invoice_date) as primera_venta,
+            MAX(p.invoice_date) as ultima_venta
+        FROM purchase_details pd
+        JOIN purchases p ON pd.purchase_id = p.id
+        WHERE p.invoice_date BETWEEN %s AND %s
+        AND p.is_cancelled = FALSE
+        GROUP BY pd.product_name, pd.product_variant
+        ORDER BY ingreso_total DESC
+        """
+        
+        return execute_query(query, (start_date, end_date), fetch_all=True) or []
+    
+    @staticmethod
+    def get_insumos_consumption_report(start_date: date, end_date: date) -> List[Dict]:
+        """
+        Obtiene un reporte del consumo de insumos en un período
+        
+        Args:
+            start_date: Fecha inicial
+            end_date: Fecha final
+            
+        Returns:
+            Lista de insumos con su consumo
+        """
+        # Esta query es más compleja porque necesitamos rastrear el consumo a través de las ventas
+        query = """
+        SELECT 
+            i.id,
+            i.nombre_insumo,
+            i.unidad,
+            i.cantidad_utilizada as cantidad_total_utilizada,
+            i.valor_unitario,
+            i.valor_total as valor_total_consumido,
+            COUNT(DISTINCT p.id) as productos_que_lo_usan
+        FROM insumos i
+        LEFT JOIN product_recipes pr ON i.id = pr.insumo_id
+        LEFT JOIN products p ON pr.product_id = p.id
+        WHERE i.cantidad_utilizada > 0
+        GROUP BY i.id
+        ORDER BY i.valor_total DESC
+        """
+        
+        return execute_query(query, fetch_all=True) or [] 

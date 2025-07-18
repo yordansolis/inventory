@@ -5,6 +5,8 @@ from .purchase_service import PurchaseService
 from pydantic import BaseModel
 from typing import List, Dict
 from datetime import date
+import pymysql
+from database.db import get_db_connection
 
 # Modelos Pydantic para validación
 class ProductDetail(BaseModel):
@@ -141,6 +143,54 @@ async def get_stock_summary():
         )
 
 # Endpoints para gestión de compras/facturas
+@router_services.post("/purchases/validate")
+async def validate_purchase(purchase_data: PurchaseCreate):
+    """
+    Valida si hay suficientes insumos para crear una compra/factura.
+    
+    NO crea la compra, solo verifica la disponibilidad.
+    """
+    try:
+        connection = get_db_connection()
+        if not connection:
+            raise HTTPException(
+                status_code=500,
+                detail="No se pudo establecer conexión con la base de datos"
+            )
+        
+        cursor = None
+        try:
+            cursor = connection.cursor(pymysql.cursors.DictCursor)
+            
+            validation_result = PurchaseService._validate_insumos_availability(
+                cursor, 
+                purchase_data.products
+            )
+            
+            if validation_result['is_valid']:
+                return {
+                    'is_valid': True,
+                    'message': 'Todos los insumos están disponibles'
+                }
+            else:
+                return {
+                    'is_valid': False,
+                    'message': 'No hay suficientes insumos',
+                    'errors': validation_result['errors']
+                }
+                
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+                
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al validar la compra: {str(e)}"
+        )
+
 @router_services.post("/purchases")
 async def create_purchase(purchase_data: PurchaseCreate):
     """
@@ -149,14 +199,20 @@ async def create_purchase(purchase_data: PurchaseCreate):
     Incluye información del cliente, vendedor, productos, domicilio (si aplica) y pago.
     """
     try:
+        print(f"Recibida solicitud para crear compra/factura: {purchase_data.invoice_number}")
+        print(f"Productos en la solicitud: {len(purchase_data.products)}")
+        
         result = PurchaseService.create_purchase(purchase_data.dict())
+        print(f"Compra creada exitosamente: {result}")
         return result
     except ValueError as ve:
+        print(f"Error de validación en compra: {str(ve)}")
         raise HTTPException(
             status_code=400,
             detail=str(ve)
         )
     except Exception as e:
+        print(f"Error inesperado al crear compra: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error al crear la compra: {str(e)}"
@@ -257,4 +313,80 @@ async def cancel_purchase(
         raise HTTPException(
             status_code=500,
             detail=f"Error al cancelar la compra: {str(e)}"
+        )
+
+# Nuevos endpoints para análisis de inventario y ventas
+@router_services.get("/inventory/status")
+async def get_inventory_status():
+    """
+    Obtiene el estado actual del inventario de insumos.
+    
+    Incluye:
+    - Insumos con bajo stock
+    - Valor total del inventario
+    - Estado de cada insumo
+    """
+    try:
+        inventory_status = PurchaseService.get_inventory_status()
+        return inventory_status
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener el estado del inventario: {str(e)}"
+        )
+
+@router_services.get("/sales/by-product")
+async def get_sales_by_product(
+    start_date: date = Query(..., description="Fecha inicial (YYYY-MM-DD)"),
+    end_date: date = Query(..., description="Fecha final (YYYY-MM-DD)")
+):
+    """
+    Obtiene las ventas agrupadas por producto en un rango de fechas.
+    
+    Útil para identificar los productos más vendidos y sus ingresos.
+    """
+    try:
+        sales_report = PurchaseService.get_sales_by_product(start_date, end_date)
+        
+        return {
+            "start_date": start_date.strftime('%d/%m/%Y'),
+            "end_date": end_date.strftime('%d/%m/%Y'),
+            "total_products": len(sales_report),
+            "products": sales_report
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener el reporte de ventas: {str(e)}"
+        )
+
+@router_services.get("/inventory/consumption-report")
+async def get_insumos_consumption_report(
+    start_date: Optional[date] = Query(None, description="Fecha inicial (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="Fecha final (YYYY-MM-DD)")
+):
+    """
+    Obtiene un reporte del consumo de insumos.
+    
+    Muestra qué insumos se han consumido más y su valor total.
+    """
+    try:
+        # Si no se especifican fechas, usar todo el histórico
+        if not start_date:
+            start_date = date(2020, 1, 1)
+        if not end_date:
+            end_date = date.today()
+            
+        consumption_report = PurchaseService.get_insumos_consumption_report(start_date, end_date)
+        
+        return {
+            "start_date": start_date.strftime('%d/%m/%Y'),
+            "end_date": end_date.strftime('%d/%m/%Y'),
+            "total_insumos": len(consumption_report),
+            "insumos": consumption_report
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener el reporte de consumo: {str(e)}"
         )
