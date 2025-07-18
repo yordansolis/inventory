@@ -374,16 +374,20 @@ export default function ProductsPage() {
       const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8052';
       const headers = getAuthHeaders();
       
+      // Crear el producto con stock_quantity = -1 para indicar disponibilidad bajo demanda
       const productData = {
         nombre_producto: formData.nombre_producto.trim(),
         variante: formData.variante.trim() || null,
-        price: parsedPrecio,
-        category_id: parsedIdCategoria,
-        stock_quantity: 0,
-        min_stock: 5
+        price: parsedPrecio, // Usar precio_cop como en el esquema ProductCreate
+        category_id: parsedIdCategoria, // Usar categoria_id como en el esquema ProductCreate
+        user_id: 1, // Asumimos que el ID del usuario actual es 1
+        is_active: true
       };
       
+      let productId;
+      
       if (editingId) {
+        // Actualizar producto existente
         const response = await fetch(`${apiUrl}/api/v1/products/${editingId}`, {
           method: 'PUT',
           headers,
@@ -395,54 +399,84 @@ export default function ProductsPage() {
           throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
         }
         
-        if (currentProductRecipe.length > 0) {
-          const recipeResponse = await fetch(`${apiUrl}/api/v1/recipes/${editingId}/recipe`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(currentProductRecipe.map(item => ({
-              insumo_id: item.consumableId,
-              cantidad: item.quantity
-            })))
-          });
-          
-          if (!recipeResponse.ok) {
-            console.error('Error adding recipe to product');
-          }
-        }
+        productId = editingId;
         
-        alert('Producto actualizado exitosamente');
       } else {
-        const response = await fetch(`${apiUrl}/api/v1/products`, {
+        // Crear nuevo producto
+        const response = await fetch(`${apiUrl}/api/v1/products/`, {
           method: 'POST',
-          headers,
-          body: JSON.stringify(productData)
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            nombre_producto: formData.nombre_producto.trim(),
+            variante: formData.variante.trim() || null,
+            precio_cop: parsedPrecio,
+            categoria_id: parseInt(formData.id_categoria),
+            user_id: 1,
+            is_active: true
+          })
         });
-        
+
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
-        }
-        
-        const result = await response.json();
-        const newProductId = result.id;
-        
-        if (newProductId && currentProductRecipe.length > 0) {
-          const recipeResponse = await fetch(`${apiUrl}/api/v1/recipes/${newProductId}/recipe`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(currentProductRecipe.map(item => ({
-              insumo_id: item.consumableId,
-              cantidad: item.quantity
-            })))
-          });
-          
-          if (!recipeResponse.ok) {
-            console.error('Error adding recipe to product');
+          const responseText = await response.text();
+          console.error('Error response:', responseText);
+          try {
+            const errorData = JSON.parse(responseText);
+            throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
+          } catch (e) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
           }
         }
-        
-        alert('Producto creado exitosamente');
+
+        const result = await response.json();
+        productId = result.id;
       }
+      
+      // Si hay insumos en la receta, los guardamos
+      if (productId && currentProductRecipe.length > 0) {
+        try {
+          console.log("Enviando receta para producto ID:", productId);
+          
+          // Preparar los datos de la receta en el formato correcto
+          const ingredients = currentProductRecipe.map(item => ({
+            insumo_id: item.consumableId,
+            cantidad: item.quantity
+          }));
+          
+          console.log("Datos de receta a enviar:", JSON.stringify(ingredients));
+          
+          const recipeResponse = await fetch(`${apiUrl}/api/v1/products/${productId}/recipe/`, {
+            method: 'POST',
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ingredients })
+          });
+          
+          const responseText = await recipeResponse.text();
+          console.log("Respuesta de la API de recetas:", responseText);
+          
+          if (!recipeResponse.ok) {
+            console.error('Error en respuesta de receta:', responseText);
+            alert(`Producto creado, pero hubo un error al guardar la receta: ${recipeResponse.status} ${recipeResponse.statusText}`);
+          } else {
+            try {
+              const recipeResult = JSON.parse(responseText);
+              console.log("Receta guardada correctamente:", recipeResult);
+            } catch (e) {
+              console.log("Respuesta no es JSON pero la receta se guardó correctamente");
+            }
+          }
+        } catch (recipeError) {
+          console.error("Error al guardar la receta:", recipeError);
+          alert(`Producto creado, pero hubo un error al guardar la receta: ${recipeError}`);
+        }
+      }
+      
+      alert(editingId ? 'Producto actualizado exitosamente' : 'Producto creado exitosamente');
       
       setEditingId(null);
       setShowAddForm(false);
@@ -515,6 +549,7 @@ export default function ProductsPage() {
     }
   }, [fetchProducts, fetchCategories, fetchConsumables]);
 
+  // Modificar la sección del formulario para hacerla más intuitiva
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Gestión de Productos</h1>
@@ -539,167 +574,186 @@ export default function ProductsPage() {
 
       {showAddForm && (
         <Card className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            {editingId ? 'Editar Producto' : 'Agregar Nuevo Producto'}
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label htmlFor="nombre_producto" className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre del Producto *
-              </label>
-              <input
-                type="text"
-                id="nombre_producto"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={formData.nombre_producto}
-                onChange={handleChange}
-                placeholder="Ej: Waffle, Jugo, etc."
-              />
-            </div>
-            <div>
-              <label htmlFor="variante" className="block text-sm font-medium text-gray-700 mb-1">
-                Variante
-              </label>
-              <input
-                type="text"
-                id="variante"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={formData.variante}
-                onChange={handleChange}
-                placeholder="Ej: CON HELADO, SIN HELADO"
-              />
-            </div>
-            <div>
-              <label htmlFor="precio" className="block text-sm font-medium text-gray-700 mb-1">
-                Precio (COP) *
-              </label>
-              <input
-                type="text"
-                id="precio"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={displayPrice}
-                onChange={handlePriceInputChange}
-                onBlur={handlePriceInputBlur}
-                onFocus={handlePriceInputFocus}
-                placeholder="Ej: $ 22.000,00"
-              />
-            </div>
-            <div>
-              <label htmlFor="id_categoria" className="block text-sm font-medium text-gray-700 mb-1">
-                Categoría (ID) *
-              </label>
-              <select
-                id="id_categoria"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={formData.id_categoria}
-                onChange={handleChange}
-              >
-                <option value="">Seleccione una categoría</option>
-                {categorias.map(cat => (
-                  console.log(" #ID DEL PRODUCTO: ", cat.id),
-                  <option key={cat.id} value={cat.id}>{cat.nombre_categoria}</option>
-                ))}
-              </select>
-            </div>
+          <div className="border-b border-gray-200 pb-4 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {editingId ? 'Editar Producto' : 'Agregar Nuevo Producto'}
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Los productos se crean como disponibles bajo demanda. El control de inventario se realiza a través de los insumos.
+            </p>
           </div>
 
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Insumos Necesarios (Receta)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Columna 1: Información del producto */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-800 mb-2">Información del Producto</h3>
+              
               <div>
-                <label htmlFor="consumableId" className="block text-sm font-medium text-gray-700 mb-1">
-                  Insumo
+                <label htmlFor="nombre_producto" className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre del Producto *
+                </label>
+                <input
+                  type="text"
+                  id="nombre_producto"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={formData.nombre_producto}
+                  onChange={handleChange}
+                  placeholder="Ej: Helado de Chocolate"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="variante" className="block text-sm font-medium text-gray-700 mb-1">
+                  Variante
+                </label>
+                <input
+                  type="text"
+                  id="variante"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={formData.variante}
+                  onChange={handleChange}
+                  placeholder="Ej: Grande, Mediano, etc."
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="precio" className="block text-sm font-medium text-gray-700 mb-1">
+                  Precio (COP) *
+                </label>
+                <input
+                  type="text"
+                  id="precio"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={displayPrice}
+                  onChange={handlePriceInputChange}
+                  onBlur={handlePriceInputBlur}
+                  onFocus={handlePriceInputFocus}
+                  placeholder="Ej: $ 22.000,00"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="id_categoria" className="block text-sm font-medium text-gray-700 mb-1">
+                  Categoría *
                 </label>
                 <select
-                  id="consumableId"
+                  id="id_categoria"
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={newRecipeItem.consumableId}
-                  onChange={handleNewRecipeItemChange}
+                  value={formData.id_categoria}
+                  onChange={handleChange}
                 >
-                  <option value="">Seleccione un insumo</option>
-                  {availableConsumables.map(consumable => (
-                    <option key={consumable.id} value={consumable.id}>
-                      {consumable.nombre} - ({consumable.unidadMedida}) - #️⃣{consumable.cantidad_utilizada}
-                    </option>
+                  <option value="">Seleccione una categoría</option>
+                  {categorias.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.nombre_categoria}</option>
                   ))}
                 </select>
               </div>
-
-              <div>
-                <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
-                  Cantidad (Predefinida)
-                </label>
-                <input
-                  type="number"
-                  id="quantity"
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 text-gray-700 cursor-not-allowed"
-                  value={newRecipeItem.quantity}
-                  placeholder={newRecipeItem.consumableId ? "Cantidad automática del insumo" : "Seleccione primero un insumo"}
-                  readOnly
-                  disabled={!newRecipeItem.consumableId}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  {newRecipeItem.consumableId ? "Cantidad predefinida del insumo. No se puede modificar." : "La cantidad se completará automáticamente al seleccionar un insumo"}
-                </p>
-              </div>
-
-              <div className="flex items-end justify-end">
-                <Button 
-                  onClick={handleAddRecipeItem} 
-                  className="w-full md:w-auto"
-                  disabled={!newRecipeItem.consumableId || !newRecipeItem.quantity || parseFloat(newRecipeItem.quantity) <= 0}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Insumo
-                </Button>
-              </div>
             </div>
+            
+            {/* Columna 2: Receta del producto */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-800 mb-2">Receta del Producto</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Agregue los insumos necesarios para preparar este producto. La cantidad se establece automáticamente según el insumo seleccionado.
+              </p>
+              
+              <div className="grid grid-cols-1 gap-4 mb-4">
+                <div>
+                  <label htmlFor="consumableId" className="block text-sm font-medium text-gray-700 mb-1">
+                    Seleccione un Insumo
+                  </label>
+                  <select
+                    id="consumableId"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={newRecipeItem.consumableId}
+                    onChange={handleNewRecipeItemChange}
+                  >
+                    <option value="">-- Seleccionar insumo --</option>
+                    {availableConsumables.map(consumable => (
+                      <option key={consumable.id} value={consumable.id}>
+                        {consumable.nombre} ({consumable.unidadMedida})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {currentProductRecipe.length > 0 && (
-              <div className="border border-gray-200 rounded-md p-4">
-                <h4 className="text-md font-medium text-gray-800 mb-2">Insumos Agregados:</h4>
-                <ul className="space-y-2">
-                  {currentProductRecipe.map(item => {
-                    const consumable = availableConsumables.find(c => c.id === item.consumableId);
-                    return (
-                      <li key={item.consumableId} className="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-                        <span>
-                          {consumable?.nombre || 'Insumo Desconocido'} ({item.quantity} {consumable?.unidadMedida || ''})
-                        </span>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleRemoveRecipeItem(item.consumableId)}
-                          title="Eliminar insumo de la receta"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <div className="flex items-end space-x-2">
+                  <div className="flex-1">
+                    <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
+                      Cantidad Predefinida
+                    </label>
+                    <input
+                      type="text"
+                      id="quantity"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 text-gray-700"
+                      value={newRecipeItem.quantity}
+                      readOnly
+                      placeholder="Cantidad automática"
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleAddRecipeItem} 
+                    className="h-10"
+                    disabled={!newRecipeItem.consumableId || !newRecipeItem.quantity || parseFloat(newRecipeItem.quantity) <= 0}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Agregar
+                  </Button>
+                </div>
               </div>
-            )}
+
+              {currentProductRecipe.length > 0 ? (
+                <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
+                  <h4 className="text-md font-medium text-gray-800 mb-2">Insumos en la Receta:</h4>
+                  <ul className="divide-y divide-gray-200">
+                    {currentProductRecipe.map(item => {
+                      const consumable = availableConsumables.find(c => c.id === item.consumableId);
+                      return (
+                        <li key={item.consumableId} className="py-2 flex justify-between items-center">
+                          <span className="font-medium">
+                            {consumable?.nombre || 'Insumo Desconocido'}
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-gray-600">
+                              {item.quantity} {consumable?.unidadMedida || ''}
+                            </span>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleRemoveRecipeItem(item.consumableId)}
+                              title="Eliminar insumo de la receta"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : (
+                <div className="border border-dashed border-gray-300 rounded-md p-4 text-center text-gray-500">
+                  No hay insumos agregados a la receta aún.
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="mt-6 flex justify-end gap-2">
-            {editingId && (
-              <Button variant="secondary" onClick={handleCancel}>
-                <X className="h-4 w-4 mr-2" />
-                Cancelar
-              </Button>
-            )}
+          <div className="mt-8 pt-4 border-t border-gray-200 flex justify-end gap-2">
+            <Button variant="secondary" onClick={handleCancel}>
+              <X className="h-4 w-4 mr-2" />
+              Cancelar
+            </Button>
             <Button onClick={handleAddOrUpdateProducto}>
               {editingId ? (
                 <>
                   <Save className="h-4 w-4 mr-2" />
-                  Actualizar Producto
+                  Guardar Cambios
                 </>
               ) : (
                 <>
                   <Plus className="h-4 w-4 mr-2" />
-                  Agregar Producto
+                  Crear Producto
                 </>
               )}
             </Button>
@@ -707,6 +761,7 @@ export default function ProductsPage() {
         </Card>
       )}
 
+      {/* Rest of the component remains the same */}
       <Card>
         <div className="p-4">
           <div className="flex justify-between items-center mb-4">

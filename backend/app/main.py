@@ -281,24 +281,7 @@ async def create_product(
         """
         
         try:
-            print(f"Intentando insertar producto directamente: {product.nombre_producto}, {product.precio_cop}, {product.categoria_id}, {product.user_id}, {product.variante}, {product.is_active}")
-            
-            # Verificar si la tabla products existe
-            check_table_query = "SHOW TABLES LIKE 'products'"
-            table_exists = execute_query(check_table_query, fetch_one=True)
-            if not table_exists:
-                print("La tabla 'products' no existe")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="La tabla 'products' no existe en la base de datos"
-                )
-            
-            # Verificar la estructura de la tabla
-            describe_query = "DESCRIBE products"
-            columns = execute_query(describe_query, fetch_all=True)
-            print("Estructura de la tabla 'products':")
-            for column in columns:
-                print(f"- {column['Field']} ({column['Type']})")
+            print(f"Intentando insertar producto: {product.nombre_producto}, precio: {product.precio_cop}, categoría: {product.categoria_id}, usuario: {product.user_id}, variante: {product.variante}")
             
             # Establecer stock_quantity en -1 para indicar disponibilidad bajo demanda
             stock_quantity = -1  # -1 indica disponibilidad bajo demanda
@@ -307,8 +290,8 @@ async def create_product(
             # Ejecutar la inserción
             result = execute_query(query, (
                 product.nombre_producto, 
-                product.precio_cop,
-                product.categoria_id,
+                product.precio_cop,  # Este valor irá a la columna 'price'
+                product.categoria_id,  # Este valor irá a la columna 'category_id'
                 product.user_id,
                 product.variante,
                 product.is_active,
@@ -316,33 +299,43 @@ async def create_product(
                 min_stock
             ))
             
-            if result is None:
-                print("La ejecución de la consulta devolvió None")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Error al insertar el producto en la base de datos"
-                )
+            print(f"Resultado de la inserción: {result}")
             
-            # Obtener el ID del producto recién creado
-            id_query = "SELECT LAST_INSERT_ID() as id"
-            id_result = execute_query(id_query, fetch_one=True)
-            product_id = id_result['id'] if id_result else None
+            # Intentar obtener el producto recién creado por nombre y otros campos únicos
+            get_product_query = """
+            SELECT id FROM products 
+            WHERE nombre_producto = %s AND user_id = %s 
+            ORDER BY id DESC 
+            LIMIT 1
+            """
             
-            if not product_id:
+            product_result = execute_query(
+                get_product_query, 
+                (product.nombre_producto, product.user_id), 
+                fetch_one=True
+            )
+            
+            if product_result and product_result.get('id'):
+                product_id = product_result['id']
+                print(f"Producto creado exitosamente con ID: {product_id}")
+                
+                return {
+                    "id": product_id, 
+                    "message": "Producto creado exitosamente",
+                    "note": "Este producto está configurado como disponible bajo demanda. El control de inventario se realiza a través de los insumos."
+                }
+            else:
                 print("No se pudo obtener el ID del producto creado")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Error al crear el producto: no se pudo obtener el ID"
                 )
-            
-            return {
-                "id": product_id, 
-                "message": "Producto creado exitosamente",
-                "note": "Este producto está configurado como disponible bajo demanda. El control de inventario se realiza a través de los insumos."
-            }
+                
+        except HTTPException:
+            raise
         except Exception as e:
             error_msg = str(e)
-            print(f"Error al insertar producto directamente: {error_msg}")
+            print(f"Error al insertar producto: {error_msg}")
             
             # Intentar obtener más información sobre el error
             if "Unknown column" in error_msg:
@@ -751,28 +744,74 @@ router_recipes = APIRouter()
 @router_recipes.post("/{product_id}/recipe")
 async def add_recipe(
     product_id: int,
-    ingredients: List[Dict[str, Any]],
+    request: Request,
     current_user: dict = Depends(get_current_active_user)
 ):
     """Añadir receta a un producto"""
+    print(f"=== INICIANDO CREACIÓN DE RECETA PARA PRODUCTO {product_id} ===")
+    
+    # Obtener los ingredientes del cuerpo de la petición
+    try:
+        body = await request.json()
+        print(f"Body recibido: {body}")
+        ingredients = body.get("ingredients", [])
+        print(f"Ingredientes extraídos: {ingredients}")
+    except Exception as e:
+        print(f"Error al procesar el body: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error al procesar el cuerpo de la petición: {str(e)}"
+        )
+    
+    if not ingredients:
+        print("No se proporcionaron ingredientes")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se proporcionaron ingredientes para la receta"
+        )
+    
     # Verificar que el producto existe
     product = ProductService.get_product_by_id(product_id)
     if not product:
+        print(f"Producto {product_id} no encontrado")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Producto con ID {product_id} no encontrado"
         )
     
+    print(f"Producto encontrado: {product['nombre_producto']}")
+    
+    # Validar que todos los insumos existen
+    from models.insumo_service import InsumoService
+    for ingredient in ingredients:
+        insumo_id = ingredient.get('insumo_id')
+        if not insumo_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cada ingrediente debe tener un 'insumo_id'"
+            )
+        
+        insumo = InsumoService.get_insumo_by_id(insumo_id)
+        if not insumo:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El insumo con ID {insumo_id} no existe"
+            )
+        print(f"Insumo {insumo_id} validado: {insumo['nombre_insumo']}")
+    
     # Añadir la receta
+    print(f"Intentando añadir {len(ingredients)} ingredientes a la receta")
     success = ProductService.add_product_recipe(product_id, ingredients)
     
     if not success:
+        print("Error al añadir la receta en ProductService")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al añadir la receta"
         )
     
-    return {"message": "Receta añadida exitosamente"}
+    print(f"=== RECETA CREADA EXITOSAMENTE PARA PRODUCTO {product_id} ===")
+    return {"message": "Receta añadida exitosamente", "ingredients_count": len(ingredients)}
 
 @router_recipes.get("/{product_id}/recipe")
 async def get_recipe(product_id: int):

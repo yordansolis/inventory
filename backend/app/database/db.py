@@ -136,6 +136,60 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=False):
         if connection:
             connection.close()
 
+def execute_insert_and_get_id(query, params=None):
+    """
+    Ejecutar una consulta INSERT y devolver el ID del registro insertado
+    """
+    connection = get_db_connection()
+    if not connection:
+        print("No se pudo establecer conexión con la base de datos")
+        return None
+    
+    cursor = None
+    try:
+        cursor = connection.cursor(pymysql.cursors.DictCursor)
+        cursor.execute(query, params)
+        
+        # Obtener el número de filas afectadas
+        rows_affected = cursor.rowcount
+        
+        if rows_affected > 0:
+            # Si se insertó al menos una fila, obtener el ID
+            cursor.execute("SELECT LAST_INSERT_ID() as id")
+            result = cursor.fetchone()
+            connection.commit()
+            return result['id'] if result and result['id'] else None
+        else:
+            # No se insertó ninguna fila
+            connection.rollback()
+            return None
+            
+    except pymysql.err.OperationalError as e:
+        error_code, error_message = e.args
+        print(f"Error operacional en la base de datos: [{error_code}] {error_message}")
+        print(f"Query: {query}")
+        print(f"Params: {params}")
+        connection.rollback()
+        return None
+    except pymysql.err.IntegrityError as e:
+        error_code, error_message = e.args
+        print(f"Error de integridad en la base de datos: [{error_code}] {error_message}")
+        print(f"Query: {query}")
+        print(f"Params: {params}")
+        connection.rollback()
+        return None
+    except Exception as e:
+        print(f"Error ejecutando INSERT: {type(e).__name__}: {e}")
+        print(f"Query: {query}")
+        print(f"Params: {params}")
+        connection.rollback()
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
 def create_tables():
     """
     Crear las tablas necesarias para el sistema de inventario

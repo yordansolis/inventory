@@ -291,23 +291,47 @@ class ProductService:
         ingredients: Lista de diccionarios con {insumo_id, cantidad}
         """
         try:
+            print(f"ProductService.add_product_recipe: Iniciando para producto {product_id}")
+            print(f"Ingredientes recibidos: {ingredients}")
+            
             # Primero eliminamos cualquier ingrediente existente
             delete_query = "DELETE FROM product_recipes WHERE product_id = %s"
-            execute_query(delete_query, (product_id,))
+            delete_result = execute_query(delete_query, (product_id,))
+            print(f"Ingredientes anteriores eliminados: {delete_result} filas afectadas")
             
             # Ahora insertamos los nuevos ingredientes
+            inserted_count = 0
             for ingredient in ingredients:
+                insumo_id = ingredient.get('insumo_id')
+                cantidad = ingredient.get('cantidad')
+                
+                if not insumo_id or not cantidad:
+                    print(f"Ingrediente inválido: {ingredient}")
+                    continue
+                
                 insert_query = """
                 INSERT INTO product_recipes (product_id, insumo_id, cantidad)
                 VALUES (%s, %s, %s)
                 """
-                execute_query(
+                
+                print(f"Insertando ingrediente: product_id={product_id}, insumo_id={insumo_id}, cantidad={cantidad}")
+                
+                result = execute_query(
                     insert_query, 
-                    (product_id, ingredient['insumo_id'], ingredient['cantidad'])
+                    (product_id, insumo_id, cantidad)
                 )
+                
+                if result and result > 0:
+                    inserted_count += 1
+                    print(f"Ingrediente insertado exitosamente")
+                else:
+                    print(f"Error al insertar ingrediente: resultado={result}")
             
-            return True
+            print(f"ProductService.add_product_recipe: {inserted_count} de {len(ingredients)} ingredientes insertados")
+            return inserted_count == len(ingredients)
+            
         except Exception as e:
+            print(f"Error en ProductService.add_product_recipe: {str(e)}")
             logger.error(f"Error añadiendo receta al producto {product_id}: {e}")
             return False
     
