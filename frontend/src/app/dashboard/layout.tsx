@@ -38,6 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/dashboard' },
     { id: 'facturar', label: 'Facturar', icon: DollarSign, href: '/dashboard/factura' },
+    { id: 'extracto-ventas', label: 'Extracto Ventas', icon: ShoppingCart, href: '/dashboard/estracto-ventas' },
     { id: 'inventario', label: 'Inventario', icon: Package, href: '/dashboard/inventario' },
     { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3, href: '/dashboard/estadisticas' },
     { id: 'domicilios', label: 'Domicilios', icon: Truck, href: '/dashboard/domicilios' },
