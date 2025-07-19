@@ -1,5 +1,5 @@
 "use client"
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ShoppingCart,
   Eye,
@@ -9,17 +9,64 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-interface VendibleProduct {
-  id: number;
-  nombre: string;
-  tipo: string;
-  precio: number;
-  stock: number;
-  minimo: number;
-  estado: string;
+interface DashboardSummary {
+  ventas_hoy: number;
+  productos_vendibles: number;
+  stock_bajo: number;
+  productos_stock_bajo: any[];
+  domicilios: number;
+  ventas_recientes: RecentSale[];
+  total_productos: number;
+  productos_sin_stock: number;
+  ventas_cantidad: number;
+  metodos_pago: PaymentMethod[];
+  productos_top: TopProduct[];
 }
 
-interface ConsumableProduct {
+interface RecentSale {
+  client_name: string;
+  product_name: string;
+  product_variant: string;
+  total_amount: number;
+  has_delivery: number;
+  delivery_person: string;
+  invoice_date: string;
+  invoice_time: string;
+  invoice_number: string;
+}
+
+interface PaymentMethod {
+  payment_method: string;
+  count: number;
+  total: number;
+}
+
+interface TopProduct {
+  product_name: string;
+  product_variant: string;
+  total_quantity: number;
+  total_revenue: number;
+  times_sold: number;
+}
+
+interface StockSummary {
+  total_productos: number;
+  productos_sin_stock: number;
+  productos_stock_bajo: number;
+  productos_disponibles: number;
+  fecha_actualizacion: string | null;
+  porcentaje_sin_stock: number;
+  porcentaje_stock_bajo: number;
+  porcentaje_disponibles: number;
+}
+
+interface LowStockData {
+  min_stock_threshold: number;
+  total_productos_bajo_stock: number;
+  productos: LowStockProduct[];
+}
+
+interface LowStockProduct {
   id: number;
   nombre: string;
   cantidad: number;
@@ -28,32 +75,69 @@ interface ConsumableProduct {
 }
 
 export default function InventoryDashboard() {
+  const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
+  const [stockSummary, setStockSummary] = useState<StockSummary | null>(null);
+  const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Datos de ejemplo basados en tu estructura
-  const productosVendibles: VendibleProduct[] = [
-    { id: 1, nombre: 'BOLA DE HELADO DE VAINILLA', tipo: 'HELADO', precio: 1000, stock: 25, minimo: 10, estado: 'bien' },
-    { id: 2, nombre: 'BOLA DE HELADO DE FRESA', tipo: 'HELADO', precio: 1500, stock: 8, minimo: 5, estado: 'bien' },
-    { id: 3, nombre: 'BOLA DE ESPUMA', tipo: 'ESPUMA', precio: 5000, stock: 3, minimo: 10, estado: 'bajo' },
-    { id: 4, nombre: 'MINI PANCAKES', tipo: 'PANCAKES', precio: 1000, stock: 100, minimo: 10, estado: 'bien' },
-    { id: 5, nombre: 'MINI DONAS X12', tipo: 'DONAS', precio: 3000, stock: 300, minimo: 10, estado: 'bien' },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Get token from localStorage or your auth context
+        const token = localStorage.getItem('token') || '';
+        const headers = {
+          'Authorization': `bearer ${token}`
+        };
 
-  const productosConsumibles: ConsumableProduct[] = [
-    { id: 101, nombre: 'VASOS X 16', cantidad: 50, minimo: 10, estado: 'bien' },
-    { id: 102, nombre: 'VASOS X 6', cantidad: 100, minimo: 10, estado: 'bien' },
-    { id: 103, nombre: 'PAQUETE DE SERVILLETAS X 50', cantidad: 6, minimo: 7, estado: 'bajo' },
-    { id: 104, nombre: 'PAQUETES DE FRESAS', cantidad: 2, minimo: 5, estado: 'bajo' },
-  ];
-
-  const ventasRecientes = [
-    { id: '001', fecha: '11/07/2025', cliente: 'Jhordan', producto: 'Bola de helado', cantidad: 2, total: 17000, domicilio: true, vendedor: 'Brayam' },
-    { id: '002', fecha: '11/07/2025', cliente: 'María', producto: 'Mini Pancakes', cantidad: 1, total: 4000, domicilio: false, vendedor: 'Brayam' },
-    { id: '003', fecha: '10/07/2025', cliente: 'Carlos', producto: 'Bola de Espuma', cantidad: 1, total: 8000, domicilio: true, vendedor: 'Ana' },
-  ];
-
-  const isVendibleProduct = (product: VendibleProduct | ConsumableProduct): product is VendibleProduct => {
-    return 'tipo' in product;
-  };
+        // Fetch dashboard summary
+        const dashboardResponse = await fetch('http://127.0.0.1:8053/api/v1/services/dashboard/summary', {
+          headers
+        });
+        
+        if (!dashboardResponse.ok) {
+          throw new Error('Failed to fetch dashboard data');
+        }
+        
+        const dashboardResult = await dashboardResponse.json();
+        setDashboardData(dashboardResult);
+        
+        // Fetch stock overview
+        const stockResponse = await fetch('http://127.0.0.1:8053/api/v1/services/stock/summary/overview', {
+          headers
+        });
+        
+        if (!stockResponse.ok) {
+          throw new Error('Failed to fetch stock summary');
+        }
+        
+        const stockResult = await stockResponse.json();
+        setStockSummary(stockResult);
+        
+        // Fetch low stock products
+        const lowStockResponse = await fetch('http://127.0.0.1:8053/api/v1/services/stock/low', {
+          headers
+        });
+        
+        if (!lowStockResponse.ok) {
+          throw new Error('Failed to fetch low stock products');
+        }
+        
+        const lowStockResult = await lowStockResponse.json();
+        setLowStockProducts(lowStockResult.productos || []);
+        
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Error cargando datos. Por favor intente nuevamente.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -114,6 +198,34 @@ export default function InventoryDashboard() {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando datos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-red-600 mx-auto" />
+          <p className="mt-4 text-gray-900 font-medium">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Header */}
@@ -132,7 +244,7 @@ export default function InventoryDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Ventas Hoy</p>
-              <p className="text-2xl font-bold text-gray-900">$29,000</p>
+              <p className="text-2xl font-bold text-gray-900">{dashboardData ? formatPrice(dashboardData.ventas_hoy) : '$0'}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-full">
               <TrendingUp className="h-6 w-6 text-green-600" />
@@ -144,7 +256,7 @@ export default function InventoryDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Productos Vendibles</p>
-              <p className="text-2xl font-bold text-gray-900">{productosVendibles.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{stockSummary?.total_productos || 0}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-full">
               <ShoppingCart className="h-6 w-6 text-blue-600" />
@@ -157,7 +269,7 @@ export default function InventoryDashboard() {
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Stock Bajo</p>
               <p className="text-2xl font-bold text-red-600">
-                {[...productosVendibles, ...productosConsumibles].filter((p: any) => p.estado === 'bajo').length}
+                {stockSummary?.productos_stock_bajo || 0}
               </p>
             </div>
             <div className="p-3 bg-red-100 rounded-full">
@@ -171,7 +283,7 @@ export default function InventoryDashboard() {
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Domicilios</p>
               <p className="text-2xl font-bold text-gray-900">
-                {ventasRecientes.filter(v => v.domicilio).length}
+                {dashboardData?.domicilios || 0}
               </p>
             </div>
             <div className="p-3 bg-purple-100 rounded-full">
@@ -201,26 +313,34 @@ export default function InventoryDashboard() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domicilio</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendedor</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {ventasRecientes.map((venta) => (
-                <tr key={venta.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{venta.id}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{venta.cliente}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{venta.producto}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatPrice(venta.total)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {venta.domicilio ? (
-                      <Badge variant="info">Sí</Badge>
-                    ) : (
-                      <Badge variant="default">No</Badge>
-                    )}
+              {dashboardData?.ventas_recientes && dashboardData.ventas_recientes.length > 0 ? (
+                dashboardData.ventas_recientes.map((venta, index) => (
+                  <tr key={venta.invoice_number} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{venta.invoice_number.substring(venta.invoice_number.length - 4)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{venta.client_name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{venta.product_name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatPrice(venta.total_amount)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {venta.has_delivery ? (
+                        <Badge variant="info">Sí</Badge>
+                      ) : (
+                        <Badge variant="default">No</Badge>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{venta.invoice_date}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                    No hay ventas recientes
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{venta.vendedor}</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -233,18 +353,17 @@ export default function InventoryDashboard() {
             Alertas de Stock Bajo
           </h2>
           <Badge variant="danger" size="lg">
-            {[...productosVendibles, ...productosConsumibles].filter(p => p.estado === 'bajo').length} productos
+            {lowStockProducts.length} productos
           </Badge>
         </div>
-        <div className="space-y-3">
-          {productosVendibles
-            .filter(p => p.estado === 'bajo')
-            .map((producto) => (
+        {lowStockProducts.length > 0 ? (
+          <div className="space-y-3">
+            {lowStockProducts.map((producto) => (
               <div key={producto.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
                 <div>
                   <p className="font-medium text-gray-900">{producto.nombre}</p>
                   <p className="text-sm text-gray-600">
-                    Stock: {producto.stock} | Mínimo: {producto.minimo}
+                    Stock: {producto.cantidad} | Mínimo: {producto.minimo}
                   </p>
                 </div>
                 <Button variant="danger" size="sm">
@@ -253,23 +372,10 @@ export default function InventoryDashboard() {
                 </Button>
               </div>
             ))}
-          {productosConsumibles
-            .filter(p => p.estado === 'bajo')
-            .map((producto) => (
-              <div key={producto.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
-                <div>
-                  <p className="font-medium text-gray-900">{producto.nombre}</p>
-                  <p className="text-sm text-gray-600">
-                    Cantidad: {producto.cantidad} | Mínimo: {producto.minimo}
-                  </p>
-                </div>
-                <Button variant="danger" size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Reabastecer
-                </Button>
-              </div>
-            ))}
-        </div>
+          </div>
+        ) : (
+          <p className="text-center text-gray-500 py-4">No hay productos con stock bajo</p>
+        )}
       </Card>
     </>
   );
