@@ -14,6 +14,8 @@ from models.insumo_service import InsumoService
 from models.sales_service import SalesService
 from schemas import schemas
 import json
+import pymysql
+from database.db import get_db_connection
 
 # Cargar variables de entorno
 load_dotenv('.env.dev')
@@ -41,9 +43,16 @@ async def startup_db_client():
     create_tables()
     print("Base de datos inicializada correctamente")
 
+
+
+# Ruta raíz de la API para verificar que la API está funcionando
 @app.get("/")
 def read_root():
     return {"message": "¡Bienvenido a la API de Inventario de Heladería!"}
+
+
+
+
 
 # Incluir las rutas de la API
 app.include_router(router_user, prefix="/api/v1/users", tags=["usuarios"])
@@ -255,10 +264,22 @@ router_products = APIRouter()
 @router_products.post("/", status_code=status.HTTP_201_CREATED)
 async def create_product(
     product: schemas.ProductCreate,
+    request: Request,
     current_user: dict = Depends(get_current_active_user)
 ):
     """Crear un nuevo producto para heladería (bajo demanda)"""
     try:
+        # Obtener los datos de la receta del cuerpo de la petición
+        body_data = await request.json()
+        ingredients = body_data.get("ingredients", [])
+        
+        # Validar que se proporcionen ingredientes para la receta
+        if not ingredients:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Se requiere al menos un ingrediente para la receta del producto"
+            )
+        
         # Validar que la categoría existe
         check_category_query = "SELECT id FROM categories WHERE id = %s"
         existing_category = execute_query(check_category_query, (product.categoria_id,), fetch_one=True)
@@ -276,24 +297,50 @@ async def create_product(
                 detail=f"La categoría con ID {product.categoria_id} no existe. Categorías disponibles:\n{categories_info}"
             )
         
-        # Intentar crear el producto directamente con una consulta SQL
-        query = """
-        INSERT INTO products (nombre_producto, price, category_id, user_id, variante, is_active, stock_quantity, min_stock)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """
+        # Validar que todos los insumos existen
+        from models.insumo_service import InsumoService
+        for ingredient in ingredients:
+            insumo_id = ingredient.get('insumo_id')
+            if not insumo_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cada ingrediente debe tener un 'insumo_id'"
+                )
+            
+            insumo = InsumoService.get_insumo_by_id(insumo_id)
+            if not insumo:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El insumo con ID {insumo_id} no existe"
+                )
         
+        # Iniciar conexión para transacción
+        connection = get_db_connection()
+        if not connection:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No se pudo establecer conexión con la base de datos"
+            )
+        
+        cursor = None
         try:
-            print(f"Intentando insertar producto: {product.nombre_producto}, precio: {product.precio_cop}, categoría: {product.categoria_id}, usuario: {product.user_id}, variante: {product.variante}")
+            cursor = connection.cursor(pymysql.cursors.DictCursor)
+            connection.begin()
             
             # Establecer stock_quantity en -1 para indicar disponibilidad bajo demanda
             stock_quantity = -1  # -1 indica disponibilidad bajo demanda
             min_stock = 0  # 0 para productos bajo demanda
             
-            # Ejecutar la inserción
-            result = execute_query(query, (
+            # Insertar el producto
+            product_query = """
+            INSERT INTO products (nombre_producto, price, category_id, user_id, variante, is_active, stock_quantity, min_stock)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            cursor.execute(product_query, (
                 product.nombre_producto, 
-                product.precio_cop,  # Este valor irá a la columna 'price'
-                product.categoria_id,  # Este valor irá a la columna 'category_id'
+                product.precio_cop,
+                product.categoria_id,
                 product.user_id,
                 product.variante,
                 product.is_active,
@@ -301,69 +348,73 @@ async def create_product(
                 min_stock
             ))
             
-            print(f"Resultado de la inserción: {result}")
+            # Obtener el ID del producto recién creado
+            product_id = cursor.lastrowid
             
-            # Intentar obtener el producto recién creado por nombre y otros campos únicos
-            get_product_query = """
-            SELECT id FROM products 
-            WHERE nombre_producto = %s AND user_id = %s 
-            ORDER BY id DESC 
-            LIMIT 1
-            """
-            
-            product_result = execute_query(
-                get_product_query, 
-                (product.nombre_producto, product.user_id), 
-                fetch_one=True
-            )
-            
-            if product_result and product_result.get('id'):
-                product_id = product_result['id']
-                print(f"Producto creado exitosamente con ID: {product_id}")
-                
-                return {
-                    "id": product_id, 
-                    "message": "Producto creado exitosamente",
-                    "note": "Este producto está configurado como disponible bajo demanda. El control de inventario se realiza a través de los insumos."
-                }
-            else:
-                print("No se pudo obtener el ID del producto creado")
+            if not product_id:
+                connection.rollback()
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Error al crear el producto: no se pudo obtener el ID"
                 )
-                
-        except HTTPException:
-            raise
-        except Exception as e:
-            error_msg = str(e)
-            print(f"Error al insertar producto: {error_msg}")
             
-            # Intentar obtener más información sobre el error
-            if "Unknown column" in error_msg:
-                column_name = error_msg.split("'")[1] if "'" in error_msg else "desconocida"
+            # Insertar los ingredientes de la receta
+            inserted_count = 0
+            for ingredient in ingredients:
+                insumo_id = ingredient.get('insumo_id')
+                cantidad = ingredient.get('cantidad')
+                
+                if not insumo_id or not cantidad:
+                    continue
+                
+                recipe_query = """
+                INSERT INTO product_recipes (product_id, insumo_id, cantidad)
+                VALUES (%s, %s, %s)
+                """
+                
+                cursor.execute(recipe_query, (product_id, insumo_id, cantidad))
+                inserted_count += 1
+            
+            # Verificar que se insertaron todos los ingredientes
+            if inserted_count != len(ingredients):
+                connection.rollback()
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Error al crear el producto: la columna '{column_name}' no existe en la tabla"
+                    detail=f"Error al crear la receta: solo se insertaron {inserted_count} de {len(ingredients)} ingredientes"
                 )
-            elif "Duplicate entry" in error_msg:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Ya existe un producto con ese nombre o identificador"
-                )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Error al crear el producto: {error_msg}"
-                )
+            
+            # Confirmar la transacción
+            connection.commit()
+            
+            # Retornar el producto creado con su ID
+            return {
+                "id": product_id,
+                "nombre_producto": product.nombre_producto,
+                "message": "Producto creado exitosamente con su receta",
+                "ingredients_count": inserted_count
+            }
+            
+        except Exception as e:
+            if connection:
+                connection.rollback()
+            print(f"Error al crear producto con receta: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error al crear el producto con su receta: {str(e)}"
+            )
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+                
     except HTTPException:
         raise
     except Exception as e:
-        error_msg = str(e)
-        print(f"Error inesperado al crear producto: {error_msg}")
+        print(f"Error inesperado: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error inesperado al crear el producto: {error_msg}"
+            detail=f"Error inesperado: {str(e)}"
         )
 
 @router_products.get("/{product_id}")
@@ -398,68 +449,165 @@ async def get_products(
     
     return products
 
-@router_products.put("/{product_id}")
+@router_products.put("/{product_id}", status_code=status.HTTP_200_OK)
 async def update_product(
     product_id: int,
     request: Request,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Actualizar un producto existente"""
-    # Verificar que el producto existe
-    product = ProductService.get_product_by_id(product_id)
-    if not product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Producto con ID {product_id} no encontrado"
-        )
-    
-    # Obtener datos de actualización
+    """Actualizar un producto existente con su receta"""
     try:
-        update_data = await request.json()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al procesar el cuerpo JSON: {str(e)}"
-        )
-    
-    # Validar datos
-    if not update_data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se proporcionaron datos para actualizar"
-        )
-    
-    # Si se actualiza la categoría, verificar que existe
-    if "category_id" in update_data:
-        category_id = update_data["category_id"]
-        check_category_query = "SELECT id FROM categories WHERE id = %s"
-        existing_category = execute_query(check_category_query, (category_id,), fetch_one=True)
+        # Obtener los datos del cuerpo de la petición
+        body_data = await request.json()
         
-        if not existing_category:
-            # Listar categorías disponibles
-            categories_query = "SELECT id, nombre_categoria FROM categories ORDER BY id"
-            available_categories = execute_query(categories_query, fetch_all=True) or []
-            
-            category_list = [f"ID: {cat['id']}, Nombre: {cat['nombre_categoria']}" for cat in available_categories]
-            categories_info = "\n".join(category_list) if category_list else "No hay categorías disponibles."
-            
+        # Extraer datos del producto y la receta
+        product_data = {
+            "nombre_producto": body_data.get("nombre_producto"),
+            "variante": body_data.get("variante"),
+            "precio_cop": body_data.get("precio_cop"),
+            "categoria_id": body_data.get("categoria_id"),
+            "is_active": body_data.get("is_active", True)
+        }
+        
+        ingredients = body_data.get("ingredients", [])
+        
+        # Validar que se proporcionen ingredientes para la receta
+        if not ingredients:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"La categoría con ID {category_id} no existe. Categorías disponibles:\n{categories_info}"
+                detail="Se requiere al menos un ingrediente para la receta del producto"
             )
-    
-    # Intentar actualizar el producto
-    success = ProductService.update_product(product_id, update_data)
-    
-    if not success:
+        
+        # Verificar que el producto existe
+        product = ProductService.get_product_by_id(product_id)
+        if not product:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Producto con ID {product_id} no encontrado"
+            )
+        
+        # Validar que la categoría existe
+        check_category_query = "SELECT id FROM categories WHERE id = %s"
+        existing_category = execute_query(check_category_query, (product_data["categoria_id"],), fetch_one=True)
+        
+        if not existing_category:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"La categoría con ID {product_data['categoria_id']} no existe"
+            )
+        
+        # Validar que todos los insumos existen
+        from models.insumo_service import InsumoService
+        for ingredient in ingredients:
+            insumo_id = ingredient.get('insumo_id')
+            if not insumo_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cada ingrediente debe tener un 'insumo_id'"
+                )
+            
+            insumo = InsumoService.get_insumo_by_id(insumo_id)
+            if not insumo:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El insumo con ID {insumo_id} no existe"
+                )
+        
+        # Iniciar conexión para transacción
+        connection = get_db_connection()
+        if not connection:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No se pudo establecer conexión con la base de datos"
+            )
+        
+        cursor = None
+        try:
+            cursor = connection.cursor(pymysql.cursors.DictCursor)
+            connection.begin()
+            
+            # Actualizar el producto
+            update_query = """
+            UPDATE products 
+            SET nombre_producto = %s, 
+                price = %s, 
+                category_id = %s, 
+                variante = %s, 
+                is_active = %s
+            WHERE id = %s
+            """
+            
+            cursor.execute(update_query, (
+                product_data["nombre_producto"],
+                product_data["precio_cop"],
+                product_data["categoria_id"],
+                product_data["variante"],
+                product_data["is_active"],
+                product_id
+            ))
+            
+            # Eliminar receta anterior
+            delete_query = "DELETE FROM product_recipes WHERE product_id = %s"
+            cursor.execute(delete_query, (product_id,))
+            
+            # Insertar los nuevos ingredientes de la receta
+            inserted_count = 0
+            for ingredient in ingredients:
+                insumo_id = ingredient.get('insumo_id')
+                cantidad = ingredient.get('cantidad')
+                
+                if not insumo_id or not cantidad:
+                    continue
+                
+                recipe_query = """
+                INSERT INTO product_recipes (product_id, insumo_id, cantidad)
+                VALUES (%s, %s, %s)
+                """
+                
+                cursor.execute(recipe_query, (product_id, insumo_id, cantidad))
+                inserted_count += 1
+            
+            # Verificar que se insertaron todos los ingredientes
+            if inserted_count != len(ingredients):
+                connection.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error al actualizar la receta: solo se insertaron {inserted_count} de {len(ingredients)} ingredientes"
+                )
+            
+            # Confirmar la transacción
+            connection.commit()
+            
+            # Retornar el producto actualizado
+            return {
+                "id": product_id,
+                "nombre_producto": product_data["nombre_producto"],
+                "message": "Producto actualizado exitosamente con su receta",
+                "ingredients_count": inserted_count
+            }
+            
+        except Exception as e:
+            if connection:
+                connection.rollback()
+            print(f"Error al actualizar producto con receta: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error al actualizar el producto con su receta: {str(e)}"
+            )
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error inesperado al actualizar producto: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al actualizar el producto"
+            detail=f"Error inesperado al actualizar el producto: {str(e)}"
         )
-    
-    # Obtener el producto actualizado
-    updated_product = ProductService.get_product_by_id(product_id)
-    return updated_product
 
 @router_products.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_product(
@@ -801,22 +949,78 @@ async def add_recipe(
             )
         print(f"Insumo {insumo_id} validado: {insumo['nombre_insumo']}")
     
-    # Añadir la receta
-    print(f"Intentando añadir {len(ingredients)} ingredientes a la receta")
-    success = ProductService.add_product_recipe(product_id, ingredients)
-    
-    if not success:
-        print("Error al añadir la receta en ProductService")
+    # Iniciar conexión para transacción
+    connection = get_db_connection()
+    if not connection:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al añadir la receta"
+            detail="No se pudo establecer conexión con la base de datos"
         )
     
-    print(f"=== RECETA CREADA EXITOSAMENTE PARA PRODUCTO {product_id} ===")
-    return {"message": "Receta añadida exitosamente", "ingredients_count": len(ingredients)}
+    cursor = None
+    try:
+        cursor = connection.cursor(pymysql.cursors.DictCursor)
+        connection.begin()
+        
+        # Eliminar receta anterior
+        delete_query = "DELETE FROM product_recipes WHERE product_id = %s"
+        cursor.execute(delete_query, (product_id,))
+        print(f"Receta anterior eliminada para producto {product_id}")
+        
+        # Insertar los nuevos ingredientes
+        inserted_count = 0
+        for ingredient in ingredients:
+            insumo_id = ingredient.get('insumo_id')
+            cantidad = ingredient.get('cantidad')
+            
+            if not insumo_id or not cantidad:
+                continue
+            
+            recipe_query = """
+            INSERT INTO product_recipes (product_id, insumo_id, cantidad)
+            VALUES (%s, %s, %s)
+            """
+            
+            cursor.execute(recipe_query, (product_id, insumo_id, cantidad))
+            inserted_count += 1
+            print(f"Ingrediente {insumo_id} insertado con cantidad {cantidad}")
+        
+        # Verificar que se insertaron todos los ingredientes
+        if inserted_count != len(ingredients):
+            connection.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error al crear la receta: solo se insertaron {inserted_count} de {len(ingredients)} ingredientes"
+            )
+        
+        # Confirmar la transacción
+        connection.commit()
+        print(f"=== RECETA CREADA EXITOSAMENTE PARA PRODUCTO {product_id} ===")
+        
+        return {
+            "message": "Receta añadida exitosamente", 
+            "ingredients_count": inserted_count
+        }
+        
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        print(f"Error al crear receta: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al crear la receta: {str(e)}"
+        )
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 @router_recipes.get("/{product_id}/recipe")
-async def get_recipe(product_id: int):
+async def get_recipe(
+    product_id: int,
+    current_user: dict = Depends(get_current_active_user)
+):
     """Obtener la receta de un producto"""
     # Verificar que el producto existe
     product = ProductService.get_product_by_id(product_id)
@@ -829,10 +1033,13 @@ async def get_recipe(product_id: int):
     # Obtener la receta
     recipe = ProductService.get_product_recipe(product_id)
     
-    return recipe
+    return {
+        "product_id": product_id,
+        "product_name": product['nombre_producto'],
+        "ingredients": recipe
+    }
 
-# Incluir las rutas de recetas
-app.include_router(router_recipes, prefix="/api/v1/products", tags=["recetas"])
+app.include_router(router_recipes, prefix="/api/v1/recipes", tags=["recetas"])
 
 # Router para ventas
 router_sales = APIRouter()
@@ -891,350 +1098,4 @@ async def get_sales_by_user(
 # Incluir las rutas de ventas
 app.include_router(router_sales, prefix="/api/v1/sales", tags=["ventas"])
 
-@app.post("/debug-create-product", status_code=status.HTTP_200_OK)
-async def debug_create_product(
-    request: Request
-):
-    """Depurar la creación de productos"""
-    from database.db import execute_query
-    
-    try:
-        # Obtener datos del cuerpo JSON
-        body = await request.json()
-        
-        # Extraer datos
-        nombre_producto = body.get("nombre_producto")
-        price = body.get("price")
-        category_id = body.get("category_id")
-        variante = body.get("variante")
-        stock_quantity = body.get("stock_quantity", 0)
-        min_stock = body.get("min_stock", 5)
-        user_id = body.get("user_id", 1)  # Default to admin user
-        
-        # Validar datos obligatorios
-        if not nombre_producto or not price or not category_id:
-            return {
-                "status": "error",
-                "message": "Faltan datos obligatorios (nombre_producto, price, category_id)"
-            }
-        
-        # Verificar que la categoría existe
-        check_category_query = "SELECT id FROM categories WHERE id = %s"
-        existing_category = execute_query(check_category_query, (category_id,), fetch_one=True)
-        
-        if not existing_category:
-            # Listar categorías disponibles
-            categories_query = "SELECT id, nombre_categoria FROM categories ORDER BY id"
-            available_categories = execute_query(categories_query, fetch_all=True) or []
-            
-            return {
-                "status": "error",
-                "message": f"La categoría con ID {category_id} no existe",
-                "available_categories": available_categories
-            }
-        
-        # Verificar que el usuario existe
-        check_user_query = "SELECT id FROM users WHERE id = %s"
-        existing_user = execute_query(check_user_query, (user_id,), fetch_one=True)
-        
-        if not existing_user:
-            # Listar usuarios disponibles
-            users_query = "SELECT id, username FROM users ORDER BY id"
-            available_users = execute_query(users_query, fetch_all=True) or []
-            
-            return {
-                "status": "error",
-                "message": f"El usuario con ID {user_id} no existe",
-                "available_users": available_users
-            }
-        
-        # Intentar insertar directamente en la base de datos
-        insert_query = """
-        INSERT INTO products (nombre_producto, price, category_id, user_id, variante, stock_quantity, min_stock)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """
-        
-        try:
-            result = execute_query(
-                insert_query, 
-                (nombre_producto, price, category_id, user_id, variante, stock_quantity, min_stock)
-            )
-            
-            if result:
-                # Obtener el ID del producto recién creado
-                id_query = "SELECT LAST_INSERT_ID() as id"
-                id_result = execute_query(id_query, fetch_one=True)
-                product_id = id_result['id'] if id_result else None
-                
-                # Obtener el producto creado
-                get_query = "SELECT * FROM products WHERE id = %s"
-                product = execute_query(get_query, (product_id,), fetch_one=True)
-                
-                return {
-                    "status": "success",
-                    "message": "Producto creado exitosamente",
-                    "product_id": product_id,
-                    "product_details": product
-                }
-            else:
-                return {
-                    "status": "error",
-                    "message": "Error al crear el producto (no se devolvió ID)"
-                }
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Error al crear el producto: {str(e)}",
-                "error_type": type(e).__name__
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error general: {str(e)}",
-            "error_type": type(e).__name__
-        }
 
-@app.post("/simple-create-product", status_code=status.HTTP_201_CREATED)
-async def simple_create_product(
-    request: Request,
-    current_user: dict = Depends(get_current_active_user)
-):
-    """Crear un producto de forma simplificada para heladería (bajo demanda)"""
-    from database.db import execute_query
-    
-    try:
-        # Obtener datos del cuerpo JSON
-        body = await request.json()
-        
-        # Extraer datos obligatorios
-        nombre_producto = body.get("nombre_producto")
-        price = body.get("price")
-        category_id = body.get("category_id")
-        
-        # Extraer datos opcionales
-        variante = body.get("variante")
-        stock_quantity = body.get("stock_quantity", -1)  # -1 indica disponibilidad bajo demanda
-        min_stock = body.get("min_stock", 0)  # 0 para productos bajo demanda
-        
-        # Validar datos obligatorios
-        if not nombre_producto or not price or not category_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Faltan datos obligatorios (nombre_producto, price, category_id)"
-            )
-        
-        # Verificar que la categoría existe
-        check_category_query = "SELECT id FROM categories WHERE id = %s"
-        existing_category = execute_query(check_category_query, (category_id,), fetch_one=True)
-        
-        if not existing_category:
-            # Listar categorías disponibles
-            categories_query = "SELECT id, nombre_categoria FROM categories ORDER BY id"
-            available_categories = execute_query(categories_query, fetch_all=True) or []
-            
-            category_list = [f"ID: {cat['id']}, Nombre: {cat['nombre_categoria']}" for cat in available_categories]
-            categories_info = "\n".join(category_list) if category_list else "No hay categorías disponibles."
-            
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"La categoría con ID {category_id} no existe. Categorías disponibles:\n{categories_info}"
-            )
-        
-        # Insertar directamente en la base de datos
-        insert_query = """
-        INSERT INTO products (nombre_producto, price, category_id, user_id, variante, stock_quantity, min_stock)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """
-        
-        # Usar el ID del usuario actual
-        user_id = current_user["id"]
-        
-        try:
-            result = execute_query(
-                insert_query, 
-                (nombre_producto, price, category_id, user_id, variante, stock_quantity, min_stock)
-            )
-            
-            if result:
-                # Obtener el ID del producto recién creado
-                id_query = "SELECT LAST_INSERT_ID() as id"
-                id_result = execute_query(id_query, fetch_one=True)
-                product_id = id_result['id'] if id_result else None
-                
-                return {
-                    "id": product_id, 
-                    "message": "Producto creado exitosamente",
-                    "note": "Este producto está configurado como disponible bajo demanda. Recuerde asociarle una receta para controlar el inventario de insumos."
-                }
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Error al crear el producto (no se devolvió ID)"
-                )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error al crear el producto: {str(e)}"
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error general: {str(e)}"
-        )
-
-@app.get("/list-users", status_code=status.HTTP_200_OK)
-async def list_users():
-    """Listar usuarios disponibles"""
-    from database.db import execute_query
-    
-    try:
-        # Listar usuarios disponibles
-        users_query = "SELECT id, username, email, role_id, is_active FROM users ORDER BY id"
-        users = execute_query(users_query, fetch_all=True) or []
-        
-        return {
-            "status": "success",
-            "users": users
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error al listar usuarios: {str(e)}",
-            "error_type": type(e).__name__
-        }
-
-@app.post("/assign-role", status_code=status.HTTP_200_OK)
-async def assign_role(
-    user_id: int,
-    role_id: int
-):
-    """Asignar un rol a un usuario"""
-    from database.db import execute_query
-    
-    try:
-        # Verificar que el usuario existe
-        check_user_query = "SELECT id FROM users WHERE id = %s"
-        existing_user = execute_query(check_user_query, (user_id,), fetch_one=True)
-        
-        if not existing_user:
-            return {
-                "status": "error",
-                "message": f"El usuario con ID {user_id} no existe"
-            }
-        
-        # Verificar que el rol existe
-        check_role_query = "SELECT id FROM roles WHERE id = %s"
-        existing_role = execute_query(check_role_query, (role_id,), fetch_one=True)
-        
-        if not existing_role:
-            # Listar roles disponibles
-            roles_query = "SELECT id, name FROM roles ORDER BY id"
-            available_roles = execute_query(roles_query, fetch_all=True) or []
-            
-            return {
-                "status": "error",
-                "message": f"El rol con ID {role_id} no existe",
-                "available_roles": available_roles
-            }
-        
-        # Asignar el rol al usuario
-        update_query = "UPDATE users SET role_id = %s WHERE id = %s"
-        result = execute_query(update_query, (role_id, user_id))
-        
-        if result:
-            # Obtener el usuario actualizado
-            get_query = """
-            SELECT u.*, r.name as role_name 
-            FROM users u
-            LEFT JOIN roles r ON u.role_id = r.id
-            WHERE u.id = %s
-            """
-            updated_user = execute_query(get_query, (user_id,), fetch_one=True)
-            
-            return {
-                "status": "success",
-                "message": f"Rol asignado exitosamente al usuario {user_id}",
-                "user": updated_user
-            }
-        else:
-            return {
-                "status": "error",
-                "message": "Error al asignar el rol al usuario"
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error al asignar rol: {str(e)}",
-            "error_type": type(e).__name__
-        }
-
-@app.post("/repair-database", status_code=status.HTTP_200_OK)
-async def repair_database():
-    """Verificar y reparar la base de datos"""
-    from database.db import execute_query
-    
-    try:
-        repairs = []
-        
-        # 1. Verificar y reparar roles
-        roles_query = "SELECT * FROM roles"
-        roles = execute_query(roles_query, fetch_all=True) or []
-        
-        if not roles:
-            # Crear roles predefinidos
-            roles_to_create = [
-                (1, "superuser", "Administrador con acceso total al sistema"),
-                (2, "staff", "Usuario con acceso limitado al sistema"),
-                (3, "viewer", "Usuario con acceso de solo lectura")
-            ]
-            
-            for role_id, name, description in roles_to_create:
-                insert_query = "INSERT INTO roles (id, name, description) VALUES (%s, %s, %s)"
-                execute_query(insert_query, (role_id, name, description))
-                repairs.append(f"Rol '{name}' creado")
-        
-        # 2. Verificar y reparar usuarios sin rol
-        users_without_role_query = "SELECT id, username FROM users WHERE role_id IS NULL"
-        users_without_role = execute_query(users_without_role_query, fetch_all=True) or []
-        
-        for user in users_without_role:
-            # Asignar rol de staff (2) por defecto
-            update_query = "UPDATE users SET role_id = 2 WHERE id = %s"
-            execute_query(update_query, (user["id"],))
-            repairs.append(f"Usuario '{user['username']}' (ID: {user['id']}) asignado al rol 'staff'")
-        
-        # 3. Verificar y reparar categorías
-        categories_query = "SELECT * FROM categories"
-        categories = execute_query(categories_query, fetch_all=True) or []
-        
-        if not categories:
-            # Crear una categoría por defecto
-            insert_query = "INSERT INTO categories (nombre_categoria) VALUES ('General')"
-            execute_query(insert_query)
-            repairs.append("Categoría 'General' creada")
-        
-        # 4. Verificar y mostrar información de la base de datos
-        tables_query = "SHOW TABLES"
-        tables = execute_query(tables_query, fetch_all=True) or []
-        
-        table_counts = {}
-        for table in tables:
-            table_name = list(table.values())[0]
-            count_query = f"SELECT COUNT(*) as count FROM {table_name}"
-            count_result = execute_query(count_query, fetch_one=True)
-            table_counts[table_name] = count_result["count"] if count_result else 0
-        
-        return {
-            "status": "success",
-            "message": "Base de datos verificada y reparada",
-            "repairs": repairs,
-            "table_counts": table_counts
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error al reparar la base de datos: {str(e)}",
-            "error_type": type(e).__name__
-        }

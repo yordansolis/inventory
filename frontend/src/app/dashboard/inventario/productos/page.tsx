@@ -399,11 +399,17 @@ export default function ProductsPage() {
       return;
     }
 
+    // Validar que hay al menos un ingrediente en la receta
+    if (currentProductRecipe.length === 0) {
+      alert('Por favor, agregue al menos un ingrediente a la receta del producto.');
+      return;
+    }
+
     try {
       const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8053';
       const headers = getAuthHeaders();
       
-      // Prepare data for API - remove receta from the main product data
+      // Prepare data for API - include both product data and recipe
       const productData = {
         nombre_producto: formData.nombre_producto.trim(),
         variante: formData.variante.trim() || null,
@@ -412,8 +418,17 @@ export default function ProductsPage() {
         user_id: getUserId(),
         is_active: true
       };
+
+      // Prepare the complete payload with both product and recipe data
+      const completePayload = {
+        ...productData,
+        ingredients: currentProductRecipe.map(item => ({
+          insumo_id: item.consumableId,
+          cantidad: item.quantity
+        }))
+      };
       
-      console.log("Sending product data:", JSON.stringify(productData, null, 2));
+      console.log("Sending complete data:", JSON.stringify(completePayload, null, 2));
       
       let response;
       
@@ -422,48 +437,26 @@ export default function ProductsPage() {
         response = await fetch(`${apiUrl}/api/v1/products/${editingId}`, {
           method: 'PUT',
           headers,
-          body: JSON.stringify(productData)
+          body: JSON.stringify(completePayload)
         });
       } else {
         // Create new product
         response = await fetch(`${apiUrl}/api/v1/products`, {
           method: 'POST',
           headers,
-          body: JSON.stringify(productData)
+          body: JSON.stringify(completePayload)
         });
       }
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error("API Error Response:", errorData);
-        throw new Error(JSON.stringify(errorData) || `Error ${response.status}: ${response.statusText}`);
+        throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
       }
       
-      // Get the product ID from the response
+      // Get the response data
       const responseData = await response.json();
-      const productId = editingId || responseData.id;
-      
-      // If we have recipe items, add them to the product in a separate request
-      if (currentProductRecipe.length > 0 && productId) {
-        console.log(`Adding recipe for product ID ${productId}`);
-        
-        const recipeResponse = await fetch(`${apiUrl}/api/v1/recipes/${productId}/recipe`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ 
-            ingredients: currentProductRecipe.map(item => ({
-              insumo_id: item.consumableId,
-              cantidad: item.quantity
-            }))
-          })
-        });
-        
-        if (!recipeResponse.ok) {
-          const recipeErrorData = await recipeResponse.json().catch(() => ({}));
-          console.error("Recipe API Error:", recipeErrorData);
-          // Don't throw error here, just log it - the product was already created
-        }
-      }
+      console.log("API Response:", responseData);
       
       // Reset form
       setShowAddForm(false);

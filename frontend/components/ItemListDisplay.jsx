@@ -13,26 +13,56 @@ const ItemListDisplay = ({ items, onAddItem, formatPrice, badgeVariant }) => {
     onAddItem(item);
   };
 
+  const getStockDisplay = (item) => {
+    // Verificar si el stock es un número
+    const stockNum = Number(item.stock);
+    
+    if (isNaN(stockNum)) {
+      return item.stock; // Si no es un número, mostrar como está
+    } else if (stockNum === 0) {
+      return "Agotado";
+    } else if (stockNum < 0) {
+      return "Bajo demanda";
+    } else {
+      return stockNum; // Si es un número válido, mostrar el número
+    }
+  };
+
+  const getStockColor = (item) => {
+    const stockNum = Number(item.stock);
+    
+    if (isNaN(stockNum) || stockNum < 0) {
+      return "text-blue-600"; // Bajo demanda
+    } else if (stockNum === 0) {
+      return "text-red-600 font-bold"; // Agotado
+    } else if (stockNum <= 5) {
+      return "text-yellow-600"; // Bajo
+    } else {
+      return "text-green-600"; // Bien
+    }
+  };
+
   return (
     <div className="space-y-3 max-h-96 overflow-y-auto">
       {items && items.length > 0 ? (
         items.map((item) => {
           // Corregido: Permitir agregar productos con stock "Bajo demanda"
-          const isDisabled = 
-            item.stock !== "Bajo demanda" && 
-            (item.stock === 0 || (typeof item.stock === 'number' && item.stock <= 0));
+          const stockNum = Number(item.stock);
+          const isDisabled = !isNaN(stockNum) && stockNum === 0;
           
           return (
             <div
               key={item.id}
-              className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+              className={`flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 ${
+                isDisabled ? 'border-red-200 bg-red-50' : 'border-gray-200'
+              }`}
             >
               <div className="flex-1">
                 <p className="font-medium text-gray-900">{item.nombre}</p>
                 <p className="text-sm text-gray-600">
-                  {formatPrice(item.precio)} | Stock: {item.stock}
+                  {formatPrice(item.precio)} | Stock: <span className={getStockColor(item)}>{getStockDisplay(item)}</span>
                 </p>
-                <Badge variant={badgeVariant || (item.estado === "bajo" ? "warning" : "success")}>
+                <Badge variant={badgeVariant || (item.estado === "bajo" ? "warning" : item.estado === "agotado" ? "destructive" : "success")}>
                   {item.tipo}
                 </Badge>
               </div>
@@ -40,9 +70,10 @@ const ItemListDisplay = ({ items, onAddItem, formatPrice, badgeVariant }) => {
                 size="sm" 
                 onClick={() => handleAddItem(item)} 
                 disabled={isDisabled}
+                variant={isDisabled ? "outline" : "default"}
               >
                 <Plus className="h-4 w-4 mr-1" />
-                Agregar
+                {isDisabled ? "Agotado" : "Agregar"}
               </Button>
             </div>
           );

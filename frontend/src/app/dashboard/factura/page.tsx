@@ -26,11 +26,20 @@ interface ProductoConsumible {
   unidad: string;
 }
 
+interface DebugInfo {
+  apiUrl: string;
+  stockStatus?: number;
+  insumosStatus?: number;
+  productCount: number;
+  insumoCount: number;
+}
+
 export default function InventoryDashboard() {
   const [productosVendibles, setProductosVendibles] = useState<ProductoVendible[]>([]);
   const [productosConsumibles, setProductosConsumibles] = useState<ProductoConsumible[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<DebugInfo>({} as DebugInfo);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -48,6 +57,7 @@ export default function InventoryDashboard() {
         const envApiUrl = process.env.NEXT_PUBLIC_BACKEND;
         if (envApiUrl) {
           apiUrl = envApiUrl;
+          // console.log("Trying API URL from env:", apiUrl);
           const headers = getAuthHeaders();
           
           try {
@@ -72,7 +82,7 @@ export default function InventoryDashboard() {
               }
             }
           } catch (e) {
-            // Silent catch
+            console.warn("Failed with env URL:", e);
           }
         }
         
@@ -80,6 +90,7 @@ export default function InventoryDashboard() {
         if (!success) {
           for (const port of possiblePorts) {
             apiUrl = `http://localhost:${port}`;
+            console.log(`Trying API URL: ${apiUrl}`);
             
             const headers = getAuthHeaders();
             
@@ -90,6 +101,8 @@ export default function InventoryDashboard() {
                 headers
               });
               
+              console.log(`Port ${port} stock status:`, stockResponse.status);
+              
               if (stockResponse.ok) {
                 const stockResult = await stockResponse.json();
                 stockData = stockResult.productos || [];
@@ -99,6 +112,8 @@ export default function InventoryDashboard() {
                   headers
                 });
                 
+                console.log(`Port ${port} insumos status:`, insumosResponse.status);
+                
                 if (insumosResponse.ok) {
                   insumosData = await insumosResponse.json();
                   success = true;
@@ -106,7 +121,7 @@ export default function InventoryDashboard() {
                 }
               }
             } catch (e) {
-              // Silent catch
+              console.warn(`Failed with port ${port}:`, e);
             }
           }
         }
@@ -115,8 +130,12 @@ export default function InventoryDashboard() {
           throw new Error('No se pudo conectar a la API en ninguno de los puertos probados');
         }
         
+        console.log("Stock data:", stockData);
+        console.log("Insumos data:", insumosData);
+        
         // Process stock data
         if (!stockData || stockData.length === 0) {
+          console.warn("No stock data found in API response");
           setProductosVendibles([]);
         } else {
           // Transform stock data to match the expected format
@@ -138,6 +157,7 @@ export default function InventoryDashboard() {
         
         // Process insumos data
         if (!insumosData || insumosData.length === 0) {
+          console.warn("No insumos found in API response");
           setProductosConsumibles([]);
         } else {
           // Transform insumos data to match the expected format
@@ -153,8 +173,17 @@ export default function InventoryDashboard() {
           setProductosConsumibles(formattedInsumos);
         }
         
+        setDebug({
+          apiUrl,
+          stockStatus: stockResponse?.status,
+          insumosStatus: insumosResponse?.status,
+          productCount: stockData?.length || 0,
+          insumoCount: insumosData?.length || 0
+        });
+        
         setLoading(false);
       } catch (error) {
+        console.error("Error fetching data:", error);
         setError(error instanceof Error ? error.message : 'Error desconocido');
         setLoading(false);
         
@@ -176,6 +205,7 @@ export default function InventoryDashboard() {
       {error && (
         <div className="text-red-500 p-4 mb-4 bg-red-50 rounded">
           Error: {error}
+          <pre className="text-xs mt-2 overflow-auto max-h-40">Debug: {JSON.stringify(debug, null, 2)}</pre>
         </div>
       )}
       <FacturacionSection
