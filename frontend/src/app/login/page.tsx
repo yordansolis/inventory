@@ -84,6 +84,16 @@ export default function InventoryLogin() {
       localStorage.setItem('tokenType', data.token_type);
       localStorage.setItem('loginTime', new Date().toISOString());
       
+      // Si la respuesta incluye información del usuario y su rol, guardarla
+      if (data.user) {
+        if (data.user.id) {
+          localStorage.setItem('userId', data.user.id.toString());
+        }
+        if (data.user.role_id) {
+          localStorage.setItem('roleId', data.user.role_id.toString());
+        }
+      }
+      
       // Redirigir usando el router de Next.js
       router.push('/dashboard');
       

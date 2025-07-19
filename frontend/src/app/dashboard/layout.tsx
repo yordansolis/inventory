@@ -21,19 +21,21 @@ import {
   Palette
 } from 'lucide-react';
 import AuthGuard from '../components/AuthGuard';
-import { logout, getUsername } from '../utils/auth';
+import { logout, getUsername, getUserRole } from '../utils/auth';
 import { useTheme } from '../utils/ThemeContext';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [username, setUsername] = useState('');
+  const [userRole, setUserRole] = useState<number>(0);
   const pathname = usePathname(); // Get current pathname for active link styling
   const { theme, toggleTheme } = useTheme();
   const isFeminine = theme === 'feminine';
 
   useEffect(() => {
-    // Obtener nombre de usuario del localStorage
+    // Obtener nombre de usuario y rol del localStorage
     setUsername(getUsername());
+    setUserRole(getUserRole());
     
     // Asegurarse de que el favicon se cargue correctamente
     const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
@@ -51,7 +53,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     logout();
   };
 
-  const menuItems = [
+  // Definir los elementos del menú
+  const baseMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/dashboard' },
     { id: 'facturar', label: 'Facturar', icon: DollarSign, href: '/dashboard/factura' },
     { id: 'inventario', label: 'Inventario', icon: Package, href: '/dashboard/inventario' },
@@ -59,9 +62,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3, href: '/dashboard/estadisticas' },
     { id: 'domicilios', label: 'Domicilios', icon: Truck, href: '/dashboard/domicilios' },
     { id: 'adiciones', label: 'Adiciones', icon: Plus, href: '/dashboard/adiciones' },
-    { id: 'usuarios', label: 'Usuarios', icon: Users, href: '/dashboard/usuarios' },
     { id: 'programacion-camisetas', label: 'Programación Camisetas', icon: Shirt, href: '/dashboard/programacion-camisetas' },
   ];
+  
+  // Agregar la sección de Usuarios solo si el rol no es 2
+  const menuItems = userRole !== 2 
+    ? [...baseMenuItems, { id: 'usuarios', label: 'Usuarios', icon: Users, href: '/dashboard/usuarios' }]
+    : baseMenuItems;
 
   return (
     <AuthGuard>

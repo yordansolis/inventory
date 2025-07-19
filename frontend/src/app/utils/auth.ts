@@ -30,6 +30,16 @@ export const getUsername = (): string => {
 };
 
 /**
+ * Obtiene el rol del usuario actual
+ */
+export const getUserRole = (): number => {
+  if (typeof window === 'undefined') return 0;
+  
+  const roleId = localStorage.getItem('roleId');
+  return roleId ? parseInt(roleId, 10) : 0;
+};
+
+/**
  * Cierra la sesión del usuario
  */
 export const logout = (): void => {
@@ -40,6 +50,7 @@ export const logout = (): void => {
   localStorage.removeItem('tokenType');
   localStorage.removeItem('loginTime');
   localStorage.removeItem('userId');
+  localStorage.removeItem('roleId');
   
   // Redirigir a la página de login
   window.location.href = '/login';
@@ -90,9 +101,14 @@ export const fetchCurrentUser = async (): Promise<any> => {
     
     const userData = await response.json();
     
-    // Guardar el ID del usuario en localStorage
+    // Guardar el ID del usuario y el rol en localStorage
     if (userData && userData.id) {
       localStorage.setItem('userId', userData.id.toString());
+      
+      // Si la API devuelve el rol, guardarlo también
+      if (userData.role_id) {
+        localStorage.setItem('roleId', userData.role_id.toString());
+      }
     }
     
     return userData;

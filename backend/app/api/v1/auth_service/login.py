@@ -38,7 +38,12 @@ def get_password_hash(password):
 
 def get_user(username: str) -> Optional[dict]:
     """Obtener usuario de la base de datos"""
-    query = "SELECT * FROM users WHERE username = %s"
+    query = """
+    SELECT u.*, r.name as role_name 
+    FROM users u 
+    LEFT JOIN roles r ON u.role_id = r.id 
+    WHERE u.username = %s
+    """
     user = execute_query(query, (username,), fetch_one=True)
     return user
 
@@ -125,7 +130,12 @@ async def get_current_active_user(
     return current_user
 
 
-@auth_router.post("/token", response_model=Token)
+# Clase para respuesta extendida del token
+class TokenWithUser(Token):
+    user: dict
+
+
+@auth_router.post("/token", response_model=TokenWithUser)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ):
@@ -141,7 +151,22 @@ async def login_for_access_token(
     access_token = create_access_token(
         data={"sub": user["username"]}, expires_delta=access_token_expires
     )
-    return Token(access_token=access_token, token_type="bearer")
+    
+    # Preparar información del usuario para la respuesta
+    user_info = {
+        "id": user["id"],
+        "username": user["username"],
+        "email": user["email"],
+        "role_id": user["role_id"],
+        "is_active": user["is_active"],
+        "role_name": user.get("role_name")
+    }
+    
+    return TokenWithUser(
+        access_token=access_token, 
+        token_type="bearer",
+        user=user_info
+    )
 
 
 @auth_router.get("/me", response_model=UserResponse)
@@ -154,6 +179,8 @@ async def read_users_me(
         username=current_user["username"],
         email=current_user["email"],
         is_active=current_user["is_active"],
-        created_at=current_user["created_at"]
+        created_at=current_user["created_at"],
+        role_id=current_user["role_id"],
+        role_name=current_user.get("role_name")
     )
 
