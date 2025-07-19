@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, Edit, Trash2, AlertCircle, Loader2 } from 'lucide-react';
 import { getAuthHeaders, isAuthenticated } from '../../../utils/auth';
 import { useRouter } from 'next/navigation';
-import { log } from 'console';
+import { useApi } from '../../../utils/api';
 
 interface ConsumableProduct {
   id: number;
@@ -49,17 +49,9 @@ interface ApiProduct {
   sitio_referencia: string;
 }
 
-// Default categories for fallback
-// const DEFAULT_CATEGORIES = [
-//   { id: 1, name: 'Consumible' },
-//   { id: 2, name: 'No consumible' },
-//   { id: 3, name: 'Bebidas' },
-//   { id: 4, name: 'Alimentos' },
-//   { id: 5, name: 'Desechables' }
-// ];
-
 export default function SuministroPage() {
   const router = useRouter();
+  const { withLoading } = useApi();
   
   const [productosConsumibles, setProductosConsumibles] = useState<ConsumableProduct[]>([]);
 
@@ -87,138 +79,132 @@ export default function SuministroPage() {
   const [error, setError] = useState<string>('');
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
 
-  // Function removed since we no longer track current stock levels
-
   // Extract fetch functions outside useEffect for reuse
   const fetchCategories = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    
     try {
-      const headers = getAuthHeaders();
-      const apiUrl = process.env.NEXT_PUBLIC_BACKEND;
-      
-      if (!apiUrl) {
-        console.error('NEXT_PUBLIC_BACKEND environment variable is not defined');
-        throw new Error('Error de configuración: URL del backend no definida');
-      }
-      
-      console.log('Fetching categories from:', `${apiUrl}/api/v1/categories`);
-      
-      const response = await fetch(`${apiUrl}/api/v1/categories`, {
-        method: 'GET',
-        headers
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log('Categories fetched:', data); // Debug log
-      
-      // Check if data is an array or has a specific property containing categories
-      let categoriesData = data;
-      if (data && typeof data === 'object' && !Array.isArray(data)) {
-        // If data is an object, try to find an array property
-        const possibleArrayProps = Object.keys(data).filter(key => Array.isArray(data[key]));
-        if (possibleArrayProps.length > 0) {
-          categoriesData = data[possibleArrayProps[0]];
-          console.log('Found categories in property:', possibleArrayProps[0]);
+      return await withLoading(async () => {
+        const headers = getAuthHeaders();
+        const apiUrl = process.env.NEXT_PUBLIC_BACKEND;
+        
+        if (!apiUrl) {
+          throw new Error('Error de configuración: URL del backend no definida');
         }
-      }
-      
-      if (!Array.isArray(categoriesData) || categoriesData.length === 0) {
-        console.error('Categories data is not an array or is empty:', categoriesData);
-        console.log('No categories found in API response');
-        categoriesData = [];
-      }
-      
-      // Normalize category objects to ensure they have id and nombre_categoria properties
-      const normalizedCategories = categoriesData.map((cat: any) => {
-        return {
-          id: cat.id || cat.category_id || cat.categoryId || 0,
-          nombre_categoria: cat.nombre_categoria || cat.name || cat.category_name || cat.categoryName || cat.nombre || 'Categoría sin nombre'
-        };
+        
+        const response = await fetch(`${apiUrl}/api/v1/categories`, {
+          method: 'GET',
+          headers
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Check if data is an array or has a specific property containing categories
+        let categoriesData = data;
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          // If data is an object, try to find an array property
+          const possibleArrayProps = Object.keys(data).filter(key => Array.isArray(data[key]));
+          if (possibleArrayProps.length > 0) {
+            categoriesData = data[possibleArrayProps[0]];
+          }
+        }
+        
+        if (!Array.isArray(categoriesData)) {
+          // Initialize as empty array instead of throwing error
+          categoriesData = [];
+        }
+        
+        // Normalize category objects to ensure they have id and nombre_categoria properties
+        const normalizedCategories = categoriesData.map((cat: any) => {
+          return {
+            id: cat.id || cat.category_id || cat.categoryId || 0,
+            nombre_categoria: cat.nombre_categoria || cat.name || cat.category_name || cat.categoryName || cat.nombre || 'Categoría sin nombre'
+          };
+        });
+        
+        setCategories(normalizedCategories);
+        
+        // Create a map of category id to name for easy lookup
+        const catMap: Record<number, string> = {};
+        normalizedCategories.forEach((cat: Category) => {
+          catMap[cat.id] = cat.nombre_categoria;
+        });
+        setCategoryMap(catMap);
+        return catMap; // Return the map for use in fetchProducts
       });
-      
-      console.log('Normalized categories:', normalizedCategories);
-      setCategories(normalizedCategories);
-      
-      // Create a map of category id to name for easy lookup
-      const catMap: Record<number, string> = {};
-      normalizedCategories.forEach((cat: Category) => {
-        catMap[cat.id] = cat.nombre_categoria;
-      });
-      console.log('Category map created:', catMap); // Debug log
-      setCategoryMap(catMap);
-      return catMap; // Return the map for use in fetchProducts
     } catch (err: any) {
-      console.error('Error fetching categories:', err);
       setError(err.message || 'Error al cargar categorías');
       
       // Create empty map in case of error
       setCategories([]);
       setCategoryMap({});
       return {};
-    } finally {
-      setLoading(false);
     }
+  // Eliminar withLoading como dependencia para evitar ciclos infinitos
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   const fetchProducts = useCallback(async (categoryMapping: Record<number, string>) => {
-    setLoadingProducts(true);
-    
     try {
-      const headers = getAuthHeaders();
-      const apiUrl = process.env.NEXT_PUBLIC_BACKEND;
-      
-      if (!apiUrl) {
-        throw new Error('Error de configuración: URL del backend no definida');
-      }
-      
-      const response = await fetch(`${apiUrl}/api/v1/insumos`, {
-        method: 'GET',
-        headers
+      await withLoading(async () => {
+        const headers = getAuthHeaders();
+        const apiUrl = process.env.NEXT_PUBLIC_BACKEND;
+        
+        if (!apiUrl) {
+          throw new Error('Error de configuración: URL del backend no definida');
+        }
+        
+        const response = await fetch(`${apiUrl}/api/v1/insumos`, {
+          method: 'GET',
+          headers
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Transform API products to our ConsumableProduct format
+        const transformedProducts: ConsumableProduct[] = data.map((product: ApiProduct) => {
+          return {
+            id: product.id,
+            nombre: product.nombre_insumo,
+            unidadMedida: product.unidad || 'unidad (u)',
+            cantidadUnitaria: product.cantidad_unitaria || 0,
+            precioPresentacion: product.precio_presentacion || 0,
+            cantidadUtilizada: product.cantidad_utilizada || 0,
+            minimo: product.stock_minimo,
+            valorUnitario: product.valor_unitario || 0,
+            valorUtilizado: product.valor_utilizado || 0,
+            sitioReferencia: product.sitio_referencia || ''
+          };
+        });
+        
+        setProductosConsumibles(transformedProducts);
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Transform API products to our ConsumableProduct format
-      const transformedProducts: ConsumableProduct[] = data.map((product: ApiProduct) => {
-        return {
-          id: product.id,
-          nombre: product.nombre_insumo,
-          unidadMedida: product.unidad || 'unidad (u)',
-          cantidadUnitaria: product.cantidad_unitaria || 0,
-          precioPresentacion: product.precio_presentacion || 0,
-          cantidadUtilizada: product.cantidad_utilizada || 0,
-          minimo: product.stock_minimo,
-          valorUnitario: product.valor_unitario || 0,
-          valorUtilizado: product.valor_utilizado || 0,
-          sitioReferencia: product.sitio_referencia || ''
-        };
-      });
-      
-      setProductosConsumibles(transformedProducts);
     } catch (err: any) {
-      console.error('Error fetching products:', err);
       setError(prev => prev || err.message || 'Error al cargar productos');
-    } finally {
-      setLoadingProducts(false);
     }
+  // Eliminar withLoading como dependencia para evitar ciclos infinitos
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch categories and products on component mount
   useEffect(() => {
-    fetchCategories().then(catMap => fetchProducts(catMap));
-  }, [fetchCategories, fetchProducts]);
+    const loadInitialData = async () => {
+      const catMap = await fetchCategories();
+      await fetchProducts(catMap);
+    };
+    
+    loadInitialData();
+    // No incluir fetchCategories o fetchProducts como dependencias
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Handler to manually refresh categories
   const handleRefreshCategories = async () => {
@@ -228,7 +214,6 @@ export default function SuministroPage() {
   // Check authentication on component mount
   useEffect(() => {
     if (!isAuthenticated()) {
-      console.log('User not authenticated, redirecting to login');
       router.push('/login');
     }
   }, [router]);
@@ -344,23 +329,13 @@ export default function SuministroPage() {
 
   // Calculate valor unitario automatically
   useEffect(() => {
-    console.log('Calculating valor unitario...', {
-      cantidadUnitaria: formData.cantidadUnitaria,
-      precioPresentacion: formData.precioPresentacion
-    });
     
     if (formData.cantidadUnitaria && formData.precioPresentacion) {
       const cantidadUnitaria = parseFloat(parseCurrency(formData.cantidadUnitaria));
       const precioPresentacion = parseFloat(parseCurrency(formData.precioPresentacion));
       
-      console.log('Parsed values:', {
-        cantidadUnitaria,
-        precioPresentacion
-      });
-      
       if (!isNaN(cantidadUnitaria) && !isNaN(precioPresentacion) && cantidadUnitaria > 0) {
         const valorUnitario = precioPresentacion / cantidadUnitaria;
-        console.log('Calculated valor unitario:', valorUnitario);
         
         setFormData(prev => ({
           ...prev,
@@ -421,60 +396,72 @@ export default function SuministroPage() {
       return;
     }
 
-    setLoading(true);
-    
     try {
-      const headers = getAuthHeaders();
-      
-      const productData = {
-        nombre_insumo: formData.nombre.trim(),
-        unidad: formData.unidadMedida.trim(),
-        cantidad_unitaria: parsedCantidadUnitaria,
-        precio_presentacion: parsedPrecioPresentacion,
-        cantidad_utilizada: parsedCantidadUtilizada,
-        stock_minimo: parsedMinimo,
-        sitio_referencia: formData.sitioReferencia.trim()
-      };
-      
-      let response;
-      console.log(productData);
-      
-      if (editingId) {
-        // Update existing product
-        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos/${editingId}`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify(productData)
-        });
-      } else {
-        // Create new product
-        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(productData)
-        });
-      }
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || `Error al ${editingId ? 'actualizar' : 'crear'} producto`);
-      }
-      
-      const savedProduct = await response.json();
-      console.log('API response for product creation/update:', savedProduct);
-      
-      if (!savedProduct || typeof savedProduct !== 'object') {
-        throw new Error(`Error al ${editingId ? 'actualizar' : 'crear'} producto. Respuesta inválida del servidor.`);
-      }
-      
-      if (!savedProduct.id) {
-        throw new Error(`Error al ${editingId ? 'actualizar' : 'crear'} producto. No se pudo obtener el ID del producto.`);
-      }
-      
-      if (editingId) {
-        // Update product in state
-        setProductosConsumibles(prev => 
-          prev.map(p => p.id === editingId ? {
+      await withLoading(async () => {
+        const headers = getAuthHeaders();
+        
+        const productData = {
+          nombre_insumo: formData.nombre.trim(),
+          unidad: formData.unidadMedida.trim(),
+          cantidad_unitaria: parsedCantidadUnitaria,
+          precio_presentacion: parsedPrecioPresentacion,
+          cantidad_utilizada: parsedCantidadUtilizada,
+          stock_minimo: parsedMinimo,
+          sitio_referencia: formData.sitioReferencia.trim()
+        };
+        
+        let response;
+        
+        if (editingId) {
+          // Update existing product
+          response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos/${editingId}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(productData)
+          });
+        } else {
+          // Create new product
+          response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(productData)
+          });
+        }
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || `Error al ${editingId ? 'actualizar' : 'crear'} producto`);
+        }
+        
+        const savedProduct = await response.json();
+        
+        if (!savedProduct || typeof savedProduct !== 'object') {
+          throw new Error(`Error al ${editingId ? 'actualizar' : 'crear'} producto. Respuesta inválida del servidor.`);
+        }
+        
+        if (!savedProduct.id) {
+          throw new Error(`Error al ${editingId ? 'actualizar' : 'crear'} producto. No se pudo obtener el ID del producto.`);
+        }
+        
+        if (editingId) {
+          // Update product in state
+          setProductosConsumibles(prev => 
+            prev.map(p => p.id === editingId ? {
+              id: savedProduct.id,
+              nombre: formData.nombre.trim(),
+              unidadMedida: formData.unidadMedida.trim(),
+              cantidadUnitaria: parsedCantidadUnitaria,
+              precioPresentacion: parsedPrecioPresentacion,
+              cantidadUtilizada: parsedCantidadUtilizada,
+              minimo: parsedMinimo,
+              valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
+              valorUtilizado: savedProduct.valor_utilizado || 0,
+              sitioReferencia: formData.sitioReferencia.trim()
+            } : p)
+          );
+        } else {
+          // Add new product to state
+          setProductosConsumibles(prev => [...prev, {
             id: savedProduct.id,
             nombre: formData.nombre.trim(),
             unidadMedida: formData.unidadMedida.trim(),
@@ -485,52 +472,41 @@ export default function SuministroPage() {
             valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
             valorUtilizado: savedProduct.valor_utilizado || 0,
             sitioReferencia: formData.sitioReferencia.trim()
-          } : p)
-        );
-      } else {
-        // Add new product to state
-        setProductosConsumibles(prev => [...prev, {
-          id: savedProduct.id,
-          nombre: formData.nombre.trim(),
-          unidadMedida: formData.unidadMedida.trim(),
-          cantidadUnitaria: parsedCantidadUnitaria,
-          precioPresentacion: parsedPrecioPresentacion,
-          cantidadUtilizada: parsedCantidadUtilizada,
-          minimo: parsedMinimo,
-          valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
-          valorUtilizado: savedProduct.valor_utilizado || 0,
-          sitioReferencia: formData.sitioReferencia.trim()
-        }]);
-      }
-      
-      // Clear form and editing state
-      setFormData({ 
-        nombre: '', 
-        unidadMedida: '', 
-        cantidadUnitaria: '', 
-        precioPresentacion: '', 
-        cantidadUtilizada: '', 
-        minimo: '', 
-        sitioReferencia: '',
-        valorUnitarioCalculado: '0',
-        valorUtilizadoCalculado: '0'
+          }]);
+        }
+        
+        // Clear form and editing state
+        setFormData({ 
+          nombre: '', 
+          unidadMedida: '', 
+          cantidadUnitaria: '', 
+          precioPresentacion: '', 
+          cantidadUtilizada: '', 
+          minimo: '', 
+          sitioReferencia: '',
+          valorUnitarioCalculado: '0',
+          valorUtilizadoCalculado: '0'
+        });
+        setEditingId(null);
+        
+        // Refresh the products list from the server to ensure we have the latest data
+        // Usar loadInitialData en lugar de llamar directamente a fetchCategories y fetchProducts
+        const loadInitialData = async () => {
+          const catMap = await fetchCategories();
+          await fetchProducts(catMap);
+        };
+        
+        await loadInitialData();
       });
-      setEditingId(null);
-      
-      // Refresh the products list from the server to ensure we have the latest data
-      const catMap = await fetchCategories();
-      await fetchProducts(catMap);
-      
     } catch (err: any) {
-      console.error('Error saving product:', err);
       setError(err.message || `Error al ${editingId ? 'actualizar' : 'crear'} producto`);
       
       // Show alert for better visibility of the error
       alert(`Error: ${err.message || `Error al ${editingId ? 'actualizar' : 'crear'} producto`}`);
-    } finally {
-      setLoading(false);
     }
-  }, [formData, editingId, parseCurrency, fetchCategories, fetchProducts]);
+  // Eliminar fetchCategories y fetchProducts como dependencias para evitar ciclos infinitos
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, editingId, parseCurrency, withLoading]);
 
   const handleEditProduct = useCallback((producto: ConsumableProduct) => {
     // Calculate values for display
@@ -561,24 +537,25 @@ export default function SuministroPage() {
 
   const handleDeleteProduct = useCallback(async (id: number) => {
     try {
-      const headers = getAuthHeaders();
-      
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos/${id}`, {
-        method: 'DELETE',
-        headers
+      await withLoading(async () => {
+        const headers = getAuthHeaders();
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos/${id}`, {
+          method: 'DELETE',
+          headers
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Error al eliminar producto');
+        }
+        
+        setProductosConsumibles((prev) => prev.filter((p) => p.id !== id));
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Error al eliminar producto');
-      }
-      
-      setProductosConsumibles((prev) => prev.filter((p) => p.id !== id));
     } catch (err: any) {
-      console.error('Error deleting product:', err);
       setError(err.message || 'Error al eliminar producto');
     }
-  }, []);
+  }, [withLoading]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -880,13 +857,8 @@ export default function SuministroPage() {
               Cancelar
             </Button>
           )}
-          <Button onClick={handleAddOrUpdateProduct} disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {editingId ? 'Actualizando...' : 'Agregando...'}
-              </>
-            ) : editingId ? (
+          <Button onClick={handleAddOrUpdateProduct}>
+            {editingId ? (
               <>
                 <Edit className="h-4 w-4 mr-2" />
                 Actualizar Producto

@@ -1,6 +1,8 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { ThemeProvider } from "./utils/ThemeContext";
+import { LoadingProvider } from "./utils/LoadingContext";
+import LoadingSpinner from "./components/LoadingSpinner";
 
 export const metadata: Metadata = {
   title: "Sistema de Inventario",
@@ -31,7 +33,10 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-white">
         <ThemeProvider>
-          {children}
+          <LoadingProvider>
+            <LoadingSpinner />
+            {children}
+          </LoadingProvider>
         </ThemeProvider>
       </body>
     </html>

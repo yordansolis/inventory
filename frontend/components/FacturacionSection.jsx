@@ -752,7 +752,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                       console.log("SIMPLE: Clic en agregar producto:", producto);
                       agregarAlCarrito(producto);
                     }}
-                    className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                    className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 cursor-pointer"
                   >
                     + Agregar Simple
                   </button>

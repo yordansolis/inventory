@@ -194,7 +194,7 @@ export default function ProductsPage() {
     try {
       setLoading(true);
       const headers = getAuthHeaders();
-      const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8052';
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8053';
       
       const response = await fetch(`${apiUrl}/api/v1/categories`, {
         method: 'GET',
@@ -213,7 +213,6 @@ export default function ProductsPage() {
         setFormData(prev => ({ ...prev, id_categoria: String(data[0].id) }));
       }
     } catch (err: any) {
-      console.error('Error fetching categories:', err);
       setError(`Error al cargar categorías: ${err.message}`);
     }
   }, [formData.id_categoria]);
@@ -222,7 +221,7 @@ export default function ProductsPage() {
     try {
       setLoading(true);
       const headers = getAuthHeaders();
-      const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8052';
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8053';
       
       const response = await fetch(`${apiUrl}/api/v1/products`, {
         method: 'GET',
@@ -247,7 +246,6 @@ export default function ProductsPage() {
         receta: []
       })));
     } catch (err: any) {
-      console.error('Error fetching products:', err);
       setError(`Error al cargar productos: ${err.message}`);
     } finally {
       setLoading(false);
@@ -257,7 +255,7 @@ export default function ProductsPage() {
   const fetchConsumables = useCallback(async () => {
     try {
       const headers = getAuthHeaders();
-      const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8052';
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:803';
       
       const response = await fetch(`${apiUrl}/api/v1/insumos`, {
         method: 'GET',
@@ -277,7 +275,7 @@ export default function ProductsPage() {
         cantidad_utilizada: item.cantidad_utilizada || 0
       })));
     } catch (err: any) {
-      console.error('Error fetching consumables:', err);
+      setError(`Error al cargar insumos: ${err.message}`);
     }
   }, []);
 
@@ -385,136 +383,100 @@ export default function ProductsPage() {
   }, []);
 
   const handleAddOrUpdateProducto = useCallback(async () => {
-    // Parse the price value, ensuring we get a valid number with decimals
-    const parsedPrecio = parseFloat(formData.precio);
-    const parsedIdCategoria = formData.id_categoria === '' ? null : parseInt(formData.id_categoria);
+    // Validate form data
+    if (!formData.nombre_producto.trim()) {
+      alert('Por favor, ingrese el nombre del producto.');
+      return;
+    }
 
-    if (!formData.nombre_producto.trim() || isNaN(parsedPrecio) || parsedPrecio <= 0 || (formData.id_categoria !== '' && isNaN(parsedIdCategoria!))) {
-      alert('Por favor, complete todos los campos obligatorios y asegúrese de que el precio y la categoría sean válidos.');
+    if (!formData.precio.trim()) {
+      alert('Por favor, ingrese el precio del producto.');
+      return;
+    }
+
+    if (!formData.id_categoria) {
+      alert('Por favor, seleccione una categoría.');
       return;
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8052';
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8053';
       const headers = getAuthHeaders();
       
-      // Ensure price is properly rounded to 2 decimal places for consistency
-      const finalPrice = Math.round(parsedPrecio * 100) / 100;
-      
-      // Crear el producto con stock_quantity = -1 para indicar disponibilidad bajo demanda
+      // Prepare data for API - remove receta from the main product data
       const productData = {
         nombre_producto: formData.nombre_producto.trim(),
         variante: formData.variante.trim() || null,
-        price: finalPrice, // Usar precio_cop como en el esquema ProductCreate
-        category_id: parsedIdCategoria, // Usar categoria_id como en el esquema ProductCreate
-        user_id: getUserId(), // Obtener el ID del usuario de la sesión
+        precio_cop: parseFloat(formData.precio.replace(/\./g, '').replace(',', '.')),
+        categoria_id: parseInt(formData.id_categoria),
+        user_id: getUserId(),
         is_active: true
       };
       
-      let productId;
+      console.log("Sending product data:", JSON.stringify(productData, null, 2));
+      
+      let response;
       
       if (editingId) {
-        // Actualizar producto existente
-        const response = await fetch(`${apiUrl}/api/v1/products/${editingId}`, {
+        // Update existing product
+        response = await fetch(`${apiUrl}/api/v1/products/${editingId}`, {
           method: 'PUT',
           headers,
           body: JSON.stringify(productData)
         });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
-        }
-        
-        productId = editingId;
-        
       } else {
-        // Crear nuevo producto
-        const response = await fetch(`${apiUrl}/api/v1/products/`, {
+        // Create new product
+        response = await fetch(`${apiUrl}/api/v1/products`, {
           method: 'POST',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            nombre_producto: formData.nombre_producto.trim(),
-            variante: formData.variante.trim() || null,
-            precio_cop: finalPrice,
-            categoria_id: parseInt(formData.id_categoria),
-            user_id: getUserId(),
-            is_active: true
+          headers,
+          body: JSON.stringify(productData)
+        });
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("API Error Response:", errorData);
+        throw new Error(JSON.stringify(errorData) || `Error ${response.status}: ${response.statusText}`);
+      }
+      
+      // Get the product ID from the response
+      const responseData = await response.json();
+      const productId = editingId || responseData.id;
+      
+      // If we have recipe items, add them to the product in a separate request
+      if (currentProductRecipe.length > 0 && productId) {
+        console.log(`Adding recipe for product ID ${productId}`);
+        
+        const recipeResponse = await fetch(`${apiUrl}/api/v1/recipes/${productId}/recipe`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ 
+            ingredients: currentProductRecipe.map(item => ({
+              insumo_id: item.consumableId,
+              cantidad: item.quantity
+            }))
           })
         });
-
-        if (!response.ok) {
-          const responseText = await response.text();
-          console.error('Error response:', responseText);
-          try {
-            const errorData = JSON.parse(responseText);
-            throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
-          } catch (e) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-          }
-        }
-
-        const result = await response.json();
-        productId = result.id;
-      }
-      
-      // Si hay insumos en la receta, los guardamos
-      if (productId && currentProductRecipe.length > 0) {
-        try {
-          console.log("Enviando receta para producto ID:", productId);
-          
-          // Preparar los datos de la receta en el formato correcto
-          const ingredients = currentProductRecipe.map(item => ({
-            insumo_id: item.consumableId,
-            cantidad: item.quantity
-          }));
-          
-          console.log("Datos de receta a enviar:", JSON.stringify(ingredients));
-          
-          const recipeResponse = await fetch(`${apiUrl}/api/v1/products/${productId}/recipe/`, {
-            method: 'POST',
-            headers: {
-              ...headers,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ ingredients })
-          });
-          
-          const responseText = await recipeResponse.text();
-          console.log("Respuesta de la API de recetas:", responseText);
-          
-          if (!recipeResponse.ok) {
-            console.error('Error en respuesta de receta:', responseText);
-            alert(`Producto creado, pero hubo un error al guardar la receta: ${recipeResponse.status} ${recipeResponse.statusText}`);
-          } else {
-            try {
-              const recipeResult = JSON.parse(responseText);
-              console.log("Receta guardada correctamente:", recipeResult);
-            } catch (e) {
-              console.log("Respuesta no es JSON pero la receta se guardó correctamente");
-            }
-          }
-        } catch (recipeError) {
-          console.error("Error al guardar la receta:", recipeError);
-          alert(`Producto creado, pero hubo un error al guardar la receta: ${recipeError}`);
+        
+        if (!recipeResponse.ok) {
+          const recipeErrorData = await recipeResponse.json().catch(() => ({}));
+          console.error("Recipe API Error:", recipeErrorData);
+          // Don't throw error here, just log it - the product was already created
         }
       }
       
-      alert(editingId ? 'Producto actualizado exitosamente' : 'Producto creado exitosamente');
-      
-      setEditingId(null);
+      // Reset form
       setShowAddForm(false);
+      setEditingId(null);
       setFormData({ nombre_producto: '', variante: '', precio: '', id_categoria: String(categorias[0]?.id || '') });
       setCurrentProductRecipe([]);
       setDisplayPrice('');
       
       await fetchProducts();
+      alert('Producto guardado exitosamente');
       
     } catch (err: any) {
-      console.error('Error saving product:', err);
+      console.error("Full error:", err);
       alert(`Error al guardar el producto: ${err.message}`);
     }
   }, [formData, editingId, currentProductRecipe, categorias, fetchProducts]);
@@ -535,7 +497,7 @@ export default function ProductsPage() {
   const handleDeleteProducto = useCallback(async (id: number) => {
     if (confirm('¿Está seguro de eliminar este producto?')) {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8052';
+        const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8053';
         const headers = getAuthHeaders();
         
         const response = await fetch(`${apiUrl}/api/v1/products/${id}`, {
@@ -551,7 +513,6 @@ export default function ProductsPage() {
         setProductos((prev) => prev.filter((p) => p.id !== id));
         alert('Producto eliminado exitosamente');
       } catch (err: any) {
-        console.error('Error deleting product:', err);
         alert(`Error al eliminar el producto: ${err.message}`);
       }
     }

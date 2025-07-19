@@ -1,17 +1,62 @@
 "use client"
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShoppingCart,
-  Package,
+
   ArrowRight,
   Tag,
   Box,
-  ScrollText
+  
 } from 'lucide-react';
 import { Card, Button } from '../../../../components/ui';
 import Link from 'next/link';
+// import { useApi } from '../../utils/api';
+
+interface InventoryStats {
+  totalProductos: number;
+  enStock: number;
+  bajoStock: number;
+}
 
 export default function InventoryDashboard() {
+  const [stats, setStats] = useState<InventoryStats>({
+    totalProductos: 0,
+    enStock: 0,
+    bajoStock: 0
+  });
+  const [error, setError] = useState<string | null>(null);
+  // const { withLoading } = useApi();
+
+  useEffect(() => {
+    // Cargar estadísticas de inventario al montar el componente
+    loadInventoryStats();
+  }, []);
+
+  const loadInventoryStats = async () => {
+    try {
+      // Usamos withLoading para mostrar el spinner mientras se cargan los datos
+      // const data = await withLoading(async () => {
+      //   // Simulamos una llamada API con un retraso
+      //   await new Promise(resolve => setTimeout(resolve, 1500));
+        
+      //   // En un caso real, aquí harías una llamada fetch a tu API
+      //   // const response = await fetch('http://127.0.0.1:8053/api/v1/services/stock/summary/overview');
+      //   // return await response.json();
+        
+      //   // Por ahora, devolvemos datos de ejemplo
+      //   return {
+      //     totalProductos: 234,
+      //     enStock: 89,
+      //     bajoStock: 12
+      //   };
+      // });
+      
+      // setStats(data);
+    } catch (error) {
+      setError('Error al cargar estadísticas de inventario');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4">
       <div className="max-w-4xl mx-auto">
@@ -23,6 +68,7 @@ export default function InventoryDashboard() {
           <p className="text-lg text-gray-600">
             Gestiona tus productos de manera eficiente
           </p>
+        
         </div>
 
         {/* Cards Container */}
@@ -113,21 +159,7 @@ export default function InventoryDashboard() {
 
         </div>
 
-        {/* Stats Section (Optional) */}
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center p-6 bg-white/60 rounded-lg backdrop-blur-sm">
-            <div className="text-3xl font-bold text-slate-600 mb-2">234</div>
-            <div className="text-sm text-gray-600">Total Productos</div>
-          </div>
-          <div className="text-center p-6 bg-white/60 rounded-lg backdrop-blur-sm">
-            <div className="text-3xl font-bold text-slate-600 mb-2">89%</div>
-            <div className="text-sm text-gray-600">En Stock</div>
-          </div>
-          <div className="text-center p-6 bg-white/60 rounded-lg backdrop-blur-sm">
-            <div className="text-3xl font-bold text-slate-600 mb-2">12</div>
-            <div className="text-sm text-gray-600">Bajo Stock</div>
-          </div>
-        </div>
+     
       </div>
     </div>
   );

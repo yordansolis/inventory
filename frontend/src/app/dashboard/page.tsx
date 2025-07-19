@@ -1,5 +1,6 @@
-"use client"
-import React, { useEffect, useState } from 'react';
+"use client";
+
+import React, { useState, useEffect } from 'react';
 import {
   ShoppingCart,
   Eye,
@@ -9,6 +10,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { useTheme } from '../utils/ThemeContext';
+import { useApi } from '../utils/api';
 
 interface DashboardSummary {
   ventas_hoy: number;
@@ -75,72 +77,82 @@ interface LowStockProduct {
   estado: string;
 }
 
-export default function InventoryDashboard() {
+export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [stockSummary, setStockSummary] = useState<StockSummary | null>(null);
   const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { theme } = useTheme();
+  const { withLoading } = useApi();
   const isFeminine = theme === 'feminine';
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
-        
-        // Get token from localStorage or your auth context
-        const token = localStorage.getItem('token') || '';
-        const headers = {
-          'Authorization': `bearer ${token}`
-        };
+        await withLoading(async () => {
+          // Get token from localStorage with correct key
+          const token = localStorage.getItem('authToken') || '';
+          const headers = {
+            'Authorization': `bearer ${token}`
+          };
 
-        // Fetch dashboard summary
-        const dashboardResponse = await fetch('http://127.0.0.1:8053/api/v1/services/dashboard/summary', {
-          headers
+          const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8053';
+          
+          try {
+            // Fetch dashboard summary
+            const dashboardResponse = await fetch(`${apiUrl}/api/v1/services/dashboard/summary`, {
+              headers
+            });
+            
+            if (dashboardResponse.ok) {
+              const dashboardResult = await dashboardResponse.json();
+              setDashboardData(dashboardResult);
+            } else {
+              setError('Error al cargar datos del dashboard');
+            }
+          } catch (dashboardError) {
+            setError('Error al cargar datos del dashboard');
+          }
+          
+          try {
+            // Fetch stock overview
+            const stockResponse = await fetch(`${apiUrl}/api/v1/services/stock/summary/overview`, {
+              headers
+            });
+            
+            if (stockResponse.ok) {
+              const stockResult = await stockResponse.json();
+              setStockSummary(stockResult);
+            } else {
+              setError('Error al cargar resumen de stock');
+            }
+          } catch (stockError) {
+            setError('Error al cargar resumen de stock');
+          }
+          
+          try {
+            // Fetch low stock products
+            const lowStockResponse = await fetch(`${apiUrl}/api/v1/services/stock/low`, {
+              headers
+            });
+            
+            if (lowStockResponse.ok) {
+              const lowStockResult = await lowStockResponse.json();
+              setLowStockProducts(lowStockResult.productos || []);
+            } else {
+              setError('Error al cargar productos con stock bajo');
+            }
+          } catch (lowStockError) {
+            setError('Error al cargar productos con stock bajo');
+          }
         });
-        
-        if (!dashboardResponse.ok) {
-          throw new Error('Failed to fetch dashboard data');
-        }
-        
-        const dashboardResult = await dashboardResponse.json();
-        setDashboardData(dashboardResult);
-        
-        // Fetch stock overview
-        const stockResponse = await fetch('http://127.0.0.1:8053/api/v1/services/stock/summary/overview', {
-          headers
-        });
-        
-        if (!stockResponse.ok) {
-          throw new Error('Failed to fetch stock summary');
-        }
-        
-        const stockResult = await stockResponse.json();
-        setStockSummary(stockResult);
-        
-        // Fetch low stock products
-        const lowStockResponse = await fetch('http://127.0.0.1:8053/api/v1/services/stock/low', {
-          headers
-        });
-        
-        if (!lowStockResponse.ok) {
-          throw new Error('Failed to fetch low stock products');
-        }
-        
-        const lowStockResult = await lowStockResponse.json();
-        setLowStockProducts(lowStockResult.productos || []);
-        
       } catch (err) {
-        console.error('Error fetching data:', err);
         setError('Error cargando datos. Por favor intente nuevamente.');
-      } finally {
-        setLoading(false);
       }
     };
     
     fetchData();
-  }, []);
+  }, []); // Dependencias vacías para que solo se ejecute una vez
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -207,17 +219,6 @@ export default function InventoryDashboard() {
     );
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${isFeminine ? 'border-pink-500' : 'border-primary-600'} mx-auto`}></div>
-          <p className="mt-4 text-gray-600">Cargando datos...</p>
-        </div>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -251,7 +252,7 @@ export default function InventoryDashboard() {
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card>
+        <Card key="sales-today">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Ventas Hoy</p>
@@ -263,7 +264,7 @@ export default function InventoryDashboard() {
           </div>
         </Card>
 
-        <Card>
+        <Card key="sellable-products">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Productos Vendibles</p>
@@ -275,7 +276,7 @@ export default function InventoryDashboard() {
           </div>
         </Card>
 
-        <Card>
+        <Card key="low-stock">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Stock Bajo</p>
@@ -289,7 +290,7 @@ export default function InventoryDashboard() {
           </div>
         </Card>
 
-        <Card>
+        <Card key="deliveries">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Domicilios</p>
@@ -377,7 +378,11 @@ export default function InventoryDashboard() {
                     Stock: {producto.cantidad} | Mínimo: {producto.minimo}
                   </p>
                 </div>
-                <Button variant="danger" size="sm">
+                <Button 
+                  key={`restock-${producto.id}`}
+                  variant="danger" 
+                  size="sm"
+                >
                   <Plus className="h-4 w-4 mr-1" />
                   Reabastecer
                 </Button>
