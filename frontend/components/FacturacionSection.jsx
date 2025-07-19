@@ -21,6 +21,7 @@ import {
   X,
   Search,
   Star,
+  CheckCircle,
 } from "lucide-react";
 
 import { Card, Badge, Button } from "./ui";
@@ -42,7 +43,7 @@ console.log("useState disponible:", typeof useState);
 console.log("useEffect disponible:", typeof useEffect);
 console.log("useMemo disponible:", typeof useMemo);
 
-export default function FacturacionSection({ productosVendibles, productosConsumibles }) {
+export default function FacturacionSection({ productosVendibles, productosConsumibles, onFacturaCreada }) {
   // Estados para facturación
   const [carrito, setCarrito] = useState([]);
   const [cliente, setCliente] = useState("");
@@ -55,6 +56,20 @@ export default function FacturacionSection({ productosVendibles, productosConsum
   const [mostrarFactura, setMostrarFactura] = useState(false);
   const [ultimaFactura, setUltimaFactura] = useState(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
+  // Estado para notificación de éxito
+  const [notificacionExito, setNotificacionExito] = useState(false);
+  const [mensajeExito, setMensajeExito] = useState("");
+
+  // Efecto para ocultar la notificación después de 5 segundos
+  useEffect(() => {
+    if (notificacionExito) {
+      const timer = setTimeout(() => {
+        setNotificacionExito(false);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [notificacionExito]);
 
   // Nuevos estados para la búsqueda y filtros
   const [busquedaProducto, setBusquedaProducto] = useState("");
@@ -220,7 +235,8 @@ export default function FacturacionSection({ productosVendibles, productosConsum
     setCarrito([]);
     setAdicionesCarrito([]);
     setCliente("");
-    setVendedor("");
+    // No limpiar el campo vendedor para que persista después de generar una factura
+    // setVendedor("");
     setDomicilio(false);
     setDireccion("");
     setTelefono("");
@@ -406,6 +422,9 @@ export default function FacturacionSection({ productosVendibles, productosConsum
               ...prev,
               id: responseData.purchase_id
             }));
+            // Mostrar notificación de éxito
+            setMensajeExito(`Factura #${responseData.purchase_id} generada con éxito`);
+            setNotificacionExito(true);
           }
           
           // Limpiar el formulario después de un envío exitoso
@@ -464,6 +483,9 @@ export default function FacturacionSection({ productosVendibles, productosConsum
             ...prev,
             id: responseData.id
           }));
+          // Mostrar notificación de éxito
+          setMensajeExito(`Factura #${responseData.id} generada con éxito`);
+          setNotificacionExito(true);
         }
         
         // Limpiar el formulario después de un envío exitoso
@@ -519,10 +541,87 @@ export default function FacturacionSection({ productosVendibles, productosConsum
     };
 
     fetchUserData();
-  }, []);
+  }, [onFacturaCreada]); // Añadimos onFacturaCreada como dependencia para que se ejecute cuando cambie
+
+  // Función para cerrar la factura y recargar la página
+  const cerrarFacturaYRecargar = () => {
+    setMostrarFactura(false);
+    // Mostrar notificación de éxito con el número de factura
+    if (ultimaFactura && ultimaFactura.id) {
+      setMensajeExito(`Factura #${ultimaFactura.id} generada con éxito`);
+      setNotificacionExito(true);
+    }
+    
+    // Si el vendedor está vacío, intentar obtenerlo de nuevo
+    if (!vendedor) {
+      const fetchUserData = async () => {
+        if (typeof window !== 'undefined') {
+          try {
+            // Primero intentamos obtener el nombre de usuario del localStorage
+            const username = localStorage.getItem('username') || '';
+            if (username) {
+              setVendedor(username);
+            }
+            
+            // Luego intentamos obtener más información del usuario desde la API
+            const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://localhost:8000';
+            const token = localStorage.getItem('authToken');
+            
+            if (token) {
+              const headers = {
+                'Authorization': `bearer ${token}`,
+                'Content-Type': 'application/json'
+              };
+              
+              const response = await fetch(`${apiUrl}/api/v1/users/auth/me`, {
+                method: 'GET',
+                headers
+              });
+              
+              if (response.ok) {
+                const userData = await response.json();
+                // Si hay un nombre completo disponible, lo usamos
+                if (userData && userData.full_name) {
+                  setVendedor(userData.full_name);
+                } else if (userData && userData.username && userData.username !== username) {
+                  setVendedor(userData.username);
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error al obtener datos del usuario:", error);
+          }
+        }
+      };
+      
+      fetchUserData();
+    }
+    
+    // Llamar a la función onFacturaCreada si existe
+    if (typeof onFacturaCreada === 'function') {
+      // Pequeño retraso para permitir que la notificación se muestre primero
+      setTimeout(() => {
+        onFacturaCreada();
+      }, 300);
+    }
+  };
 
   return (
     <div>
+      {/* Notificación de éxito */}
+      {notificacionExito && (
+        <div className="fixed top-4 right-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-lg z-50 flex items-center">
+          <CheckCircle className="h-5 w-5 mr-2" />
+          <span>{mensajeExito}</span>
+          <button 
+            onClick={() => setNotificacionExito(false)} 
+            className="ml-4 text-green-700 hover:text-green-900"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Sección de depuración - TEMPORAL */}
       {/* <div className="mb-4 p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
         <h3 className="text-lg font-bold text-yellow-800 mb-2">🔧 DEPURACIÓN - TEMPORAL</h3>
@@ -1064,9 +1163,9 @@ export default function FacturacionSection({ productosVendibles, productosConsum
           <div className="bg-white rounded-lg max-w-md w-full max-h-screen overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Factura</h2>
+                <h2 className="text-2xl font-bold text-gray-900">Factura #{ultimaFactura.id}</h2>
                 <button
-                  onClick={() => setMostrarFactura(false)}
+                  onClick={cerrarFacturaYRecargar}
                   className="text-gray-500 hover:text-gray-700"
                 >
                   <X className="h-6 w-6" />
@@ -1229,7 +1328,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                 <Button onClick={() => window.print()} className="flex-1">
                   Imprimir
                 </Button>
-                <Button variant="danger" onClick={() => setMostrarFactura(false)}>
+                <Button variant="danger" onClick={cerrarFacturaYRecargar}>
                   Cerrar
                 </Button>
               </div>
