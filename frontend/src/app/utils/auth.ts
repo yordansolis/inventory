@@ -1,4 +1,5 @@
 // Funciones de utilidad para la autenticación
+import { useState, useEffect, useCallback } from 'react';
 
 /**
  * Verifica si el usuario está autenticado
@@ -99,4 +100,51 @@ export const fetchCurrentUser = async (): Promise<any> => {
     console.error('Error al obtener datos del usuario:', error);
     return null;
   }
+};
+
+/**
+ * Hook de autenticación para usar en componentes
+ */
+export const useAuth = () => {
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<any>(null);
+  const [isAuth, setIsAuth] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      setIsLoading(true);
+      const authenticated = isAuthenticated();
+      setIsAuth(authenticated);
+
+      if (authenticated) {
+        try {
+          const userData = await fetchCurrentUser();
+          setUser(userData);
+        } catch (error) {
+          console.error('Error al obtener usuario:', error);
+          logout();
+        }
+      }
+      
+      setIsLoading(false);
+    };
+
+    checkAuth();
+  }, []);
+
+  const getToken = useCallback((): Promise<string> => {
+    return new Promise((resolve) => {
+      const token = getAuthToken();
+      resolve(token);
+    });
+  }, []);
+
+  return {
+    isLoading,
+    isAuthenticated: isAuth,
+    user,
+    logout,
+    getToken,
+    getAuthHeaders
+  };
 }; 

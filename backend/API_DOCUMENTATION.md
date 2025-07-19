@@ -597,6 +597,202 @@ DELETE /api/v1/insumos/1
 - 404 Not Found: "Insumo con ID X no encontrado"
 - 500 Internal Server Error: "Error al eliminar el insumo con ID X"
 
+## Gestión de Adiciones (Toppings y Complementos)
+
+### Listar Adiciones
+
+```
+GET /api/v1/services/adiciones
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+[
+  {
+    "id": 101,
+    "nombre": "CREMA CHANTILLY",
+    "tipo": "TOPPING",
+    "precio": 500,
+    "stock": 50,
+    "minimo": 10,
+    "estado": "bien"
+  },
+  {
+    "id": 102,
+    "nombre": "AREQUIPE",
+    "tipo": "TOPPING",
+    "precio": 800,
+    "stock": 30,
+    "minimo": 5,
+    "estado": "bien"
+  }
+]
+```
+
+### Obtener una Adición por ID
+
+```
+GET /api/v1/services/adiciones/101
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 101,
+  "nombre": "CREMA CHANTILLY",
+  "tipo": "TOPPING",
+  "precio": 500,
+  "stock": 50,
+  "minimo": 10,
+  "estado": "bien"
+}
+```
+
+**Posibles errores:**
+
+- 404 Not Found: "Adición con ID 101 no encontrada"
+- 500 Internal Server Error: "Error al obtener la adición: [detalle del error]"
+
+### Crear una Nueva Adición
+
+```
+POST /api/v1/services/adiciones
+```
+
+**Body (raw JSON):**
+
+```json
+{
+  "nombre": "CREMA CHANTILLY",
+  "tipo": "TOPPING",
+  "precio": 500,
+  "stock": 50,
+  "minimo": 10,
+  "estado": "bien"
+}
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 101,
+  "nombre": "CREMA CHANTILLY",
+  "tipo": "TOPPING",
+  "precio": 500,
+  "stock": 50,
+  "minimo": 10,
+  "estado": "bien"
+}
+```
+
+**Posibles errores:**
+
+- 400 Bad Request: "Ya existe una adición con el nombre CREMA CHANTILLY"
+- 500 Internal Server Error: "Error al crear la adición: [detalle del error]"
+
+### Actualizar una Adición
+
+```
+PUT /api/v1/services/adiciones/101
+```
+
+**Body (raw JSON):**
+
+```json
+{
+  "nombre": "CREMA CHANTILLY EXTRA",
+  "tipo": "TOPPING",
+  "precio": 600,
+  "stock": 45,
+  "minimo": 15,
+  "estado": "bien"
+}
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 101,
+  "nombre": "CREMA CHANTILLY EXTRA",
+  "tipo": "TOPPING",
+  "precio": 600,
+  "stock": 45,
+  "minimo": 15,
+  "estado": "bien"
+}
+```
+
+**Posibles errores:**
+
+- 404 Not Found: "Adición con ID 101 no encontrada"
+- 400 Bad Request: "Ya existe otra adición con el nombre CREMA CHANTILLY EXTRA"
+- 500 Internal Server Error: "Error al actualizar la adición: [detalle del error]"
+
+### Eliminar una Adición
+
+```
+DELETE /api/v1/services/adiciones/101
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "message": "Adición con ID 101 eliminada exitosamente"
+}
+```
+
+**Posibles errores:**
+
+- 404 Not Found: "Adición con ID 101 no encontrada"
+- 500 Internal Server Error: "Error al eliminar la adición: [detalle del error]"
+
+### Cargar Datos Iniciales de Adiciones
+
+```
+POST /api/v1/services/adiciones/seed
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "message": "Datos iniciales de adiciones insertados correctamente"
+}
+```
+
+**Posibles errores:**
+
+- 500 Internal Server Error: "Error al insertar datos iniciales: [detalle del error]"
+
 ## Gestión de Recetas
 
 ### Añadir Receta a un Producto
@@ -1775,3 +1971,176 @@ function ExtractoVentas() {
   // Resto del componente...
 }
 ```
+
+## Gestión de Domiciliarios
+
+### Listar Todos los Domiciliarios
+
+```
+GET /api/v1/services/domiciliarios
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+[
+  {
+    "id": 1,
+    "nombre": "Juan Pérez",
+    "telefono": "3001234567",
+    "tarifa": 5000
+  },
+  {
+    "id": 2,
+    "nombre": "Ana García",
+    "telefono": "3109876543",
+    "tarifa": 6000
+  },
+  {
+    "id": 3,
+    "nombre": "Pedro López",
+    "telefono": "3205551234",
+    "tarifa": 4500
+  }
+]
+```
+
+**Posibles errores:**
+
+- 401 Unauthorized: "Token de autenticación no proporcionado"
+- 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
+- 500 Internal Server Error: "Error al obtener los domiciliarios: [detalle del error]"
+
+### Obtener un Domiciliario por ID
+
+```
+GET /api/v1/services/domiciliarios/1
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 1,
+  "nombre": "Juan Pérez",
+  "telefono": "3001234567",
+  "tarifa": 5000
+}
+```
+
+**Posibles errores:**
+
+- 401 Unauthorized: "Token de autenticación no proporcionado"
+- 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
+- 404 Not Found: "Domiciliario con ID 1 no encontrado"
+- 500 Internal Server Error: "Error al obtener el domiciliario: [detalle del error]"
+
+### Crear un Nuevo Domiciliario
+
+```
+POST /api/v1/services/domiciliarios
+```
+
+**Body (raw JSON):**
+
+```json
+{
+  "nombre": "Juan Pérez",
+  "telefono": "3001234567",
+  "tarifa": 5000
+}
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 1,
+  "nombre": "Juan Pérez",
+  "telefono": "3001234567",
+  "tarifa": 5000
+}
+```
+
+**Posibles errores:**
+
+- 400 Bad Request: "Ya existe un domiciliario con el teléfono 3001234567"
+- 401 Unauthorized: "Token de autenticación no proporcionado"
+- 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
+- 500 Internal Server Error: "Error al crear el domiciliario: [detalle del error]"
+
+### Actualizar un Domiciliario
+
+```
+PUT /api/v1/services/domiciliarios/1
+```
+
+**Body (raw JSON):**
+
+```json
+{
+  "nombre": "Juan Pablo Pérez",
+  "telefono": "3001234567",
+  "tarifa": 5500
+}
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "id": 1,
+  "nombre": "Juan Pablo Pérez",
+  "telefono": "3001234567",
+  "tarifa": 5500
+}
+```
+
+**Posibles errores:**
+
+- 400 Bad Request: "Ya existe otro domiciliario con el teléfono 3001234567"
+- 401 Unauthorized: "Token de autenticación no proporcionado"
+- 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
+- 404 Not Found: "Domiciliario con ID 1 no encontrado"
+- 500 Internal Server Error: "Error al actualizar el domiciliario: [detalle del error]"
+
+### Eliminar un Domiciliario
+
+```
+DELETE /api/v1/services/domiciliarios/1
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "message": "Domiciliario con ID 1 eliminado exitosamente"
+}
+```
+
+**Posibles errores:**
+
+- 401 Unauthorized: "Token de autenticación no proporcionado"
+- 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
+- 404 Not Found: "Domiciliario con ID 1 no encontrado"
+- 500 Internal Server Error: "Error al eliminar el domiciliario: [detalle del error]"

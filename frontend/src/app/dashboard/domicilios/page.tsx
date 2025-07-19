@@ -1,6 +1,7 @@
 "use client"
-import React, { useState, useCallback, useMemo } from 'react';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../utils/auth';
 
 interface Domiciliario {
   id: number;
@@ -15,12 +16,16 @@ interface DomiciliarioFormData {
   tarifa: string;
 }
 
+interface ApiError {
+  message: string;
+  visible: boolean;
+}
+
 export default function DomiciliosPage() {
-  const [domiciliarios, setDomiciliarios] = useState<Domiciliario[]>([
-    { id: 1, nombre: 'Juan Pérez', telefono: '3001234567', tarifa: 5000 },
-    { id: 2, nombre: 'Ana García', telefono: '3109876543', tarifa: 6000 },
-    { id: 3, nombre: 'Pedro López', telefono: '3205551234', tarifa: 4500 },
-  ]);
+  const [domiciliarios, setDomiciliarios] = useState<Domiciliario[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<ApiError>({ message: '', visible: false });
+  const { getToken } = useAuth();
 
   const [formData, setFormData] = useState<DomiciliarioFormData>({
     nombre: '',
@@ -29,6 +34,39 @@ export default function DomiciliosPage() {
   });
 
   const [editingId, setEditingId] = useState<number | null>(null);
+
+  // Cargar domiciliarios al montar el componente
+  useEffect(() => {
+    fetchDomiciliarios();
+  }, []);
+
+  // Función para obtener todos los domiciliarios
+  const fetchDomiciliarios = async () => {
+    setIsLoading(true);
+    try {
+      const token = await getToken();
+      const response = await fetch('/api/v1/users/services/domiciliarios/', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error al obtener domiciliarios: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setDomiciliarios(data);
+    } catch (err) {
+      console.error('Error al cargar domiciliarios:', err);
+      setError({
+        message: err instanceof Error ? err.message : 'Error al cargar domiciliarios',
+        visible: true
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Optimización: useCallback para evitar re-renders innecesarios
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,42 +79,82 @@ export default function DomiciliosPage() {
   }, []);
 
   // Optimización: useCallback para las funciones de manejo
-  const handleAddOrUpdateDomiciliario = useCallback(() => {
+  const handleAddOrUpdateDomiciliario = useCallback(async () => {
     const parsedTarifa = formData.tarifa === '' ? null : parseFloat(formData.tarifa);
     
     if (!formData.nombre.trim() || !formData.telefono.trim() || 
         (formData.tarifa !== '' && (parsedTarifa === null || isNaN(parsedTarifa)))) {
-      alert('Por favor, complete todos los campos obligatorios y asegúrese de que la tarifa sea un número válido.');
+      setError({
+        message: 'Por favor, complete todos los campos obligatorios y asegúrese de que la tarifa sea un número válido.',
+        visible: true
+      });
       return;
     }
 
-    if (editingId) {
-      // Update logic
-      setDomiciliarios((prev) =>
-        prev.map((d) =>
-          d.id === editingId ? {
-            id: editingId,
-            nombre: formData.nombre.trim(),
-            telefono: formData.telefono.trim(),
-            tarifa: parsedTarifa
-          } : d
-        )
-      );
-      setEditingId(null);
-    } else {
-      // Add logic
-      const newId = domiciliarios.length > 0 ? Math.max(...domiciliarios.map(d => d.id)) + 1 : 1;
-      setDomiciliarios((prev) => [...prev, {
-        id: newId,
+    try {
+      const token = await getToken();
+      const domiciliarioData = {
         nombre: formData.nombre.trim(),
         telefono: formData.telefono.trim(),
         tarifa: parsedTarifa
-      }]);
-    }
+      };
 
-    // Clear form
-    setFormData({ nombre: '', telefono: '', tarifa: '' });
-  }, [formData, editingId, domiciliarios]);
+      if (editingId) {
+        // Actualizar domiciliario existente
+        const response = await fetch(`/api/v1/users/services/domiciliarios/${editingId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(domiciliarioData)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || `Error al actualizar domiciliario: ${response.statusText}`);
+        }
+
+        const updatedDomiciliario = await response.json();
+        
+        // Actualizar el estado local
+        setDomiciliarios(prev => 
+          prev.map(d => d.id === editingId ? updatedDomiciliario : d)
+        );
+        
+        setEditingId(null);
+      } else {
+        // Crear nuevo domiciliario
+        const response = await fetch('/api/v1/users/services/domiciliarios/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(domiciliarioData)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || `Error al crear domiciliario: ${response.statusText}`);
+        }
+
+        const newDomiciliario = await response.json();
+        
+        // Añadir al estado local
+        setDomiciliarios(prev => [...prev, newDomiciliario]);
+      }
+
+      // Limpiar formulario
+      setFormData({ nombre: '', telefono: '', tarifa: '' });
+    } catch (err) {
+      console.error('Error:', err);
+      setError({
+        message: err instanceof Error ? err.message : 'Error al procesar la solicitud',
+        visible: true
+      });
+    }
+  }, [formData, editingId, getToken]);
 
   const handleEditDomiciliario = useCallback((domiciliario: Domiciliario) => {
     setFormData({ 
@@ -87,13 +165,39 @@ export default function DomiciliosPage() {
     setEditingId(domiciliario.id);
   }, []);
 
-  const handleDeleteDomiciliario = useCallback((id: number) => {
-    setDomiciliarios((prev) => prev.filter((d) => d.id !== id));
-  }, []);
+  const handleDeleteDomiciliario = useCallback(async (id: number) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`/api/v1/users/services/domiciliarios/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Error al eliminar domiciliario: ${response.statusText}`);
+      }
+
+      // Eliminar del estado local
+      setDomiciliarios(prev => prev.filter(d => d.id !== id));
+    } catch (err) {
+      console.error('Error:', err);
+      setError({
+        message: err instanceof Error ? err.message : 'Error al eliminar el domiciliario',
+        visible: true
+      });
+    }
+  }, [getToken]);
 
   const handleCancelEdit = useCallback(() => {
     setFormData({ nombre: '', telefono: '', tarifa: '' });
     setEditingId(null);
+  }, []);
+
+  const handleCloseError = useCallback(() => {
+    setError(prev => ({ ...prev, visible: false }));
   }, []);
 
   // Optimización: Memoizar componentes para evitar re-renders
@@ -149,6 +253,17 @@ export default function DomiciliosPage() {
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Gestión de Domiciliarios</h1>
+      
+      {/* Mensaje de error */}
+      {error.visible && (
+        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start">
+          <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+          <div className="flex-grow">{error.message}</div>
+          <button onClick={handleCloseError} className="text-red-500 hover:text-red-700">
+            &times;
+          </button>
+        </div>
+      )}
       
       <Card className="mb-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
@@ -228,7 +343,11 @@ export default function DomiciliosPage() {
           Listado de Domiciliarios ({domiciliarios.length})
         </h2>
         
-        {domiciliarios.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-8 text-gray-500">
+            Cargando domiciliarios...
+          </div>
+        ) : domiciliarios.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             No hay domiciliarios registrados. Agrega uno para comenzar.
           </div>

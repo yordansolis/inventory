@@ -4,12 +4,42 @@ import React, { useState, useEffect } from "react";
 import FacturacionSection from "../../../../components/FacturacionSection";
 import { getAuthHeaders } from "../../utils/auth";
 
+// Define types for our data
+interface ProductoVendible {
+  id: number;
+  nombre: string;
+  tipo: string;
+  precio: number;
+  stock: number | string;
+  stockCalculado?: number;
+  minimo: number;
+  estado: string;
+  variante?: string;
+}
+
+interface ProductoConsumible {
+  id: number;
+  nombre: string;
+  cantidad: number;
+  minimo: number;
+  estado: string;
+  unidad: string;
+}
+
+interface DebugInfo {
+  apiUrl: string;
+  stockStatus?: number;
+  insumosStatus?: number;
+  productCount: number;
+  insumoCount: number;
+}
+
 export default function InventoryDashboard() {
-  const [productosVendibles, setProductosVendibles] = useState([]);
-  const [productosConsumibles, setProductosConsumibles] = useState([]);
+  const [productosVendibles, setProductosVendibles] = useState<ProductoVendible[]>([]);
+  const [productosConsumibles, setProductosConsumibles] = useState<ProductoConsumible[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [debug, setDebug] = useState({});
+  const [error, setError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<DebugInfo>({} as DebugInfo);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -17,15 +47,16 @@ export default function InventoryDashboard() {
         // Try different ports based on the README.md
         const possiblePorts = [8000, 8081, 8089, 8052];
         let stockData = null;
-        let insumosData = [];
+        let insumosData: any[] = [];
         let apiUrl = '';
         let stockResponse = null;
         let insumosResponse = null;
         let success = false;
         
         // First try the environment variable
-        apiUrl = process.env.NEXT_PUBLIC_BACKEND;
-        if (apiUrl) {
+        const envApiUrl = process.env.NEXT_PUBLIC_BACKEND;
+        if (envApiUrl) {
+          apiUrl = envApiUrl;
           console.log("Trying API URL from env:", apiUrl);
           const headers = getAuthHeaders();
           
@@ -104,30 +135,11 @@ export default function InventoryDashboard() {
         
         // Process stock data
         if (!stockData || stockData.length === 0) {
-          console.warn("No stock data found in API response, using default data");
-          setProductosVendibles([
-            {
-              id: 1,
-              nombre: "WAFFLE CON FRESAS",
-              tipo: "WAFFLES",
-              precio: 22000,
-              stock: "Bajo demanda",
-              minimo: 0,
-              estado: "bien",
-            },
-            {
-              id: 2,
-              nombre: "BOLA DE HELADO DE VAINILLA",
-              tipo: "HELADOS",
-              precio: 5000,
-              stock: "Bajo demanda",
-              minimo: 0,
-              estado: "bien",
-            }
-          ]);
+          console.warn("No stock data found in API response");
+          setProductosVendibles([]);
         } else {
           // Transform stock data to match the expected format
-          const formattedProducts = stockData.map(product => ({
+          const formattedProducts = stockData.map((product: any) => ({
             id: product.producto_id,
             nombre: product.nombre_producto + (product.variante ? ` - ${product.variante}` : ''),
             tipo: product.categoria_nombre || "Sin categoría",
@@ -145,14 +157,11 @@ export default function InventoryDashboard() {
         
         // Process insumos data
         if (!insumosData || insumosData.length === 0) {
-          console.warn("No insumos found in API response, using default data");
-          setProductosConsumibles([
-            { id: 201, nombre: "FRESAS", cantidad: 1000, minimo: 100, estado: "bien", unidad: "gramos" },
-            { id: 202, nombre: "HARINA", cantidad: 5000, minimo: 1000, estado: "bien", unidad: "gramos" }
-          ]);
+          console.warn("No insumos found in API response");
+          setProductosConsumibles([]);
         } else {
           // Transform insumos data to match the expected format
-          const formattedInsumos = insumosData.map(insumo => ({
+          const formattedInsumos = insumosData.map((insumo: any) => ({
             id: insumo.id,
             nombre: insumo.nombre_insumo,
             cantidad: insumo.cantidad_unitaria || 0,
@@ -175,25 +184,12 @@ export default function InventoryDashboard() {
         setLoading(false);
       } catch (error) {
         console.error("Error fetching data:", error);
-        setError(error.message);
+        setError(error instanceof Error ? error.message : 'Error desconocido');
         setLoading(false);
         
-        // Provide fallback data in case of error
-        setProductosVendibles([
-          {
-            id: 1,
-            nombre: "WAFFLE CON FRESAS (FALLBACK)",
-            tipo: "WAFFLES",
-            precio: 22000,
-            stock: "Bajo demanda",
-            minimo: 0,
-            estado: "bien",
-          }
-        ]);
-        
-        setProductosConsumibles([
-          { id: 201, nombre: "FRESAS (FALLBACK)", cantidad: 1000, minimo: 100, estado: "bien", unidad: "gramos" }
-        ]);
+        // No fallback data, just set empty arrays
+        setProductosVendibles([]);
+        setProductosConsumibles([]);
       }
     };
 

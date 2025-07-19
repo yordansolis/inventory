@@ -38,11 +38,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/dashboard' },
     { id: 'facturar', label: 'Facturar', icon: DollarSign, href: '/dashboard/factura' },
-    { id: 'extracto-ventas', label: 'Extracto Ventas', icon: ShoppingCart, href: '/dashboard/estracto-ventas' },
     { id: 'inventario', label: 'Inventario', icon: Package, href: '/dashboard/inventario' },
+    { id: 'extracto-ventas', label: 'Extracto Ventas', icon: ShoppingCart, href: '/dashboard/estracto-ventas' },
     { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3, href: '/dashboard/estadisticas' },
     { id: 'domicilios', label: 'Domicilios', icon: Truck, href: '/dashboard/domicilios' },
-    { id: 'ingredientes', label: 'Ingredientes', icon: TestTube, href: '/dashboard/ingredientes' },
     { id: 'adiciones', label: 'Adiciones', icon: Plus, href: '/dashboard/adiciones' },
     { id: 'usuarios', label: 'Usuarios', icon: Users, href: '/dashboard/usuarios' },
     { id: 'programacion-camisetas', label: 'Programación Camisetas', icon: Shirt, href: '/dashboard/programacion-camisetas' },

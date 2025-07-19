@@ -5,6 +5,8 @@ from .purchase_service import PurchaseService
 from .dashboard_service import router_dashboard
 from .statistics_service import router_statistics
 from .extract_service import router_extracts
+from .domiciliary import router_domiciliary
+from .additions import router_additions
 from pydantic import BaseModel
 from typing import List, Dict
 from datetime import date
@@ -48,6 +50,12 @@ router_services.include_router(router_statistics, prefix="/statistics", tags=["s
 
 # Incluir el router de extractos
 router_services.include_router(router_extracts, prefix="/extracts", tags=["extracts"])
+
+# Incluir el router de domiciliarios
+router_services.include_router(router_domiciliary, prefix="/domiciliarios", tags=["domiciliarios"])
+
+# Incluir el router de adiciones
+router_services.include_router(router_additions, prefix="/adiciones", tags=["adiciones"])
 
 @router_services.get("/")
 async def get_services():
