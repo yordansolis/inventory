@@ -524,7 +524,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
   return (
     <div>
       {/* Sección de depuración - TEMPORAL */}
-      <div className="mb-4 p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
+      {/* <div className="mb-4 p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
         <h3 className="text-lg font-bold text-yellow-800 mb-2">🔧 DEPURACIÓN - TEMPORAL</h3>
         <div className="flex flex-wrap gap-2 mb-2">
           <button 
@@ -551,7 +551,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
           <p>Items en carrito: {carrito.length}</p>
           <p>Cliente: "{cliente}"</p>
         </div>
-      </div>
+      </div> */}
 
       {/* Header */}
       <div className="mb-8">
@@ -695,7 +695,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
             <Button
               variant={!mostrarAdiciones ? "default" : "info"}
               onClick={() => setMostrarAdiciones(false)}
-              className="flex-1"
+              className="flex-1 cursor-pointer"
             >
               <Package className="h-4 w-4 mr-2" />
               Productos ({productosFiltrados.length})
@@ -703,7 +703,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
             <Button
               variant={mostrarAdiciones ? "default" : "info"}
               onClick={() => setMostrarAdiciones(true)}
-              className="flex-1"
+              className="flex-1 cursor-pointer"
             >
               <Star className="h-4 w-4 mr-2" />
               Adiciones ({adicionesFiltradas.length})
@@ -737,16 +737,17 @@ export default function FacturacionSection({ productosVendibles, productosConsum
             </h2>
             
             {/* Lista simplificada para depuración */}
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            {/* <div className="mb-4 p-3 bg-gray-50 rounded-lg">
               <h4 className="font-semibold mb-2">Lista Simplificada (DEPURACIÓN):</h4>
               {(productosFiltrados || []).map((producto, index) => (
                 <div key={producto.id || index} className="flex justify-between items-center py-2 border-b">
                   <div>
                     <span className="font-medium">{producto.nombre}</span>
                     <span className="text-sm text-gray-600 ml-2">
-                      Stock: {producto.stock} | Precio: {formatPrice(producto.precio)}
+                      Stock: {producto.stock + 1} | Precio: {formatPrice(producto.precio)}
                     </span>
                   </div>
+
                   <button
                     onClick={() => {
                       console.log("SIMPLE: Clic en agregar producto:", producto);
@@ -761,7 +762,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
               {(!productosFiltrados || productosFiltrados.length === 0) && (
                 <p className="text-gray-500 text-center py-4">No hay productos disponibles</p>
               )}
-            </div>
+            </div> */}
 
             {/* Componente original */}
             <ItemListDisplay
@@ -1000,9 +1001,9 @@ export default function FacturacionSection({ productosVendibles, productosConsum
           </Card>
 
           {/* Botones de acción */}
-          <div className="flex space-x-4">
+          <div className="flex space-x-4 ">
             {/* Botón de prueba simplificado */}
-            <button
+            {/* <button
               onClick={() => {
                 console.log("SIMPLE: Intentando procesar factura simple");
                 console.log("SIMPLE: Carrito actual:", carrito);
@@ -1021,12 +1022,15 @@ export default function FacturacionSection({ productosVendibles, productosConsum
               disabled={carrito.length === 0}
             >
               🧪 Procesar Simple
-            </button>
+            </button> */}
 
             <AlertDialog open={alertDialogOpen} onOpenChange={setAlertDialogOpen}>
               <Button
                 onClick={procesarFactura}
-                className="flex-1"
+                className="flex-1 
+                cursor-pointer
+                 bg-green-500 text-white rounded hover:bg-green-600"
+
                 disabled={carrito.length === 0 && adicionesCarrito.length === 0}
               >
                 <DollarSign className="h-4 w-4 mr-2" />
