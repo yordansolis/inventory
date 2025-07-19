@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Label, TextInput, Button, Alert, Spinner } from 'flowbite-react';
 import { HiEye, HiEyeOff, HiInformationCircle } from 'react-icons/hi';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 export default function InventoryLogin() {
   const router = useRouter();
@@ -20,6 +21,17 @@ export default function InventoryLogin() {
     const authToken = localStorage.getItem('authToken');
     if (authToken) {
       router.push('/dashboard');
+    }
+    
+    // Asegurarse de que el favicon se cargue correctamente
+    const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (!link) {
+      const newLink = document.createElement('link');
+      newLink.rel = 'icon';
+      newLink.href = '/icon.ico';
+      document.head.appendChild(newLink);
+    } else {
+      link.href = '/icon.ico';
     }
   }, [router]);
 
@@ -83,45 +95,61 @@ export default function InventoryLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-5">
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white flex items-center justify-center p-5">
       <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-black mb-2 tracking-tight">
-            Inventario
+        {/* Header con Logo */}
+        <div className="text-center mb-10">
+          <div className="flex justify-center mb-6">
+            <div className="rounded-full overflow-hidden border-4 border-white shadow-lg p-1 bg-white" style={{width: '160px', height: '160px'}}>
+              <Image 
+                src="/logo.svg" 
+                alt="Logo" 
+                width={150} 
+                height={150} 
+                priority
+                className="rounded-full"
+              />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2 tracking-tight">
+            Sistema de Inventario
           </h1>
-          <p className="text-lg text-gray-600">
-            Inicia sesión en tu cuenta
+          <p className="text-base text-pink-600">
+            Inicia sesión para continuar
           </p>
         </div>
 
         {/* Login Card */}
-        <Card className="bg-white border border-gray-200 shadow-none">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Card className="bg-white border border-pink-100 shadow-sm rounded-xl">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             {/* username Field */}
             <div>
               <div className="mb-2 block">
                 <Label 
                   htmlFor="username" 
                   children="Nombre de usuario"
-                  className="text-gray-900 text-sm font-medium"
+                  className="text-gray-700 text-base font-medium"
                 />
               </div>
               <TextInput
                 id="username"
                 name="username"
                 type="text"
-                placeholder="johndoe"
+                placeholder="Ingresa tu usuario"
                 value={formData.username}
                 onChange={handleInputChange}
                 required
-                className="text-sm"
+                sizing="lg"
+                className="text-base"
                 theme={{
                   field: {
                     input: {
-                      base: "block w-full border disabled:cursor-not-allowed disabled:opacity-50",
+                      base: "block w-full border disabled:cursor-not-allowed disabled:opacity-50 rounded-lg",
                       colors: {
-                        gray: "bg-white border-gray-300 text-gray-900 focus:border-black focus:ring-black"
+                        gray: "bg-white border-pink-200 text-gray-900 focus:border-pink-400 focus:ring-pink-300"
+                      },
+                      sizes: {
+                        lg: "p-4 sm:text-base"
                       }
                     }
                   }
@@ -136,7 +164,7 @@ export default function InventoryLogin() {
                 <Label 
                   htmlFor="password" 
                   children="Contraseña"
-                  className="text-gray-900 text-sm font-medium"
+                  className="text-gray-700 text-base font-medium"
                 />
               </div>
               <div className="relative">
@@ -148,28 +176,32 @@ export default function InventoryLogin() {
                   value={formData.password}
                   onChange={handleInputChange}
                   required
-                  className="text-sm pr-10"
+                  sizing="lg"
+                  className="text-base pr-10"
                   theme={{
                     field: {
                       input: {
-                        base: "block w-full border disabled:cursor-not-allowed disabled:opacity-50",
+                        base: "block w-full border disabled:cursor-not-allowed disabled:opacity-50 rounded-lg",
                         colors: {
-                          gray: "bg-white border-gray-300 text-gray-900 focus:border-black focus:ring-black"
+                          gray: "bg-white border-pink-200 text-gray-900 focus:border-pink-400 focus:ring-pink-300"
+                        },
+                        sizes: {
+                          lg: "p-4 sm:text-base"
+                        }
                       }
                     }
-                  }
-                }}
-                color="gray"
-              />
+                  }}
+                  color="gray"
+                />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-600 hover:text-gray-900"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-pink-600"
                 >
                   {showPassword ? (
-                    <HiEyeOff className="h-5 w-5" />
+                    <HiEyeOff className="h-6 w-6" />
                   ) : (
-                    <HiEye className="h-5 w-5" />
+                    <HiEye className="h-6 w-6" />
                   )}
                 </button>
               </div>
@@ -177,8 +209,8 @@ export default function InventoryLogin() {
 
             {/* Error Alert */}
             {error && (
-              <Alert color="failure" icon={HiInformationCircle}>
-                <span className="text-sm">{error}</span>
+              <Alert color="failure" icon={HiInformationCircle} className="rounded-lg">
+                <span className="text-base">{error}</span>
               </Alert>
             )}
 
@@ -186,7 +218,8 @@ export default function InventoryLogin() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-black hover:bg-gray-800 focus:ring-black text-sm font-medium py-3"
+              className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 focus:ring-pink-400 text-white text-base font-medium py-4 rounded-lg transition-all duration-200 shadow-sm"
+              size="lg"
             >
               {loading ? (
                 <>
@@ -211,8 +244,8 @@ export default function InventoryLogin() {
         </Card>
 
         {/* Footer */}
-        <div className="text-center mt-8 pt-6 border-t border-gray-200">
-          <p className="text-gray-600 text-sm">
+        <div className="text-center mt-8 pt-6 border-t border-pink-100">
+          <p className="text-pink-400 text-sm">
             © 2025 Sistema de Inventario. Todos los derechos reservados.
           </p>
         </div>

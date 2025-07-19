@@ -3,9 +3,31 @@
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-rgb: 255, 255, 255;
+  color-scheme: light only;
+}
+
+/* Forzar modo claro */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: light only;
+  }
 }
 
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
+}
+
+/* Asegurar que los inputs siempre tengan fondo blanco y texto negro */
+input, 
+textarea, 
+select {
+  background-color: white !important;
+  color: black !important;
+  border-color: #e5e7eb !important;
+}
+
+/* Asegurar que los labels siempre sean negros */
+label {
+  color: black !important;
 }
