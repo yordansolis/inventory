@@ -25,7 +25,14 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  
+
+
+
+  // Agregar estas nuevas importaciones para el gráfico de área
+  Area,
+  AreaChart
 } from 'recharts';
 
 // Interfaces for API responses
@@ -255,7 +262,7 @@ export default function EstadisticasPage() {
     if (active) {
       return (
         <button
-          className="px-4 py-2 text-sm font-bold rounded-md transition-all bg-sky-500 text-white shadow-md border-2 border-sky-600 dark:bg-sky-400 dark:border-sky-500"
+          className="px-4 py-2 text-sm font-bold rounded-md transition-all bg-blue-600 text-white shadow-md border-2 border-blue-800 dark:bg-blue-500 dark:border-blue-700"
           onClick={onClick}
         >
           {children}
@@ -267,7 +274,7 @@ export default function EstadisticasPage() {
     if (variant === 'default') {
       return (
         <button
-          className="px-4 py-2 text-sm font-medium rounded-md transition-all bg-sky-300 text-sky-800 hover:bg-sky-400 hover:text-white shadow-sm dark:bg-sky-600 dark:text-white dark:hover:bg-sky-500"
+          className="px-4 py-2 text-sm font-medium rounded-md transition-all bg-blue-400 text-white hover:bg-blue-500 shadow-sm dark:bg-blue-700 dark:hover:bg-blue-600"
           onClick={onClick}
         >
           {children}
@@ -276,7 +283,7 @@ export default function EstadisticasPage() {
     } else {
       return (
         <button
-          className="px-4 py-2 text-sm font-medium rounded-md transition-all bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600"
+          className="px-4 py-2 text-sm font-medium rounded-md transition-all bg-white text-gray-800 border border-gray-300 hover:bg-gray-100 shadow-sm dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600"
           onClick={onClick}
         >
           {children}
@@ -776,6 +783,8 @@ export default function EstadisticasPage() {
           <p className="text-center text-gray-500 py-12">No hay datos disponibles</p>
         )}
       </Card>
+
+      
     </div>
   );
 }

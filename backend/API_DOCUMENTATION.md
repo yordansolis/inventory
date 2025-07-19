@@ -1531,3 +1531,247 @@ export default EstadisticasPanel;
 ```
 
 Este ejemplo muestra cómo podrías consumir los datos de estadísticas en un componente React para crear un panel de control básico.
+
+## Extractos de Ventas
+
+Esta sección describe cómo utilizar los endpoints de extractos para obtener información detallada sobre las compras y ventas realizadas.
+
+### Obtener Extracto Mensual de Compras
+
+```
+GET /api/v1/services/extracts/monthly/{year}/{month}
+```
+
+**Parámetros de ruta:**
+
+- year: Año del extracto (ej: 2025)
+- month: Mes del extracto (1-12)
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Ejemplo:**
+
+```
+GET /api/v1/services/extracts/monthly/2025/7
+```
+
+**Respuesta:**
+
+```json
+{
+  "year": 2025,
+  "month": 7,
+  "month_name": "Julio",
+  "total_records": 2,
+  "data": [
+    {
+      "invoice_number": "1752824978017",
+      "invoice_date": "18/07/2025",
+      "invoice_time": "02:49:38",
+      "cliente": "lei (3113634658)",
+      "vendedor": "admin",
+      "product_name": "FRESAS",
+      "product_variant": "FRESAS CON HELADO",
+      "quantity": 1,
+      "unit_price": 22000,
+      "subtotal": 22000,
+      "subtotal_products": 22000,
+      "total_amount": 25000,
+      "payment_method": "Transferencia",
+      "created_at": "15/08/2023 10:30:00"
+    },
+    {
+      "invoice_number": "1752824978018",
+      "invoice_date": "19/07/2025",
+      "invoice_time": "15:30:22",
+      "cliente": "Carlos (3001234567)",
+      "vendedor": "admin",
+      "product_name": "WAFFLESS",
+      "product_variant": "CHOCOLATE",
+      "quantity": 2,
+      "unit_price": 18000,
+      "subtotal": 36000,
+      "subtotal_products": 36000,
+      "total_amount": 36000,
+      "payment_method": "Efectivo",
+      "created_at": "15/08/2023 16:45:00"
+    }
+  ]
+}
+```
+
+### Obtener Extracto Diario de Compras
+
+```
+GET /api/v1/services/extracts/daily/{date}
+```
+
+**Parámetros de ruta:**
+
+- date: Fecha del extracto en formato YYYY-MM-DD
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Ejemplo:**
+
+```
+GET /api/v1/services/extracts/daily/2025-07-18
+```
+
+**Respuesta:**
+
+```json
+{
+  "date": "18/07/2025",
+  "total_records": 1,
+  "data": [
+    {
+      "invoice_number": "1752824978017",
+      "invoice_date": "18/07/2025",
+      "invoice_time": "02:49:38",
+      "cliente": "lei (3113634658)",
+      "vendedor": "admin",
+      "product_name": "FRESAS",
+      "product_variant": "FRESAS CON HELADO",
+      "quantity": 1,
+      "unit_price": 22000,
+      "subtotal": 22000,
+      "subtotal_products": 22000,
+      "total_amount": 25000,
+      "payment_method": "Transferencia",
+      "created_at": "15/08/2023 10:30:00"
+    }
+  ]
+}
+```
+
+### Obtener Extracto por Rango de Fechas
+
+```
+GET /api/v1/services/extracts/range?start_date={start_date}&end_date={end_date}
+```
+
+**Parámetros de consulta:**
+
+- start_date: Fecha inicial del rango en formato YYYY-MM-DD
+- end_date: Fecha final del rango en formato YYYY-MM-DD
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Ejemplo:**
+
+```
+GET /api/v1/services/extracts/range?start_date=2025-07-15&end_date=2025-07-20
+```
+
+**Respuesta:**
+
+```json
+{
+  "start_date": "15/07/2025",
+  "end_date": "20/07/2025",
+  "total_records": 2,
+  "data": [
+    {
+      "invoice_number": "1752824978017",
+      "invoice_date": "18/07/2025",
+      "invoice_time": "02:49:38",
+      "cliente": "lei (3113634658)",
+      "vendedor": "admin",
+      "product_name": "FRESAS",
+      "product_variant": "FRESAS CON HELADO",
+      "quantity": 1,
+      "unit_price": 22000,
+      "subtotal": 22000,
+      "subtotal_products": 22000,
+      "total_amount": 25000,
+      "payment_method": "Transferencia",
+      "created_at": "15/08/2023 10:30:00"
+    },
+    {
+      "invoice_number": "1752824978018",
+      "invoice_date": "19/07/2025",
+      "invoice_time": "15:30:22",
+      "cliente": "Carlos (3001234567)",
+      "vendedor": "admin",
+      "product_name": "WAFFLESS",
+      "product_variant": "CHOCOLATE",
+      "quantity": 2,
+      "unit_price": 18000,
+      "subtotal": 36000,
+      "subtotal_products": 36000,
+      "total_amount": 36000,
+      "payment_method": "Efectivo",
+      "created_at": "15/08/2023 16:45:00"
+    }
+  ]
+}
+```
+
+## Uso de los Extractos en el Frontend
+
+Los endpoints de extractos son especialmente útiles para:
+
+1. **Reportes detallados**:
+
+   - Generar informes de ventas por día, mes o período personalizado
+   - Exportar datos para análisis financiero
+   - Auditar transacciones históricas
+
+2. **Análisis de clientes**:
+
+   - Ver historial de compras de clientes específicos
+   - Identificar patrones de compra
+
+3. **Gestión administrativa**:
+   - Conciliar ventas diarias
+   - Verificar comisiones de vendedores
+   - Generar informes para contabilidad
+
+### Ejemplo de Integración en React
+
+```jsx
+import { useEffect, useState } from "react";
+import axios from "axios";
+
+function ExtractoVentas() {
+  const [extractData, setExtractData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
+
+  useEffect(() => {
+    const fetchExtract = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          `http://localhost:8000/api/v1/services/extracts/monthly/${year}/${month}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setExtractData(response.data.data);
+        setLoading(false);
+      } catch (err) {
+        setError("Error al cargar el extracto de ventas");
+        setLoading(false);
+        console.error(err);
+      }
+    };
+
+    fetchExtract();
+  }, [year, month]);
+
+  // Resto del componente...
+}
+```
