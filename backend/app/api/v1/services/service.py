@@ -7,6 +7,7 @@ from .statistics_service import router_statistics
 from .extract_service import router_extracts
 from .domiciliary import router_domiciliary
 from .additions import router_additions
+from .pdf_service import router as router_pdf
 from pydantic import BaseModel
 from typing import List, Dict
 from datetime import date
@@ -56,6 +57,7 @@ router_services.include_router(router_domiciliary, prefix="/domiciliarios", tags
 
 # Incluir el router de adiciones
 router_services.include_router(router_additions, prefix="/adiciones", tags=["adiciones"])
+router_services.include_router(router_pdf)
 
 @router_services.get("/")
 async def get_services():

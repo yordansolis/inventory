@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-from api.v1.router import router_user
+from api.v1.router import router as router_user
 from api.v1.services.service import router_services
 from api.v1.auth_service.login import get_current_active_user
 from database.db import create_tables, execute_query

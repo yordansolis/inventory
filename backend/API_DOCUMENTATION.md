@@ -2144,3 +2144,85 @@ DELETE /api/v1/services/domiciliarios/1
 - 401 Unauthorized: "Token expirado. Por favor, inicie sesión nuevamente"
 - 404 Not Found: "Domiciliario con ID 1 no encontrado"
 - 500 Internal Server Error: "Error al eliminar el domiciliario: [detalle del error]"
+
+## Generación de Reportes PDF
+
+Esta sección describe cómo generar reportes en formato PDF a partir de los datos de ventas y extractos.
+
+### Generar Reporte de Ventas en PDF
+
+```
+POST /api/v1/services/pdf/generate-report
+```
+
+Este endpoint recibe los datos de un reporte consolidado y un extracto detallado para generar un documento PDF.
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Body (raw JSON):**
+
+El cuerpo de la solicitud debe contener tres claves principales: `report_data`, `extract_data`, y `period`.
+
+```json
+{
+  "report_data": {
+    "total_ventas": 83000.0,
+    "cantidad_ventas": 4,
+    "ticket_promedio": 20750.0,
+    "cantidad_domicilios": 1,
+    "metodos_pago": [
+      {
+        "payment_method": "efectivo",
+        "count": 3,
+        "total": 60000.0
+      },
+      {
+        "payment_method": "transferencia",
+        "count": 1,
+        "total": 23000.0
+      }
+    ],
+    "productos_top": [
+      {
+        "producto": "WAFFLESS - FRESAS CON HELADO",
+        "variante": "FRESAS CON HELADO",
+        "quantity_sold": 4,
+        "numero_ordenes": 4,
+        "revenue": 80000.0
+      }
+    ]
+  },
+  "extract_data": [
+    {
+      "invoice_number": "1752824978017",
+      "invoice_date": "18/07/2025",
+      "invoice_time": "02:49:38",
+      "cliente": "lei (3113634658)",
+      "vendedor": "admin",
+      "product_name": "FRESAS",
+      "product_variant": "FRESAS CON HELADO",
+      "quantity": 1,
+      "unit_price": 22000,
+      "subtotal": 22000,
+      "total_amount": 25000,
+      "payment_method": "Transferencia"
+    }
+  ],
+  "period": "Reporte Mensual: Julio 2025"
+}
+```
+
+**Respuesta Exitosa:**
+
+- **Código de estado:** 200 OK
+- **Content-Type:** `application/pdf`
+- **Content-Disposition:** `attachment; filename="reporte_ventas_YYYYMMDD_HHMMSS.pdf"`
+- El cuerpo de la respuesta es el archivo PDF binario.
+
+**Posibles errores:**
+
+- 400 Bad Request: Si los datos en el cuerpo de la solicitud no son válidos (ej: campos faltantes, tipos de datos incorrectos).
+- 401 Unauthorized: Si el token de autenticación no es válido o no se proporciona.
+- 500 Internal Server Error: Si ocurre un error inesperado durante la generación del PDF.
