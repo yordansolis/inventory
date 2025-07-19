@@ -10,7 +10,9 @@ import {
   Key,
   Eye,
   EyeOff,
-  AlertCircle
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { getAuthHeaders } from '../../utils/auth';
 
@@ -39,11 +41,24 @@ export default function UsersManagement() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [fetchError, setFetchError] = useState('');
 
+  // Estado para paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
+
   // Filtrar usuarios por término de búsqueda
   const filteredUsers = users.filter(user => 
     user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Obtener usuarios actuales para la paginación
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentUsers = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
+  
+  // Cambiar de página
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
 
   // Cargar usuarios desde la API
   useEffect(() => {
@@ -87,6 +102,11 @@ export default function UsersManagement() {
     
     fetchUsers();
   }, []);
+
+  // Resetear la página cuando cambia la búsqueda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   // Manejar apertura del modal para crear/editar usuario
   const handleOpenModal = (user: User | null = null) => {
@@ -307,7 +327,7 @@ export default function UsersManagement() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar usuarios..."
+            placeholder="Buscar por usuario o email..."
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -354,9 +374,8 @@ export default function UsersManagement() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.length > 0 ? (
-                  filteredUsers.map((user) => (
-                    console.log(user),
+                {currentUsers.length > 0 ? (
+                  currentUsers.map((user) => (
                     <tr key={user.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -398,12 +417,84 @@ export default function UsersManagement() {
                 ) : (
                   <tr>
                     <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
-                      No se encontraron usuarios
+                      {searchTerm ? 'No se encontraron usuarios con esa búsqueda' : 'No hay usuarios disponibles'}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            
+            {/* Pagination */}
+            <div className="flex justify-between items-center mt-4 px-2">
+              <div className="text-sm text-gray-600">
+                {filteredUsers.length > 0 ? 
+                  `Mostrando ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, filteredUsers.length)} de ${filteredUsers.length} usuarios` :
+                  `0 usuarios encontrados`
+                }
+              </div>
+              {filteredUsers.length > 0 && (
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => paginate(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className={`${
+                      currentPage === 1 
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    } p-2 rounded-md`}
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  
+                  {/* Page numbers - show limited range */}
+                  <div className="flex space-x-1">
+                    {Array.from({ length: Math.max(1, Math.min(5, totalPages)) }).map((_, idx) => {
+                      // Calculate which page numbers to show
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        // If 5 or fewer pages, show all
+                        pageNum = idx + 1;
+                      } else if (currentPage <= 3) {
+                        // If at start, show first 5
+                        pageNum = idx + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        // If at end, show last 5
+                        pageNum = totalPages - 4 + idx;
+                      } else {
+                        // Otherwise show current page and 2 on each side
+                        pageNum = currentPage - 2 + idx;
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => paginate(pageNum)}
+                          className={`w-8 h-8 flex items-center justify-center rounded-md ${
+                            currentPage === pageNum
+                              ? 'bg-gray-900 text-white' 
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    className={`${
+                      currentPage === totalPages || totalPages === 0
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    } p-2 rounded-md`}
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </Card>

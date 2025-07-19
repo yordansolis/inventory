@@ -7,7 +7,10 @@ import {
   AlertTriangle,
   Truck,
   Plus,
-  TrendingUp
+  TrendingUp,
+  Search,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useTheme } from '../utils/ThemeContext';
 import { useApi } from '../utils/api';
@@ -85,6 +88,12 @@ export default function Dashboard() {
   const { theme } = useTheme();
   const { withLoading } = useApi();
   const isFeminine = theme === 'feminine';
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
+  const [allSales, setAllSales] = useState<RecentSale[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -107,6 +116,10 @@ export default function Dashboard() {
             if (dashboardResponse.ok) {
               const dashboardResult = await dashboardResponse.json();
               setDashboardData(dashboardResult);
+              // Store all sales for pagination
+              if (dashboardResult.ventas_recientes) {
+                setAllSales(dashboardResult.ventas_recientes);
+              }
             } else {
               setError('Error al cargar datos del dashboard');
             }
@@ -153,6 +166,22 @@ export default function Dashboard() {
     
     fetchData();
   }, []); // Dependencias vacías para que solo se ejecute una vez
+
+  // Filter sales based on search term
+  const filteredSales = allSales.filter(sale => 
+    sale.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    sale.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    sale.invoice_number.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Get current sales for pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentSales = filteredSales.slice(indexOfFirstItem, indexOfLastItem);
+  
+  // Change page
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  const totalPages = Math.ceil(filteredSales.length / itemsPerPage);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -316,6 +345,26 @@ export default function Dashboard() {
             Ver todas
           </Button>
         </div>
+        
+        {/* Search input */}
+        <div className="mb-4">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar por cliente, producto o número de factura..."
+              className={`pl-10 pr-4 py-2 w-full border ${isFeminine ? 'border-pink-200 focus:ring-pink-500 focus:border-pink-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'} rounded-md`}
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1); // Reset to first page on new search
+              }}
+            />
+          </div>
+        </div>
+        
         <div className="overflow-x-auto">
           <table className={`min-w-full divide-y ${isFeminine ? 'divide-pink-100' : 'divide-gray-200'}`}>
             <thead className={isFeminine ? 'bg-pink-50' : 'bg-gray-50'}>
@@ -329,8 +378,8 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody className={`bg-white divide-y ${isFeminine ? 'divide-pink-100' : 'divide-gray-200'}`}>
-              {dashboardData?.ventas_recientes && dashboardData.ventas_recientes.length > 0 ? (
-                dashboardData.ventas_recientes.map((venta, index) => (
+              {currentSales && currentSales.length > 0 ? (
+                currentSales.map((venta) => (
                   <tr key={venta.invoice_number} className={`hover:${isFeminine ? 'bg-pink-50' : 'bg-gray-50'} transition-colors`}>
                     <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>#{venta.invoice_number.substring(venta.invoice_number.length - 4)}</td>
                     <td className={`px-6 py-4 whitespace-nowrap text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{venta.client_name}</td>
@@ -349,12 +398,88 @@ export default function Dashboard() {
               ) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                    No hay ventas recientes
+                    {searchTerm ? 'No se encontraron ventas con esa búsqueda' : 'No hay ventas recientes'}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+        
+        {/* Pagination */}
+        <div className="flex justify-between items-center mt-4 px-2">
+          <div className="text-sm text-gray-600">
+            {filteredSales.length > 0 ? 
+              `Mostrando ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, filteredSales.length)} de ${filteredSales.length} ventas` :
+              `0 ventas encontradas`
+            }
+          </div>
+          {filteredSales.length > 0 && (
+            <div className="flex space-x-2">
+              <button
+                onClick={() => paginate(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className={`${
+                  currentPage === 1 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                    : `${isFeminine ? 'bg-pink-100 text-pink-600 hover:bg-pink-200' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`
+                } p-2 rounded-md`}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              
+              {/* Page numbers - show limited range */}
+              <div className="flex space-x-1">
+                {Array.from({ length: Math.max(1, Math.min(5, totalPages)) }).map((_, idx) => {
+                  // Calculate which page numbers to show
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    // If 5 or fewer pages, show all
+                    pageNum = idx + 1;
+                  } else if (currentPage <= 3) {
+                    // If at start, show first 5
+                    pageNum = idx + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    // If at end, show last 5
+                    pageNum = totalPages - 4 + idx;
+                  } else {
+                    // Otherwise show current page and 2 on each side
+                    pageNum = currentPage - 2 + idx;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => paginate(pageNum)}
+                      className={`w-8 h-8 flex items-center justify-center rounded-md ${
+                        currentPage === pageNum
+                          ? isFeminine 
+                            ? 'bg-pink-500 text-white' 
+                            : 'bg-gray-900 text-white'
+                          : isFeminine
+                            ? 'bg-pink-50 text-pink-600 hover:bg-pink-100'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              <button
+                onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className={`${
+                  currentPage === totalPages || totalPages === 0
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                    : `${isFeminine ? 'bg-pink-100 text-pink-600 hover:bg-pink-200' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`
+                } p-2 rounded-md`}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          )}
         </div>
       </Card>
 
