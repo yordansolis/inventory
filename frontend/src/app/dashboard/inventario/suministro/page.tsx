@@ -12,7 +12,8 @@ interface ConsumableProduct {
   unidadMedida: string;
   cantidadUnitaria: number; // Changed from presentacionCantidad
   precioPresentacion: number;
-  cantidadUtilizada: number;
+  cantidadUtilizada: number; // Para control de stock
+  cantidadPorProducto: number; // Nueva: Cantidad utilizada por producto en recetas
   minimo: number;
   valorUnitario: number; // Calculated field
   valorUtilizado: number; // Calculated field
@@ -24,7 +25,8 @@ interface ProductFormData {
   unidadMedida: string;
   cantidadUnitaria: string; // Changed from presentacionCantidad
   precioPresentacion: string;
-  cantidadUtilizada: string;
+  cantidadUtilizada: string; // Para control de stock
+  cantidadPorProducto: string; // Nueva: Cantidad utilizada por producto en recetas
   minimo: string;
   sitioReferencia: string;
   valorUnitarioCalculado?: string;
@@ -43,7 +45,8 @@ interface ApiProduct {
   cantidad_unitaria: number; // Changed from presentacion_cantidad
   precio_presentacion: number;
   valor_unitario: number; // Calculated by backend
-  cantidad_utilizada: number;
+  cantidad_utilizada: number; // Para control de stock
+  cantidad_por_producto: number; // Nueva: Cantidad utilizada por producto en recetas
   valor_utilizado: number; // Calculated by backend
   stock_minimo: number; // Changed from cantidad_actual and stock_minimo
   sitio_referencia: string;
@@ -61,6 +64,7 @@ export default function SuministroPage() {
     cantidadUnitaria: '',
     precioPresentacion: '',
     cantidadUtilizada: '',
+    cantidadPorProducto: '',
     minimo: '',
     sitioReferencia: '',
     valorUnitarioCalculado: '0',
@@ -178,6 +182,7 @@ export default function SuministroPage() {
             cantidadUnitaria: product.cantidad_unitaria || 0,
             precioPresentacion: product.precio_presentacion || 0,
             cantidadUtilizada: product.cantidad_utilizada || 0,
+            cantidadPorProducto: product.cantidad_por_producto || 0,
             minimo: product.stock_minimo,
             valorUnitario: product.valor_unitario || 0,
             valorUtilizado: product.valor_utilizado || 0,
@@ -311,7 +316,7 @@ export default function SuministroPage() {
         ...prev,
         [id]: formattedValue
       }));
-    } else if (id === 'cantidadUnitaria' || id === 'cantidadUtilizada') {
+    } else if (id === 'cantidadUnitaria' || id === 'cantidadUtilizada' || id === 'cantidadPorProducto') {
       // Format decimal numbers
       const formattedValue = formatDecimalNumber(value);
       
@@ -387,6 +392,7 @@ export default function SuministroPage() {
     const parsedCantidadUnitaria = formData.cantidadUnitaria === '' ? 0 : parseFloat(parseCurrency(formData.cantidadUnitaria));
     const parsedPrecioPresentacion = formData.precioPresentacion === '' ? 0 : parseFloat(parseCurrency(formData.precioPresentacion));
     const parsedCantidadUtilizada = formData.cantidadUtilizada === '' ? 0 : parseFloat(parseCurrency(formData.cantidadUtilizada));
+    const parsedCantidadPorProducto = formData.cantidadPorProducto === '' ? 0 : parseFloat(parseCurrency(formData.cantidadPorProducto));
     
     if (!formData.nombre.trim() || !formData.unidadMedida.trim() || 
         (formData.minimo !== '' && (isNaN(parsedMinimo) || parsedMinimo < 0)) ||
@@ -406,6 +412,7 @@ export default function SuministroPage() {
           cantidad_unitaria: parsedCantidadUnitaria,
           precio_presentacion: parsedPrecioPresentacion,
           cantidad_utilizada: parsedCantidadUtilizada,
+          cantidad_por_producto: parsedCantidadPorProducto,
           stock_minimo: parsedMinimo,
           sitio_referencia: formData.sitioReferencia.trim()
         };
@@ -453,6 +460,7 @@ export default function SuministroPage() {
               cantidadUnitaria: parsedCantidadUnitaria,
               precioPresentacion: parsedPrecioPresentacion,
               cantidadUtilizada: parsedCantidadUtilizada,
+              cantidadPorProducto: parsedCantidadPorProducto,
               minimo: parsedMinimo,
               valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
               valorUtilizado: savedProduct.valor_utilizado || 0,
@@ -468,6 +476,7 @@ export default function SuministroPage() {
             cantidadUnitaria: parsedCantidadUnitaria,
             precioPresentacion: parsedPrecioPresentacion,
             cantidadUtilizada: parsedCantidadUtilizada,
+            cantidadPorProducto: parsedCantidadPorProducto,
             minimo: parsedMinimo,
             valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
             valorUtilizado: savedProduct.valor_utilizado || 0,
@@ -482,6 +491,7 @@ export default function SuministroPage() {
           cantidadUnitaria: '', 
           precioPresentacion: '', 
           cantidadUtilizada: '', 
+          cantidadPorProducto: '',
           minimo: '', 
           sitioReferencia: '',
           valorUnitarioCalculado: '0',
@@ -520,6 +530,7 @@ export default function SuministroPage() {
     // Format decimal values for display with Colombian format
     const cantidadUnitariaFormatted = producto.cantidadUnitaria.toString().replace('.', ',');
     const cantidadUtilizadaFormatted = producto.cantidadUtilizada.toString().replace('.', ',');
+    const cantidadPorProductoFormatted = producto.cantidadPorProducto.toString().replace('.', ',');
     
     setFormData({ 
       nombre: producto.nombre,
@@ -527,6 +538,7 @@ export default function SuministroPage() {
       cantidadUnitaria: formatDecimalNumber(cantidadUnitariaFormatted),
       precioPresentacion: formatCurrencyWithoutTrailingZeros(producto.precioPresentacion),
       cantidadUtilizada: formatDecimalNumber(cantidadUtilizadaFormatted),
+      cantidadPorProducto: formatDecimalNumber(cantidadPorProductoFormatted),
       minimo: String(producto.minimo),
       sitioReferencia: producto.sitioReferencia,
       valorUnitarioCalculado: valorUnitarioCalc,
@@ -568,6 +580,7 @@ export default function SuministroPage() {
       cantidadUnitaria: '', 
       precioPresentacion: '', 
       cantidadUtilizada: '', 
+      cantidadPorProducto: '',
       minimo: '', 
       sitioReferencia: '',
       valorUnitarioCalculado: '0',
@@ -802,7 +815,7 @@ export default function SuministroPage() {
 
           <div>
             <label htmlFor="cantidadUtilizada" className="block text-sm font-medium text-gray-700 mb-1">
-              Cantidad Utilizada por Unidad
+              Cantidad Utilizada (Control de Stock)
             </label>
             <input
               type="text"
@@ -812,6 +825,26 @@ export default function SuministroPage() {
               onChange={handleChange}
               placeholder="Ej: 50 o 0,5"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Este campo es para control interno de stock. No afecta a las recetas.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="cantidadPorProducto" className="block text-sm font-medium text-gray-700 mb-1">
+              Cantidad Utilizada por Producto
+            </label>
+            <input
+              type="text"
+              id="cantidadPorProducto"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={formData.cantidadPorProducto}
+              onChange={handleChange}
+              placeholder="Ej: 1 o 0,5"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Cantidad que se utilizará en las recetas de productos.
+            </p>
           </div>
 
           <div>
@@ -921,6 +954,9 @@ export default function SuministroPage() {
                     Valor Unitario
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
+                    Cant. por Producto
+                  </th>
+                  <th className="p-4 text-left font-semibold text-gray-600">
                     Stock Mínimo
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
@@ -948,6 +984,9 @@ export default function SuministroPage() {
                     </td>
                     <td className="p-4 text-gray-700">
                       ${formatCurrencyWithoutTrailingZeros(producto.valorUnitario)}
+                    </td>
+                    <td className="p-4 text-gray-700">
+                      {producto.cantidadPorProducto} {producto.unidadMedida}
                     </td>
                     <td className="p-4 text-gray-700">
                       {producto.minimo} {producto.unidadMedida}

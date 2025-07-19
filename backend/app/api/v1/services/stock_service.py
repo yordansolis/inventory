@@ -26,7 +26,13 @@ class StockService:
             p.variante,
             p.price AS precio,
             c.nombre_categoria AS categoria_nombre,
-            COALESCE(FLOOR(MIN((i.cantidad_unitaria - i.cantidad_utilizada) / pr.cantidad)), 0) AS stock_disponible
+            COALESCE(FLOOR(MIN(
+                (i.cantidad_unitaria - i.cantidad_utilizada) / 
+                CASE 
+                    WHEN i.cantidad_por_producto > 0 THEN i.cantidad_por_producto
+                    ELSE pr.cantidad
+                END
+            )), 0) AS stock_disponible
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN product_recipes pr ON p.id = pr.product_id
@@ -37,6 +43,7 @@ class StockService:
         """
         
         try:
+            print("DEBUG - Ejecutando cálculo de stock de productos")
             results = execute_query(query, fetch_all=True)
             
             # Transformar resultados para incluir información adicional
@@ -51,12 +58,14 @@ class StockService:
                     'stock_disponible': int(row['stock_disponible']) if row['stock_disponible'] is not None else 0,
                     'tipo': 'producto'
                 }
+                print(f"DEBUG - Producto: {stock_info['nombre_producto']} - Stock disponible: {stock_info['stock_disponible']}")
                 stock_data.append(stock_info)
             
             return stock_data
             
         except Exception as e:
             logger.error(f"Error calculando stock de productos: {e}")
+            print(f"DEBUG - Error calculando stock: {e}")
             return []
     
     @staticmethod
@@ -78,7 +87,13 @@ class StockService:
                 p.price AS precio,
                 c.nombre_categoria AS categoria_nombre,
                 p.min_stock,
-                COALESCE(FLOOR(MIN((i.cantidad_unitaria - i.cantidad_utilizada) / pr.cantidad)), 0) AS stock_disponible
+                COALESCE(FLOOR(MIN(
+                    (i.cantidad_unitaria - i.cantidad_utilizada) / 
+                    CASE 
+                        WHEN i.cantidad_por_producto > 0 THEN i.cantidad_por_producto
+                        ELSE pr.cantidad
+                    END
+                )), 0) AS stock_disponible
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN product_recipes pr ON p.id = pr.product_id
@@ -145,8 +160,19 @@ class StockService:
             i.nombre_insumo,
             i.unidad,
             (i.cantidad_unitaria - i.cantidad_utilizada) AS cantidad_disponible,
-            pr.cantidad AS cantidad_requerida,
-            FLOOR((i.cantidad_unitaria - i.cantidad_utilizada) / pr.cantidad) AS unidades_posibles
+            pr.cantidad AS cantidad_receta,
+            i.cantidad_por_producto,
+            CASE 
+                WHEN i.cantidad_por_producto > 0 THEN i.cantidad_por_producto
+                ELSE pr.cantidad
+            END AS cantidad_requerida,
+            FLOOR(
+                (i.cantidad_unitaria - i.cantidad_utilizada) / 
+                CASE 
+                    WHEN i.cantidad_por_producto > 0 THEN i.cantidad_por_producto
+                    ELSE pr.cantidad
+                END
+            ) AS unidades_posibles
         FROM product_recipes pr
         JOIN insumos i ON pr.insumo_id = i.id
         WHERE pr.product_id = %s
@@ -178,6 +204,8 @@ class StockService:
                 'nombre_insumo': insumo['nombre_insumo'],
                 'unidad': insumo['unidad'],
                 'cantidad_disponible': float(insumo['cantidad_disponible']),
+                'cantidad_receta': float(insumo['cantidad_receta']),
+                'cantidad_por_producto': float(insumo['cantidad_por_producto']) if insumo['cantidad_por_producto'] else 0,
                 'cantidad_requerida': float(insumo['cantidad_requerida']),
                 'unidades_posibles': int(insumo['unidades_posibles']),
                 'es_limitante': int(insumo['unidades_posibles']) == stock_disponible
@@ -202,7 +230,13 @@ class StockService:
             SELECT
                 p.id AS producto_id,
                 p.min_stock,
-                COALESCE(FLOOR(MIN((i.cantidad_unitaria - i.cantidad_utilizada) / pr.cantidad)), 0) AS stock_disponible
+                COALESCE(FLOOR(MIN(
+                    (i.cantidad_unitaria - i.cantidad_utilizada) / 
+                    CASE 
+                        WHEN i.cantidad_por_producto > 0 THEN i.cantidad_por_producto
+                        ELSE pr.cantidad
+                    END
+                )), 0) AS stock_disponible
             FROM products p
             LEFT JOIN product_recipes pr ON p.id = pr.product_id
             LEFT JOIN insumos i ON pr.insumo_id = i.id

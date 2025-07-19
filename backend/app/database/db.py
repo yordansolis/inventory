@@ -259,6 +259,7 @@ def create_tables():
         precio_presentacion DECIMAL(10,2) NOT NULL,
         valor_unitario DECIMAL(10,2) AS (precio_presentacion / cantidad_unitaria) STORED,
         cantidad_utilizada DECIMAL(10,2) DEFAULT 0,
+        cantidad_por_producto DECIMAL(10,2) DEFAULT 0,
         valor_total DECIMAL(10,2) AS (valor_unitario * cantidad_utilizada) STORED,
         stock_minimo DECIMAL(10,2) DEFAULT 0,
         sitio_referencia VARCHAR(255),

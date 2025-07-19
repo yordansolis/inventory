@@ -10,7 +10,7 @@ def update_insumos_table():
         SELECT COLUMN_NAME 
         FROM INFORMATION_SCHEMA.COLUMNS 
         WHERE TABLE_NAME = 'insumos' 
-        AND COLUMN_NAME IN ('valor_unitario', 'valor_unitarioxunidad', 'sitio_referencia')
+        AND COLUMN_NAME IN ('valor_unitario', 'valor_unitarioxunidad', 'sitio_referencia', 'cantidad_por_producto')
         """
         
         existing_columns = execute_query(check_columns_query, fetch_all=True) or []
@@ -48,6 +48,17 @@ def update_insumos_table():
             print("Columna 'sitio_referencia' añadida correctamente")
         else:
             print("La columna 'sitio_referencia' ya existe")
+            
+        # Añadir columna cantidad_por_producto si no existe
+        if 'cantidad_por_producto' not in existing_column_names:
+            add_cantidad_por_producto_query = """
+            ALTER TABLE insumos
+            ADD COLUMN cantidad_por_producto DECIMAL(10,2) DEFAULT 0
+            """
+            execute_query(add_cantidad_por_producto_query)
+            print("Columna 'cantidad_por_producto' añadida correctamente")
+        else:
+            print("La columna 'cantidad_por_producto' ya existe")
         
         print("Actualización de la tabla insumos completada")
         return True

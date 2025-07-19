@@ -645,6 +645,7 @@ async def create_insumo(
     cantidad_unitaria: Optional[float] = None,
     precio_presentacion: Optional[float] = None,
     cantidad_utilizada: Optional[float] = None,
+    cantidad_por_producto: Optional[float] = None,
     stock_minimo: Optional[float] = None,
     sitio_referencia: Optional[str] = None
 ):
@@ -662,6 +663,8 @@ async def create_insumo(
             precio_presentacion = body["precio_presentacion"]
         if cantidad_utilizada is None and "cantidad_utilizada" in body:
             cantidad_utilizada = body["cantidad_utilizada"]
+        if cantidad_por_producto is None and "cantidad_por_producto" in body:
+            cantidad_por_producto = body["cantidad_por_producto"]
         if stock_minimo is None and "stock_minimo" in body:
             stock_minimo = body["stock_minimo"]
         if sitio_referencia is None and "sitio_referencia" in body:
@@ -671,7 +674,7 @@ async def create_insumo(
         # Si no hay cuerpo JSON o hay un error, usar los parámetros de consulta
         pass
     
-    print(f"Datos recibidos: nombre={nombre_insumo}, unidad={unidad}, cantidad_unitaria={cantidad_unitaria}, precio_presentacion={precio_presentacion}, cantidad_utilizada={cantidad_utilizada}, min={stock_minimo}, sitio_referencia={sitio_referencia}")
+    print(f"Datos recibidos: nombre={nombre_insumo}, unidad={unidad}, cantidad_unitaria={cantidad_unitaria}, precio_presentacion={precio_presentacion}, cantidad_utilizada={cantidad_utilizada}, cantidad_por_producto={cantidad_por_producto}, min={stock_minimo}, sitio_referencia={sitio_referencia}")
     
     # Validar que los campos obligatorios estén presentes
     if nombre_insumo is None:
@@ -698,6 +701,8 @@ async def create_insumo(
     # Valores por defecto
     if cantidad_utilizada is None:
         cantidad_utilizada = 0
+    if cantidad_por_producto is None:
+        cantidad_por_producto = 0
     if stock_minimo is None:
         stock_minimo = 0
     
@@ -719,6 +724,7 @@ async def create_insumo(
             cantidad_unitaria=cantidad_unitaria,
             precio_presentacion=precio_presentacion,
             cantidad_utilizada=cantidad_utilizada,
+            cantidad_por_producto=cantidad_por_producto,
             stock_minimo=stock_minimo,
             sitio_referencia=sitio_referencia
         )

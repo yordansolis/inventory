@@ -495,8 +495,8 @@ export default function Dashboard() {
         </div>
         {lowStockProducts.length > 0 ? (
           <div className="space-y-3">
-            {lowStockProducts.map((producto) => (
-              <div key={producto.id} className={`flex items-center justify-between p-3 ${isFeminine ? 'bg-rose-50 border border-rose-200' : 'bg-red-50 border border-red-200'} rounded-lg`}>
+            {lowStockProducts.map((producto, index) => (
+              <div key={`producto-${producto.id}-${index}`} className={`flex items-center justify-between p-3 ${isFeminine ? 'bg-rose-50 border border-rose-200' : 'bg-red-50 border border-red-200'} rounded-lg`}>
                 <div>
                   <p className={`font-medium ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{producto.nombre}</p>
                   <p className="text-sm text-gray-600">
@@ -504,7 +504,6 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <Button 
-                  key={`restock-${producto.id}`}
                   variant="danger" 
                   size="sm"
                 >

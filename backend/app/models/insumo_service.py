@@ -9,6 +9,7 @@ class InsumoService:
     @staticmethod
     def create_insumo(nombre_insumo: str, unidad: str, cantidad_unitaria: float, 
                      precio_presentacion: float, cantidad_utilizada: float = 0,
+                     cantidad_por_producto: float = 0,
                      stock_minimo: float = 0, 
                      sitio_referencia: Optional[str] = None) -> Optional[int]:
         """Crear un nuevo insumo"""
@@ -22,14 +23,14 @@ class InsumoService:
             
         query = """
         INSERT INTO insumos (nombre_insumo, unidad, cantidad_unitaria, precio_presentacion,
-                           cantidad_utilizada, stock_minimo, sitio_referencia)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                           cantidad_utilizada, cantidad_por_producto, stock_minimo, sitio_referencia)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
         
         try:
-            print(f"Intentando crear insumo: {nombre_insumo}, {unidad}, {cantidad_unitaria}, {precio_presentacion}, {cantidad_utilizada}, {stock_minimo},  {sitio_referencia}")
+            print(f"Intentando crear insumo: {nombre_insumo}, {unidad}, {cantidad_unitaria}, {precio_presentacion}, {cantidad_utilizada}, {cantidad_por_producto}, {stock_minimo}, {sitio_referencia}")
             result = execute_query(query, (nombre_insumo, unidad, cantidad_unitaria, precio_presentacion,
-                                         cantidad_utilizada, stock_minimo,  sitio_referencia))
+                                         cantidad_utilizada, cantidad_por_producto, stock_minimo, sitio_referencia))
             print(f"Resultado de execute_query: {result}")
             
             if result is not None:

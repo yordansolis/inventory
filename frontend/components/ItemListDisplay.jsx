@@ -60,7 +60,7 @@ const ItemListDisplay = ({ items, onAddItem, formatPrice, badgeVariant }) => {
               <div className="flex-1">
                 <p className="font-medium text-gray-900">{item.nombre}</p>
                 <p className="text-sm text-gray-600">
-                  {formatPrice(item.precio)} | Stock: <span className={getStockColor(item)}>{getStockDisplay(item)+1}</span>
+                  {formatPrice(item.precio)} | Stock: <span className={getStockColor(item)}>{getStockDisplay(item)}</span>
                 </p>
                 <Badge variant={badgeVariant || (item.estado === "bajo" ? "warning" : item.estado === "agotado" ? "destructive" : "success")}>
                   {item.tipo}

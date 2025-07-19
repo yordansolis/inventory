@@ -291,7 +291,8 @@ class PurchaseService:
     @staticmethod
     def _update_product_stock(cursor, product_name: str, variant: Optional[str], quantity: int):
         """
-        Actualiza el stock del producto y los insumos después de una venta
+        Actualiza solo los insumos después de una venta.
+        El stock del producto se calcula dinámicamente desde los insumos disponibles.
         
         Args:
             cursor: Cursor de la base de datos
@@ -341,17 +342,79 @@ class PurchaseService:
             product = cursor.fetchone()
         
         if product:
-            # Si el producto tiene stock_quantity = -1, es bajo demanda y no se actualiza
-            if product['stock_quantity'] >= 0:
-                # Actualizar stock del producto
-                new_stock = max(0, product['stock_quantity'] - quantity)
-                update_query = """
-                UPDATE products SET stock_quantity = %s WHERE id = %s
-                """
-                cursor.execute(update_query, (new_stock, product['id']))
+            print(f"DEBUG - Actualizando producto: {product_name} (ID: {product['id']})")
             
-            # Actualizar los insumos según la receta del producto
+            # SOLO actualizar los insumos según la receta del producto
+            # NO actualizar stock_quantity del producto
             PurchaseService._update_insumos_from_recipe(cursor, product['id'], quantity)
+            
+            print(f"DEBUG - Solo se actualizaron los insumos para el producto {product_name}")
+        else:
+            print(f"ADVERTENCIA - No se encontró el producto: {product_name}")
+
+    # def _update_product_stock(cursor, product_name: str, variant: Optional[str], quantity: int):
+    #     """
+    #     Actualiza el stock del producto y los insumos después de una venta
+        
+    #     Args:
+    #         cursor: Cursor de la base de datos
+    #         product_name: Nombre del producto
+    #         variant: Variante del producto (opcional)
+    #         quantity: Cantidad vendida
+    #     """
+    #     product = None
+        
+    #     # Buscar el producto - Método 1: Búsqueda exacta
+    #     if variant:
+    #         query = """
+    #         SELECT id, stock_quantity FROM products 
+    #         WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
+    #         """
+    #         cursor.execute(query, (product_name, variant))
+    #         product = cursor.fetchone()
+    #     else:
+    #         query = """
+    #         SELECT id, stock_quantity FROM products 
+    #         WHERE nombre_producto = %s AND (variante IS NULL OR variante = '') AND is_active = TRUE
+    #         """
+    #         cursor.execute(query, (product_name,))
+    #         product = cursor.fetchone()
+        
+    #     # Método 2: Si no encontró, intentar separar por " - " 
+    #     if not product and ' - ' in product_name:
+    #         parts = product_name.split(' - ', 1)
+    #         if len(parts) == 2:
+    #             nombre_base = parts[0].strip()
+    #             variante_base = parts[1].strip()
+                
+    #             query = """
+    #             SELECT id, stock_quantity FROM products 
+    #             WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
+    #             """
+    #             cursor.execute(query, (nombre_base, variante_base))
+    #             product = cursor.fetchone()
+        
+    #     # Método 3: Búsqueda más flexible
+    #     if not product:
+    #         query = """
+    #         SELECT id, stock_quantity FROM products 
+    #         WHERE CONCAT(nombre_producto, IFNULL(CONCAT(' - ', variante), '')) = %s AND is_active = TRUE
+    #         """
+    #         cursor.execute(query, (product_name,))
+    #         product = cursor.fetchone()
+        
+    #     if product:
+    #         # Si el producto tiene stock_quantity = -1, es bajo demanda y no se actualiza
+    #         if product['stock_quantity'] >= 0:
+    #             # Actualizar stock del producto
+    #             new_stock = max(0, product['stock_quantity'] - quantity)
+    #             update_query = """
+    #             UPDATE products SET stock_quantity = %s WHERE id = %s
+    #             """
+    #             cursor.execute(update_query, (new_stock, product['id']))
+            
+    #         # Actualizar los insumos según la receta del producto
+    #         PurchaseService._update_insumos_from_recipe(cursor, product['id'], quantity)
     
     @staticmethod
     def _update_insumos_from_recipe(cursor, product_id: int, quantity_sold: int):
@@ -365,7 +428,7 @@ class PurchaseService:
         """
         # Obtener la receta del producto
         recipe_query = """
-        SELECT pr.insumo_id, pr.cantidad, i.nombre_insumo, i.cantidad_utilizada
+        SELECT pr.insumo_id, pr.cantidad, i.nombre_insumo, i.cantidad_utilizada, i.cantidad_unitaria, i.cantidad_por_producto
         FROM product_recipes pr
         JOIN insumos i ON pr.insumo_id = i.id
         WHERE pr.product_id = %s
@@ -374,34 +437,43 @@ class PurchaseService:
         recipe_items = cursor.fetchall()
         
         if recipe_items:
-            print(f"Actualizando insumos para producto ID {product_id}, cantidad vendida: {quantity_sold}")
+            print(f"DEBUG - Actualizando insumos para producto ID {product_id}, cantidad vendida: {quantity_sold}")
             
             # Actualizar la cantidad utilizada de cada insumo
             for item in recipe_items:
                 insumo_id = item['insumo_id']
-                cantidad_actual = float(item['cantidad_utilizada'])
-                total_quantity_to_add = float(item['cantidad']) * float(quantity_sold)
-                nueva_cantidad = cantidad_actual + total_quantity_to_add
+                cantidad_utilizada_actual = float(item['cantidad_utilizada'])
+                cantidad_unitaria_actual = float(item['cantidad_unitaria'])
                 
-                # Actualizar cantidad_utilizada del insumo
+                # Usar cantidad_por_producto si está disponible, de lo contrario usar la cantidad de la receta
+                cantidad_por_unidad = float(item['cantidad_por_producto']) if item['cantidad_por_producto'] and float(item['cantidad_por_producto']) > 0 else float(item['cantidad'])
+                total_quantity_to_use = cantidad_por_unidad * float(quantity_sold)
+                
+                print(f"DEBUG - Insumo ID {insumo_id}: cantidad_por_producto={cantidad_por_unidad}, quantity_sold={quantity_sold}")
+                print(f"DEBUG - Antes de actualizar: cantidad_utilizada={cantidad_utilizada_actual}, cantidad_unitaria={cantidad_unitaria_actual}")
+                
+                nueva_cantidad_utilizada = cantidad_utilizada_actual + total_quantity_to_use
+                
+                # Actualizar SOLO cantidad_utilizada del insumo, mantener cantidad_unitaria intacta
                 update_insumo_query = """
                 UPDATE insumos 
                 SET cantidad_utilizada = %s
                 WHERE id = %s
                 """
-                cursor.execute(update_insumo_query, (nueva_cantidad, insumo_id))
+                cursor.execute(update_insumo_query, (nueva_cantidad_utilizada, insumo_id))
                 
-                print(f"Insumo '{item['nombre_insumo']}' (ID: {insumo_id}): "
-                      f"Cantidad anterior: {cantidad_actual}, "
-                      f"Incremento: +{total_quantity_to_add}, "
-                      f"Nueva cantidad: {nueva_cantidad}")
+                print(f"DEBUG - Insumo '{item['nombre_insumo']}' (ID: {insumo_id}): "
+                      f"Cantidad utilizada anterior: {cantidad_utilizada_actual}, "
+                      f"Incremento: +{total_quantity_to_use}, "
+                      f"Nueva cantidad utilizada: {nueva_cantidad_utilizada}")
                 
                 # Verificar que se actualizó correctamente
-                verify_query = "SELECT cantidad_utilizada FROM insumos WHERE id = %s"
+                verify_query = "SELECT cantidad_utilizada, cantidad_unitaria FROM insumos WHERE id = %s"
                 cursor.execute(verify_query, (insumo_id,))
                 verify_result = cursor.fetchone()
                 if verify_result:
-                    print(f"Verificación: Insumo {insumo_id} ahora tiene cantidad_utilizada = {verify_result['cantidad_utilizada']}")
+                    print(f"DEBUG - Verificación: Insumo {insumo_id} ahora tiene cantidad_utilizada = {verify_result['cantidad_utilizada']}, "
+                          f"cantidad_unitaria = {verify_result['cantidad_unitaria']}")
         else:
             print(f"Advertencia: El producto ID {product_id} no tiene receta definida")
     
@@ -573,14 +645,8 @@ class PurchaseService:
     @staticmethod
     def cancel_purchase(invoice_number: str, reason: str) -> Dict:
         """
-        Cancela una compra y restaura el stock
-        
-        Args:
-            invoice_number: Número de factura
-            reason: Razón de la cancelación
-            
-        Returns:
-            Dict con el resultado de la operación
+        Cancela una compra y restaura solo los insumos
+        (Ya no restaura stock_quantity porque no lo modificamos al vender)
         """
         connection = get_db_connection()
         if not connection:
@@ -599,34 +665,32 @@ class PurchaseService:
             if not purchase:
                 raise ValueError(f"No se encontró la factura {invoice_number}")
             
-            # Obtener detalles de los productos para restaurar stock
-            details_query = """
-            SELECT * FROM purchase_details WHERE purchase_id = %s
-            """
+            # Obtener detalles de los productos para restaurar insumos
+            details_query = "SELECT * FROM purchase_details WHERE purchase_id = %s"
             cursor.execute(details_query, (purchase['id'],))
             details = cursor.fetchall()
             
-            # Restaurar stock de productos
+            # Restaurar SOLO los insumos (no stock_quantity)
             for detail in details:
                 product = None
                 
-                # Buscar el producto - Método 1: Búsqueda exacta
+                # Buscar el producto usando los mismos métodos que en _update_product_stock
                 if detail['product_variant']:
                     product_query = """
-                    SELECT id, stock_quantity FROM products 
+                    SELECT id FROM products 
                     WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
                     """
                     cursor.execute(product_query, (detail['product_name'], detail['product_variant']))
                     product = cursor.fetchone()
                 else:
                     product_query = """
-                    SELECT id, stock_quantity FROM products 
+                    SELECT id FROM products 
                     WHERE nombre_producto = %s AND (variante IS NULL OR variante = '') AND is_active = TRUE
                     """
                     cursor.execute(product_query, (detail['product_name'],))
                     product = cursor.fetchone()
                 
-                # Método 2: Si no encontró, intentar separar por " - " 
+                # Método alternativo si no encontró
                 if not product and ' - ' in detail['product_name']:
                     parts = detail['product_name'].split(' - ', 1)
                     if len(parts) == 2:
@@ -634,28 +698,18 @@ class PurchaseService:
                         variante_base = parts[1].strip()
                         
                         product_query = """
-                        SELECT id, stock_quantity FROM products 
+                        SELECT id FROM products 
                         WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
                         """
                         cursor.execute(product_query, (nombre_base, variante_base))
                         product = cursor.fetchone()
                 
-                # Método 3: Búsqueda más flexible
-                if not product:
-                    product_query = """
-                    SELECT id, stock_quantity FROM products 
-                    WHERE CONCAT(nombre_producto, IFNULL(CONCAT(' - ', variante), '')) = %s AND is_active = TRUE
-                    """
-                    cursor.execute(product_query, (detail['product_name'],))
-                    product = cursor.fetchone()
-                
                 if product:
-                    # Restaurar stock
-                    new_stock = product['stock_quantity'] + detail['quantity']
-                    update_stock_query = """
-                    UPDATE products SET stock_quantity = %s WHERE id = %s
-                    """
-                    cursor.execute(update_stock_query, (new_stock, product['id']))
+                    # SOLO restaurar insumos (revertir la cantidad utilizada)
+                    PurchaseService._restore_insumos_from_recipe(cursor, product['id'], detail['quantity'])
+                    print(f"DEBUG - Restaurados insumos para producto ID {product['id']}")
+                else:
+                    print(f"ADVERTENCIA - No se pudo encontrar producto para restaurar: {detail['product_name']}")
             
             # Marcar la compra como cancelada
             cancel_query = """
@@ -672,7 +726,7 @@ class PurchaseService:
             return {
                 'status': 'success',
                 'message': f'Factura {invoice_number} cancelada exitosamente',
-                'products_restored': len(details)
+                'insumos_restored': len(details)
             }
             
         except Exception as e:
@@ -684,6 +738,243 @@ class PurchaseService:
                 cursor.close()
             if connection:
                 connection.close()
+
+    def repair_stock_data():
+        """
+        Script para reparar los datos de stock existentes.
+        
+        Este script:
+        1. Resetea todos los stock_quantity a -1 (indicando producción bajo demanda)
+        2. Opcionalmente, puedes resetear las cantidades utilizadas de insumos si es necesario
+        """
+        connection = get_db_connection()
+        if not connection:
+            raise Exception("No se pudo establecer conexión con la base de datos")
+        
+        cursor = None
+        try:
+            cursor = connection.cursor(pymysql.cursors.DictCursor)
+            connection.begin()
+            
+            print("INICIANDO REPARACIÓN DE DATOS DE STOCK...")
+            
+            # OPCIÓN A: Resetear stock_quantity a -1 para todos los productos
+            # Esto indica que son productos bajo demanda
+            reset_products_query = """
+            UPDATE products 
+            SET stock_quantity = -1 
+            WHERE is_active = TRUE
+            """
+            cursor.execute(reset_products_query)
+            affected_products = cursor.rowcount
+            print(f"✓ Reseteados {affected_products} productos a stock bajo demanda (stock_quantity = -1)")
+            
+            # OPCIÓN B: Si quieres resetear completamente los insumos utilizados
+            # (Descomenta solo si realmente quieres empezar desde cero)
+            """
+            reset_insumos_query = "UPDATE insumos SET cantidad_utilizada = 0"
+            cursor.execute(reset_insumos_query)
+            affected_insumos = cursor.rowcount
+            print(f"✓ Reseteadas cantidades utilizadas de {affected_insumos} insumos")
+            """
+            
+            connection.commit()
+            print("REPARACIÓN COMPLETADA EXITOSAMENTE")
+            
+            return {
+                'status': 'success',
+                'products_updated': affected_products,
+                'message': 'Datos de stock reparados correctamente'
+            }
+            
+        except Exception as e:
+            if connection:
+                connection.rollback()
+            print(f"ERROR durante la reparación: {e}")
+            raise e
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+    # def cancel_purchase(invoice_number: str, reason: str) -> Dict:
+    #     """
+    #     Cancela una compra y restaura el stock de los productos
+        
+    #     Args:
+    #         invoice_number: Número de factura
+    #         reason: Razón de la cancelación
+            
+    #     Returns:
+    #         Dict con el resultado de la operación
+    #     """
+    #     connection = get_db_connection()
+    #     if not connection:
+    #         raise Exception("No se pudo establecer conexión con la base de datos")
+        
+    #     cursor = None
+    #     try:
+    #         cursor = connection.cursor(pymysql.cursors.DictCursor)
+    #         connection.begin()
+            
+    #         # Verificar que la compra existe
+    #         purchase_query = "SELECT id FROM purchases WHERE invoice_number = %s"
+    #         cursor.execute(purchase_query, (invoice_number,))
+    #         purchase = cursor.fetchone()
+            
+    #         if not purchase:
+    #             raise ValueError(f"No se encontró la factura {invoice_number}")
+            
+    #         # Obtener detalles de los productos para restaurar stock
+    #         details_query = """
+    #         SELECT * FROM purchase_details WHERE purchase_id = %s
+    #         """
+    #         cursor.execute(details_query, (purchase['id'],))
+    #         details = cursor.fetchall()
+            
+    #         # Restaurar stock de productos
+    #         for detail in details:
+    #             product = None
+                
+    #             # Buscar el producto - Método 1: Búsqueda exacta
+    #             if detail['product_variant']:
+    #                 product_query = """
+    #                 SELECT id, stock_quantity FROM products 
+    #                 WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
+    #                 """
+    #                 cursor.execute(product_query, (detail['product_name'], detail['product_variant']))
+    #                 product = cursor.fetchone()
+    #             else:
+    #                 product_query = """
+    #                 SELECT id, stock_quantity FROM products 
+    #                 WHERE nombre_producto = %s AND (variante IS NULL OR variante = '') AND is_active = TRUE
+    #                 """
+    #                 cursor.execute(product_query, (detail['product_name'],))
+    #                 product = cursor.fetchone()
+                
+    #             # Método 2: Si no encontró, intentar separar por " - " 
+    #             if not product and ' - ' in detail['product_name']:
+    #                 parts = detail['product_name'].split(' - ', 1)
+    #                 if len(parts) == 2:
+    #                     nombre_base = parts[0].strip()
+    #                     variante_base = parts[1].strip()
+                        
+    #                     product_query = """
+    #                     SELECT id, stock_quantity FROM products 
+    #                     WHERE nombre_producto = %s AND variante = %s AND is_active = TRUE
+    #                     """
+    #                     cursor.execute(product_query, (nombre_base, variante_base))
+    #                     product = cursor.fetchone()
+                
+    #             # Método 3: Búsqueda más flexible
+    #             if not product:
+    #                 product_query = """
+    #                 SELECT id, stock_quantity FROM products 
+    #                 WHERE CONCAT(nombre_producto, IFNULL(CONCAT(' - ', variante), '')) = %s AND is_active = TRUE
+    #                 """
+    #                 cursor.execute(product_query, (detail['product_name'],))
+    #                 product = cursor.fetchone()
+                
+    #             if product:
+    #                 # Restaurar stock
+    #                 new_stock = product['stock_quantity'] + detail['quantity']
+    #                 update_stock_query = """
+    #                 UPDATE products SET stock_quantity = %s WHERE id = %s
+    #                 """
+    #                 cursor.execute(update_stock_query, (new_stock, product['id']))
+                    
+    #                 # Restaurar insumos (revertir la cantidad utilizada)
+    #                 PurchaseService._restore_insumos_from_recipe(cursor, product['id'], detail['quantity'])
+            
+    #         # Marcar la compra como cancelada
+    #         cancel_query = """
+    #         UPDATE purchases 
+    #         SET is_cancelled = TRUE, 
+    #             cancellation_reason = %s,
+    #             cancelled_at = NOW()
+    #         WHERE id = %s
+    #         """
+    #         cursor.execute(cancel_query, (reason, purchase['id']))
+            
+    #         connection.commit()
+            
+    #         return {
+    #             'status': 'success',
+    #             'message': f'Factura {invoice_number} cancelada exitosamente',
+    #             'products_restored': len(details)
+    #         }
+            
+    #     except Exception as e:
+    #         if connection:
+    #             connection.rollback()
+    #         raise e
+    #     finally:
+    #         if cursor:
+    #             cursor.close()
+    #         if connection:
+    #             connection.close()
+                
+    @staticmethod
+    def _restore_insumos_from_recipe(cursor, product_id: int, quantity: int):
+        """
+        Restaura la cantidad utilizada de insumos cuando se cancela una venta
+        
+        Args:
+            cursor: Cursor de la base de datos
+            product_id: ID del producto
+            quantity: Cantidad del producto que se canceló
+        """
+        # Obtener la receta del producto
+        recipe_query = """
+        SELECT pr.insumo_id, pr.cantidad, i.nombre_insumo, i.cantidad_utilizada, i.cantidad_unitaria, i.cantidad_por_producto
+        FROM product_recipes pr
+        JOIN insumos i ON pr.insumo_id = i.id
+        WHERE pr.product_id = %s
+        """
+        cursor.execute(recipe_query, (product_id,))
+        recipe_items = cursor.fetchall()
+        
+        if recipe_items:
+            print(f"DEBUG - Restaurando insumos para producto ID {product_id}, cantidad cancelada: {quantity}")
+            
+            # Actualizar la cantidad utilizada de cada insumo (restar)
+            for item in recipe_items:
+                insumo_id = item['insumo_id']
+                cantidad_utilizada_actual = float(item['cantidad_utilizada'])
+                cantidad_unitaria_actual = float(item['cantidad_unitaria'])
+                
+                # Usar cantidad_por_producto si está disponible, de lo contrario usar la cantidad de la receta
+                cantidad_por_unidad = float(item['cantidad_por_producto']) if item['cantidad_por_producto'] and float(item['cantidad_por_producto']) > 0 else float(item['cantidad'])
+                total_quantity_to_restore = cantidad_por_unidad * float(quantity)
+                
+                print(f"DEBUG - Insumo ID {insumo_id}: cantidad_por_producto={cantidad_por_unidad}, quantity={quantity}")
+                print(f"DEBUG - Antes de restaurar: cantidad_utilizada={cantidad_utilizada_actual}, cantidad_unitaria={cantidad_unitaria_actual}")
+                
+                # Restar de la cantidad utilizada (no puede ser negativa)
+                nueva_cantidad_utilizada = max(0, cantidad_utilizada_actual - total_quantity_to_restore)
+                
+                # Actualizar SOLO cantidad_utilizada del insumo
+                update_insumo_query = """
+                UPDATE insumos 
+                SET cantidad_utilizada = %s
+                WHERE id = %s
+                """
+                cursor.execute(update_insumo_query, (nueva_cantidad_utilizada, insumo_id))
+                
+                print(f"DEBUG - Insumo '{item['nombre_insumo']}' (ID: {insumo_id}): "
+                      f"Cantidad utilizada anterior: {cantidad_utilizada_actual}, "
+                      f"Decremento: -{total_quantity_to_restore}, "
+                      f"Nueva cantidad utilizada: {nueva_cantidad_utilizada}")
+                
+                # Verificar que se actualizó correctamente
+                verify_query = "SELECT cantidad_utilizada, cantidad_unitaria FROM insumos WHERE id = %s"
+                cursor.execute(verify_query, (insumo_id,))
+                verify_result = cursor.fetchone()
+                if verify_result:
+                    print(f"DEBUG - Verificación: Insumo {insumo_id} ahora tiene cantidad_utilizada = {verify_result['cantidad_utilizada']}, "
+                          f"cantidad_unitaria = {verify_result['cantidad_unitaria']}")
+        else:
+            print(f"Advertencia: El producto ID {product_id} no tiene receta definida")
     
     @staticmethod
     def get_inventory_status() -> Dict:
