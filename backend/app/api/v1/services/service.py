@@ -3,6 +3,7 @@ from typing import Optional
 from .stock_service import StockService
 from .purchase_service import PurchaseService
 from .dashboard_service import router_dashboard
+from .statistics_service import router_statistics
 from pydantic import BaseModel
 from typing import List, Dict
 from datetime import date
@@ -40,6 +41,9 @@ router_services = APIRouter()
 
 # Incluir el router de dashboard
 router_services.include_router(router_dashboard, prefix="/dashboard", tags=["dashboard"])
+
+# Incluir el router de estadísticas
+router_services.include_router(router_statistics, prefix="/statistics", tags=["statistics"])
 
 @router_services.get("/")
 async def get_services():

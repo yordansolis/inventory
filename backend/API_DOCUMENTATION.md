@@ -1170,3 +1170,364 @@ Este comportamiento es ideal para una heladería, donde:
    - El sistema alerta si el stock de fresas cae por debajo del mínimo
 
 Este flujo demuestra cómo el sistema mantiene actualizado el inventario de insumos automáticamente basado en las ventas realizadas, sin preocuparse por el stock de productos terminados, lo cual es ideal para un negocio como una heladería donde los productos se preparan al momento.
+
+## Estadísticas de la Aplicación
+
+Esta sección describe cómo utilizar los endpoints de estadísticas para obtener información detallada sobre ventas, productos y métricas de servicio.
+
+### Obtener Estadísticas Generales
+
+```
+GET /api/v1/services/statistics
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "total_products": 1,
+  "monthly_sales": {
+    "count": 4,
+    "revenue": 83000.0
+  },
+  "weekly_sales": [
+    {
+      "date": "19/07/2025",
+      "count": 2,
+      "revenue": 43000.0,
+      "ticket_promedio": 21500.0
+    },
+    {
+      "date": "18/07/2025",
+      "count": 2,
+      "revenue": 40000.0,
+      "ticket_promedio": 20000.0
+    }
+  ],
+  "top_products": [
+    {
+      "product_name": "WAFFLESS - FRESAS CON HELADO",
+      "product_variant": "FRESAS CON HELADO",
+      "quantity_sold": 4,
+      "revenue": 80000.0,
+      "numero_ordenes": 4
+    }
+  ]
+}
+```
+
+### Obtener Estadísticas de Ventas por Tiempo
+
+```
+GET /api/v1/services/statistics/ventas-por-tiempo/{time_range}
+```
+
+**Parámetros de ruta:**
+
+- time_range: Rango de tiempo para las estadísticas. Valores permitidos: "day", "week", "month", "year"
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Ejemplo (Ventas por día):**
+
+```
+GET /api/v1/services/statistics/ventas-por-tiempo/day
+```
+
+**Respuesta:**
+
+```json
+{
+  "ventas_por_dia": [
+    {
+      "fecha": "19/07/2025",
+      "total_ventas": 2,
+      "ingresos": 43000.0,
+      "ticket_promedio": 21500.0
+    },
+    {
+      "fecha": "18/07/2025",
+      "total_ventas": 2,
+      "ingresos": 40000.0,
+      "ticket_promedio": 20000.0
+    }
+  ]
+}
+```
+
+**Ejemplo (Ventas por mes):**
+
+```
+GET /api/v1/services/statistics/ventas-por-tiempo/month
+```
+
+**Respuesta:**
+
+```json
+{
+  "ventas_por_mes": [
+    {
+      "año": 2025,
+      "mes": 7,
+      "total_ventas": 4,
+      "ingresos": 83000.0,
+      "ingresos_domicilio": 3000.0
+    }
+  ]
+}
+```
+
+**Ejemplo (Ventas por semana):**
+
+```
+GET /api/v1/services/statistics/ventas-por-tiempo/week
+```
+
+**Respuesta:**
+
+```json
+{
+  "ventas_por_semana": [
+    {
+      "semana": 202529,
+      "inicio_semana": "14/07/2025",
+      "fin_semana": "19/07/2025",
+      "total_ventas": 4,
+      "ingresos": 83000.0
+    }
+  ]
+}
+```
+
+**Ejemplo (Ventas por año):**
+
+```
+GET /api/v1/services/statistics/ventas-por-tiempo/year
+```
+
+**Respuesta:**
+
+```json
+{
+  "ventas_por_año": [
+    {
+      "año": 2025,
+      "total_ventas": 4,
+      "ingresos": 83000.0,
+      "ticket_promedio": 20750.0,
+      "ingresos_domicilio": 3000.0
+    }
+  ]
+}
+```
+
+### Obtener Productos Más Vendidos
+
+```
+GET /api/v1/services/statistics/productos-top
+```
+
+**Parámetros de consulta opcionales:**
+
+- start_date: Fecha inicial para el filtro (YYYY-MM-DD)
+- end_date: Fecha final para el filtro (YYYY-MM-DD)
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Ejemplo:**
+
+```
+GET /api/v1/services/statistics/productos-top?start_date=2025-07-01&end_date=2025-07-31
+```
+
+**Respuesta:**
+
+```json
+{
+  "productos_mas_vendidos": [
+    {
+      "producto": "WAFFLESS - FRESAS CON HELADO",
+      "variante": "FRESAS CON HELADO",
+      "cantidad_vendida": 4,
+      "ingresos": 80000.0,
+      "numero_ordenes": 4
+    }
+  ],
+  "periodo": {
+    "fecha_inicio": "01/07/2025",
+    "fecha_fin": "31/07/2025"
+  }
+}
+```
+
+### Obtener Métricas de Entrega y Servicio
+
+```
+GET /api/v1/services/statistics/metricas-entrega
+```
+
+**Headers:**
+
+- Authorization: Bearer {tu_token}
+
+**Respuesta:**
+
+```json
+{
+  "domicilios_vs_directa": [
+    {
+      "tipo": "Venta directa",
+      "total_ordenes": 3,
+      "ingresos_total": 60000.0,
+      "ticket_promedio": 20000.0,
+      "total_domicilios": 0.0
+    },
+    {
+      "tipo": "Domicilio",
+      "total_ordenes": 1,
+      "ingresos_total": 23000.0,
+      "ticket_promedio": 23000.0,
+      "total_domicilios": 3000.0
+    }
+  ],
+  "metodos_pago": [
+    {
+      "metodo_pago": "efectivo",
+      "cantidad_transacciones": 3,
+      "valor_total": 60000.0,
+      "valor_promedio": 20000.0
+    },
+    {
+      "metodo_pago": "transferencia",
+      "cantidad_transacciones": 1,
+      "valor_total": 23000.0,
+      "valor_promedio": 23000.0
+    }
+  ]
+}
+```
+
+## Uso de las Estadísticas en el Frontend
+
+Los endpoints de estadísticas son especialmente útiles para:
+
+1. **Dashboards y paneles de control**:
+
+   - Mostrar gráficos de ventas diarias, semanales o mensuales
+   - Visualizar tendencias de ingresos a lo largo del tiempo
+   - Destacar productos más vendidos
+
+2. **Análisis de negocio**:
+
+   - Comparar ventas entre diferentes períodos
+   - Identificar qué productos generan más ingresos
+   - Analizar la efectividad de los domicilios vs ventas directas
+
+3. **Toma de decisiones**:
+   - Determinar qué productos promocionar basado en su popularidad
+   - Optimizar el inventario según patrones de venta
+   - Evaluar qué métodos de pago son más utilizados
+
+### Ejemplo de Integración en React
+
+```jsx
+import { useEffect, useState } from "react";
+import axios from "axios";
+
+function EstadisticasPanel() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          "http://localhost:8000/api/v1/services/statistics",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setStats(response.data);
+        setLoading(false);
+      } catch (err) {
+        setError("Error al cargar estadísticas");
+        setLoading(false);
+        console.error(err);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+  if (loading) return <div>Cargando estadísticas...</div>;
+  if (error) return <div>{error}</div>;
+  if (!stats) return <div>No hay datos disponibles</div>;
+
+  return (
+    <div className="stats-panel">
+      <h2>Estadísticas de Ventas</h2>
+
+      <div className="stats-summary">
+        <div className="stat-card">
+          <h3>Ventas del Mes</h3>
+          <p className="stat-value">{stats.monthly_sales.count}</p>
+          <p className="stat-label">
+            Total: ${stats.monthly_sales.revenue.toLocaleString()}
+          </p>
+        </div>
+
+        <div className="stat-card">
+          <h3>Productos Activos</h3>
+          <p className="stat-value">{stats.total_products}</p>
+        </div>
+      </div>
+
+      <h3>Ventas Recientes</h3>
+      <div className="sales-chart">
+        {/* Aquí podrías integrar una librería de gráficos como Chart.js o Recharts */}
+        {stats.weekly_sales.map((day) => (
+          <div
+            key={day.date}
+            className="chart-bar"
+            style={{ height: `${day.revenue / 1000}px` }}
+          >
+            <span className="bar-value">${day.revenue.toLocaleString()}</span>
+            <span className="bar-label">{day.date}</span>
+          </div>
+        ))}
+      </div>
+
+      <h3>Productos Más Vendidos</h3>
+      <ul className="top-products">
+        {stats.top_products.map((product, index) => (
+          <li key={index} className="product-item">
+            <span className="product-name">{product.product_name}</span>
+            <span className="product-quantity">
+              {product.quantity_sold} unidades
+            </span>
+            <span className="product-revenue">
+              ${product.revenue.toLocaleString()}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default EstadisticasPanel;
+```
+
+Este ejemplo muestra cómo podrías consumir los datos de estadísticas en un componente React para crear un panel de control básico.
