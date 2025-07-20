@@ -1,11 +1,3 @@
-# from fastapi import APIRouter, Response, Body
-# from fpdf import FPDF
-# from datetime import datetime
-# from typing import List, Dict, Any, Optional
-# from pydantic import BaseModel, Field
-# import locale
-
-
 from fastapi import APIRouter, Response, Body
 from fastapi.responses import StreamingResponse
 from fpdf import FPDF
@@ -14,6 +6,8 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 import locale
 import io
+import os
+from pathlib import Path
 
 # Set locale for currency formatting
 try:
@@ -27,6 +21,51 @@ except locale.Error:
 router = APIRouter()
 
 # --- Helper Functions ---
+def get_logo_path() -> Optional[str]:
+    """
+    Busca el logo en el directorio @/icons
+    Soporta formatos: png, jpg, jpeg, gif
+    """
+    # ============ AQUÍ ESTÁ LA RUTA ============
+    # Obtener el directorio base del proyecto
+    current_dir = Path(__file__).resolve().parent
+    
+    # Navegar hasta encontrar el directorio icons
+    # Asumiendo que @/icons está en la raíz del proyecto
+    project_root = current_dir
+    while project_root.parent != project_root:
+        icons_dir = project_root / "icons"  # ← RUTA PRINCIPAL: busca carpeta "icons"
+        if icons_dir.exists():
+            break
+        project_root = project_root.parent
+    else:
+        # Si no encontramos, intentar desde la raíz actual
+        icons_dir = Path.cwd() / "icons"  # ← RUTA ALTERNATIVA: desde directorio actual
+    
+    if not icons_dir.exists():
+        print(f"Warning: Directorio icons no encontrado en {icons_dir}")
+        return None
+    
+    # ============ NOMBRES DE ARCHIVO QUE BUSCA ============
+    # Buscar archivos de logo comunes
+    logo_names = ["logo.png", "logo.jpg", "logo.jpeg", "logo.gif", "brand.png", "company.png"]  # ← NOMBRES ESPECÍFICOS
+    
+    for logo_name in logo_names:
+        logo_path = icons_dir / logo_name
+        if logo_path.exists():
+            print(f"Logo encontrado en: {logo_path}")  # ← MENSAJE DE DEBUG
+            return str(logo_path)
+    
+    # Si no encuentra nombres comunes, tomar el primer archivo de imagen
+    for ext in ["*.png", "*.jpg", "*.jpeg", "*.gif"]:  # ← EXTENSIONES SOPORTADAS
+        logo_files = list(icons_dir.glob(ext))
+        if logo_files:
+            print(f"Logo encontrado (primer archivo): {logo_files[0]}")  # ← MENSAJE DE DEBUG
+            return str(logo_files[0])
+    
+    print(f"Warning: No se encontró logo en {icons_dir}")
+    return None
+
 def format_price(price: float) -> str:
     try:
         # Format as currency without decimals
@@ -77,16 +116,28 @@ class PDFRequest(BaseModel):
     report_data: ReportData
     extract_data: List[ExtractDataItem]
     period: str
+    use_logo: bool = True  # Cambiar a booleano para usar logo automáticamente
 
 # --- PDF Generation Logic ---
 
 class PDF(FPDF):
-    def __init__(self, period: str):
+    def __init__(self, period: str, logo_path: Optional[str] = None):
         super().__init__()
         self.period = period
+        self.logo_path = logo_path
         self.alias_nb_pages()
 
     def header(self):
+        # Logo si está disponible
+        if self.logo_path:
+            try:
+                # Verificar si el archivo existe y agregarlo
+                self.image(self.logo_path, 10, 8, 33)  # x, y, width
+                self.ln(20)  # Espacio después del logo
+            except:
+                # Si hay error con el logo, continuar sin él
+                pass
+        
         self.set_font('Arial', 'B', 16)
         self.cell(0, 10, 'Reporte de Ventas', 0, 1, 'C')
         self.set_font('Arial', 'I', 10)
@@ -124,18 +175,73 @@ class PDF(FPDF):
         self.set_font('Arial', '', 8)
         
         # Check if we need a page break
-        if self.get_y() + 10 > self.page_break_trigger:
+        if self.get_y() + 15 > self.page_break_trigger:
             self.add_page()
             
+        # Calcular la altura necesaria para textos largos
+        max_lines = 1
+        processed_data = []
+        
         for i, datum in enumerate(data):
-            self.cell(col_widths[i], 6, str(datum), 'LR', 0, align[i])
-        self.ln()
+            text = str(datum)
+            # Calcular cuántas líneas necesita el texto
+            text_width = col_widths[i] - 2  # Margen interno
+            if self.get_string_width(text) > text_width:
+                # Dividir texto en líneas
+                lines = self._split_text(text, text_width)
+                max_lines = max(max_lines, len(lines))
+                processed_data.append(lines)
+            else:
+                processed_data.append([text])
+        
+        # Calcular altura de la fila
+        row_height = max_lines * 4 + 2
+        
+        # Dibujar cada línea
+        for line_num in range(max_lines):
+            for i, lines in enumerate(processed_data):
+                text = lines[line_num] if line_num < len(lines) else ""
+                self.cell(col_widths[i], 4 if max_lines > 1 else 6, text, 'LR', 0, align[i])
+            self.ln(4 if max_lines > 1 else 6)
+    
+    def _split_text(self, text: str, max_width: float) -> list:
+        """Divide el texto en líneas que caben en el ancho especificado"""
+        words = text.split(' ')
+        lines = []
+        current_line = ""
+        
+        for word in words:
+            test_line = f"{current_line} {word}".strip()
+            if self.get_string_width(test_line) <= max_width:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = word
+                # Si una palabra sola es muy larga, cortarla
+                while self.get_string_width(current_line) > max_width and len(current_line) > 1:
+                    # Encontrar punto de corte
+                    cut_pos = len(current_line)
+                    while cut_pos > 0 and self.get_string_width(current_line[:cut_pos]) > max_width:
+                        cut_pos -= 1
+                    if cut_pos > 0:
+                        lines.append(current_line[:cut_pos])
+                        current_line = current_line[cut_pos:]
+                    else:
+                        break
+        
+        if current_line:
+            lines.append(current_line)
+            
+        return lines if lines else [""]
         
     def draw_table_border(self):
         self.cell(sum(self.current_col_widths), 0, '', 'T', 1)
 
-def generate_pdf_report(report_data: dict, extract_data: list, period: str):
-    pdf = PDF(period=period)
+def generate_pdf_report(report_data: dict, extract_data: list, period: str, use_logo: bool = True):
+    # Obtener el logo automáticamente si se solicita
+    logo_path = get_logo_path() if use_logo else None
+    pdf = PDF(period=period, logo_path=logo_path)
     pdf.add_page()
 
     # --- Summary Section ---
@@ -162,14 +268,23 @@ def generate_pdf_report(report_data: dict, extract_data: list, period: str):
     pdf.chapter_title("Productos Más Vendidos")
     
     headers = ["Producto", "Cant.", "Órdenes", "Ingresos"]
-    col_widths = [left_col_width * 0.5, 20, 25, 35]
+    col_widths = [left_col_width * 0.55, 18, 22, 32]  # Ajustado para dar más espacio al producto
     pdf.current_col_widths = col_widths
     pdf.table_header(headers, col_widths)
 
     align = ['L', 'R', 'R', 'R']
     for p in report_data['productos_top']:
+        # Formatear nombre del producto de manera más compacta
+        producto_nombre = p['producto']
+        if p['variante'] and p['variante'].strip():
+            # Truncar variante si es muy larga
+            variante = p['variante'][:20] + "..." if len(p['variante']) > 20 else p['variante']
+            producto_texto = f"{producto_nombre}\n({variante})"
+        else:
+            producto_texto = producto_nombre
+            
         data = [
-            f"{p['producto']} ({p['variante']})" if p['variante'] else p['producto'],
+            producto_texto,
             str(p['cantidad_vendida']),
             str(p['numero_ordenes']),
             format_price(p['ingresos'])
@@ -248,11 +363,13 @@ def generate_pdf_report(report_data: dict, extract_data: list, period: str):
 async def api_generate_pdf_report(request: PDFRequest = Body(...)):
     """
     Generates a PDF report from structured report and extract data.
+    Automatically includes logo from @/icons directory if use_logo=True.
     """
     pdf_content = generate_pdf_report(
         request.report_data.dict(),
         [item.dict() for item in request.extract_data],
-        request.period
+        request.period,
+        request.use_logo
     )
     
     filename = f"reporte_ventas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -265,6 +382,17 @@ async def api_generate_pdf_report(request: PDFRequest = Body(...)):
         media_type='application/pdf',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
+
+
+
+# from fastapi import APIRouter, Response, Body
+# from fastapi.responses import StreamingResponse
+# from fpdf import FPDF
+# from datetime import datetime
+# from typing import List, Dict, Any, Optional
+# from pydantic import BaseModel, Field
+# import locale
+# import io
 
 # # Set locale for currency formatting
 # try:
@@ -328,16 +456,28 @@ async def api_generate_pdf_report(request: PDFRequest = Body(...)):
 #     report_data: ReportData
 #     extract_data: List[ExtractDataItem]
 #     period: str
+#     logo_path: Optional[str] = None
 
 # # --- PDF Generation Logic ---
 
 # class PDF(FPDF):
-#     def __init__(self, period: str):
+#     def __init__(self, period: str, logo_path: Optional[str] = None):
 #         super().__init__()
 #         self.period = period
+#         self.logo_path = logo_path
 #         self.alias_nb_pages()
 
 #     def header(self):
+#         # Logo si está disponible
+#         if self.logo_path:
+#             try:
+#                 # Verificar si el archivo existe y agregarlo
+#                 self.image(self.logo_path, 10, 8, 33)  # x, y, width
+#                 self.ln(20)  # Espacio después del logo
+#             except:
+#                 # Si hay error con el logo, continuar sin él
+#                 pass
+        
 #         self.set_font('Arial', 'B', 16)
 #         self.cell(0, 10, 'Reporte de Ventas', 0, 1, 'C')
 #         self.set_font('Arial', 'I', 10)
@@ -375,18 +515,71 @@ async def api_generate_pdf_report(request: PDFRequest = Body(...)):
 #         self.set_font('Arial', '', 8)
         
 #         # Check if we need a page break
-#         if self.get_y() + 10 > self.page_break_trigger:
+#         if self.get_y() + 15 > self.page_break_trigger:
 #             self.add_page()
             
+#         # Calcular la altura necesaria para textos largos
+#         max_lines = 1
+#         processed_data = []
+        
 #         for i, datum in enumerate(data):
-#             self.cell(col_widths[i], 6, str(datum), 'LR', 0, align[i])
-#         self.ln()
+#             text = str(datum)
+#             # Calcular cuántas líneas necesita el texto
+#             text_width = col_widths[i] - 2  # Margen interno
+#             if self.get_string_width(text) > text_width:
+#                 # Dividir texto en líneas
+#                 lines = self._split_text(text, text_width)
+#                 max_lines = max(max_lines, len(lines))
+#                 processed_data.append(lines)
+#             else:
+#                 processed_data.append([text])
+        
+#         # Calcular altura de la fila
+#         row_height = max_lines * 4 + 2
+        
+#         # Dibujar cada línea
+#         for line_num in range(max_lines):
+#             for i, lines in enumerate(processed_data):
+#                 text = lines[line_num] if line_num < len(lines) else ""
+#                 self.cell(col_widths[i], 4 if max_lines > 1 else 6, text, 'LR', 0, align[i])
+#             self.ln(4 if max_lines > 1 else 6)
+    
+#     def _split_text(self, text: str, max_width: float) -> list:
+#         """Divide el texto en líneas que caben en el ancho especificado"""
+#         words = text.split(' ')
+#         lines = []
+#         current_line = ""
+        
+#         for word in words:
+#             test_line = f"{current_line} {word}".strip()
+#             if self.get_string_width(test_line) <= max_width:
+#                 current_line = test_line
+#             else:
+#                 if current_line:
+#                     lines.append(current_line)
+#                 current_line = word
+#                 # Si una palabra sola es muy larga, cortarla
+#                 while self.get_string_width(current_line) > max_width and len(current_line) > 1:
+#                     # Encontrar punto de corte
+#                     cut_pos = len(current_line)
+#                     while cut_pos > 0 and self.get_string_width(current_line[:cut_pos]) > max_width:
+#                         cut_pos -= 1
+#                     if cut_pos > 0:
+#                         lines.append(current_line[:cut_pos])
+#                         current_line = current_line[cut_pos:]
+#                     else:
+#                         break
+        
+#         if current_line:
+#             lines.append(current_line)
+            
+#         return lines if lines else [""]
         
 #     def draw_table_border(self):
 #         self.cell(sum(self.current_col_widths), 0, '', 'T', 1)
 
-# def generate_pdf_report(report_data: dict, extract_data: list, period: str):
-#     pdf = PDF(period=period)
+# def generate_pdf_report(report_data: dict, extract_data: list, period: str, logo_path: Optional[str] = None):
+#     pdf = PDF(period=period, logo_path=logo_path)
 #     pdf.add_page()
 
 #     # --- Summary Section ---
@@ -413,14 +606,23 @@ async def api_generate_pdf_report(request: PDFRequest = Body(...)):
 #     pdf.chapter_title("Productos Más Vendidos")
     
 #     headers = ["Producto", "Cant.", "Órdenes", "Ingresos"]
-#     col_widths = [left_col_width * 0.5, 20, 25, 35]
+#     col_widths = [left_col_width * 0.55, 18, 22, 32]  # Ajustado para dar más espacio al producto
 #     pdf.current_col_widths = col_widths
 #     pdf.table_header(headers, col_widths)
 
 #     align = ['L', 'R', 'R', 'R']
 #     for p in report_data['productos_top']:
+#         # Formatear nombre del producto de manera más compacta
+#         producto_nombre = p['producto']
+#         if p['variante'] and p['variante'].strip():
+#             # Truncar variante si es muy larga
+#             variante = p['variante'][:20] + "..." if len(p['variante']) > 20 else p['variante']
+#             producto_texto = f"{producto_nombre}\n({variante})"
+#         else:
+#             producto_texto = producto_nombre
+            
 #         data = [
-#             f"{p['producto']} ({p['variante']})" if p['variante'] else p['producto'],
+#             producto_texto,
 #             str(p['cantidad_vendida']),
 #             str(p['numero_ordenes']),
 #             format_price(p['ingresos'])
@@ -478,11 +680,19 @@ async def api_generate_pdf_report(request: PDFRequest = Body(...)):
 #     else:
 #         pdf.cell(sum(col_widths), 10, "No hay datos para mostrar", 1, 1, 'C')
 
+#     # Asegurar que siempre retornemos bytes
 #     raw = pdf.output(dest='S')
-#     # fpdf2 may return either bytes or str depending on version
+    
+#     # Convertir a bytes según el tipo retornado
 #     if isinstance(raw, str):
-#         raw = raw.encode('latin-1')
-#     return raw
+#         return raw.encode('latin-1')
+#     elif isinstance(raw, bytearray):
+#         return bytes(raw)
+#     elif isinstance(raw, bytes):
+#         return raw
+#     else:
+#         # Si es algún otro tipo, intentar convertir a string y luego a bytes
+#         return str(raw).encode('latin-1')
 
 
 # # --- API Endpoint ---
@@ -491,17 +701,23 @@ async def api_generate_pdf_report(request: PDFRequest = Body(...)):
 # async def api_generate_pdf_report(request: PDFRequest = Body(...)):
 #     """
 #     Generates a PDF report from structured report and extract data.
+#     Optional logo_path parameter to include business logo in header.
 #     """
 #     pdf_content = generate_pdf_report(
 #         request.report_data.dict(),
 #         [item.dict() for item in request.extract_data],
-#         request.period
+#         request.period,
+#         request.logo_path
 #     )
     
 #     filename = f"reporte_ventas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     
-#     return Response(
-#         content=pdf_content, 
-#         media_type='application/pdf', 
+#     # Usar BytesIO para crear un stream
+#     pdf_stream = io.BytesIO(pdf_content)
+    
+#     return StreamingResponse(
+#         io.BytesIO(pdf_content),
+#         media_type='application/pdf',
 #         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
-#     ) 
+#     )
+
