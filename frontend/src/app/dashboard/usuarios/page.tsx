@@ -186,14 +186,18 @@ export default function UsersManagement() {
           estado: updatedUser.is_active ? 'activo' : 'inactivo'
         } : user));
       } else {
-        // Llamada a la API para crear usuario
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/users/register`, {
+        // Llamada a la API para crear usuario (corregido para usar endpoint de admin)
+        const headers = getAuthHeaders(); // Añadir cabeceras de autenticación
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/admin/users`, { // Endpoint corregido
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers, // Usar las cabeceras de autenticación
           body: JSON.stringify({
             username: currentUser.username,
             email: currentUser.email,
             password: currentUser.password
+            // Nota: Es posible que el backend requiera un 'role_id'. 
+            // Si después de este cambio hay un error, lo añadiremos.
           })
         });
         

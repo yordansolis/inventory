@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Badge } from '../../../../components/ui';
-import { Download, FileText, Calendar, Filter, RefreshCw, Search, ArrowRight } from 'lucide-react';
+import { Download, FileText, Calendar, Filter, RefreshCw, Search, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatPrice } from '../../utils/format';
 
 type ExtractType = 'monthly' | 'daily' | 'range';
@@ -22,6 +22,12 @@ export default function EstractoVentasPage() {
         return d.toISOString().split('T')[0];
     });
     const [rangeEndDate, setRangeEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+    // Pagination states
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [totalPages, setTotalPages] = useState<number>(1);
+    const [totalRecords, setTotalRecords] = useState<number>(0);
+    const pageSize = 50;
 
     const [reportData, setReportData] = useState<any>(null);
     const [extractData, setExtractData] = useState<any[]>([]);
@@ -72,6 +78,7 @@ export default function EstractoVentasPage() {
             setError(null);
             setReportData(null);
             setExtractData([]);
+            setCurrentPage(1); // Resetear paginación
 
             const token = localStorage.getItem('token') || '';
             const headers = { 'Authorization': `bearer ${token}` };
@@ -84,14 +91,14 @@ export default function EstractoVentasPage() {
                 const lastDay = new Date(year, month, 0);
                 startDate = firstDay.toISOString().split('T')[0];
                 endDate = lastDay.toISOString().split('T')[0];
-                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/monthly/${year}/${month}`;
+                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/monthly/${year}/${month}?page=${currentPage}&page_size=${pageSize}`;
             } else if (extractType === 'daily') {
                 startDate = endDate = dailyDate;
-                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/daily/${dailyDate}`;
+                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/daily/${dailyDate}?page=${currentPage}&page_size=${pageSize}`;
             } else { // range
                 startDate = rangeStartDate;
                 endDate = rangeEndDate;
-                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/range?start_date=${rangeStartDate}&end_date=${rangeEndDate}`;
+                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/range?start_date=${rangeStartDate}&end_date=${rangeEndDate}&page=${currentPage}&page_size=${pageSize}`;
             }
 
             const extractResponse = await fetch(extractUrl, { headers });
@@ -101,6 +108,12 @@ export default function EstractoVentasPage() {
             const extractJson = await extractResponse.json();
             const detailedData = extractJson.data || [];
             setExtractData(detailedData);
+            
+            // Actualizar información de paginación
+            if (extractJson.pagination) {
+                setTotalPages(extractJson.pagination.pages || 1);
+                setTotalRecords(extractJson.pagination.total || 0);
+            }
 
             if (detailedData.length === 0) {
                 setReportData({
@@ -121,7 +134,10 @@ export default function EstractoVentasPage() {
             );
             const topProductsData = topProductsResponse.ok ? await topProductsResponse.json() : { productos_mas_vendidos: [] };
 
-            const deliveryResponse = await fetch('http://127.0.0.1:8053/api/v1/services/statistics/metricas-entrega', { headers });
+            const deliveryResponse = await fetch(
+                `http://127.0.0.1:8053/api/v1/services/statistics/metricas-entrega?start_date=${startDate}&end_date=${endDate}`, 
+                { headers }
+            );
             const deliveryData = deliveryResponse.ok ? await deliveryResponse.json() : {};
             
             const invoiceTotals: { [key: string]: { total: number; method: string } } = {};
@@ -157,7 +173,8 @@ export default function EstractoVentasPage() {
                 ticket_promedio: total_ventas ? (total_ingresos / total_ventas) : 0,
                 cantidad_domicilios: deliveryData?.total_domicilios || 0,
                 metodos_pago: metodos_pago,
-                productos_top: topProductsData?.productos_mas_vendidos || []
+                productos_top: topProductsData?.productos_mas_vendidos || [],
+                transferencias_por_cuenta: deliveryData?.transferencias_por_cuenta || []
             };
             
             setReportData(combinedReport);
@@ -170,7 +187,7 @@ export default function EstractoVentasPage() {
         }
     };
 
-    const fetchExtract = async () => {
+    const fetchExtractData = async (page: number = 1) => {
         try {
             setLoading(true);
             setError(null);
@@ -180,11 +197,18 @@ export default function EstractoVentasPage() {
             const headers = {
                 'Authorization': `bearer ${token}`
             };
+
+            let extractUrl = '';
             
-            // Fetch monthly extract data using our new API
-            const response = await fetch(`http://127.0.0.1:8053/api/v1/services/extracts/monthly/${year}/${month}`, {
-                headers
-            });
+            if (extractType === 'monthly') {
+                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/monthly/${year}/${month}?page=${page}&page_size=${pageSize}`;
+            } else if (extractType === 'daily') {
+                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/daily/${dailyDate}?page=${page}&page_size=${pageSize}`;
+            } else { // range
+                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/range?start_date=${rangeStartDate}&end_date=${rangeEndDate}&page=${page}&page_size=${pageSize}`;
+            }
+            
+            const response = await fetch(extractUrl, { headers });
             
             if (!response.ok) {
                 throw new Error('Error al obtener el extracto de ventas');
@@ -192,7 +216,13 @@ export default function EstractoVentasPage() {
             
             const data = await response.json();
             setExtractData(data.data || []);
-            // setShowExtractTable(true); // This state is removed, so this line is removed
+            
+            // Actualizar información de paginación
+            if (data.pagination) {
+                setTotalPages(data.pagination.pages || 1);
+                setTotalRecords(data.pagination.total || 0);
+                setCurrentPage(page);
+            }
             
         } catch (err) {
             console.error('Error fetching extract:', err);
@@ -203,13 +233,26 @@ export default function EstractoVentasPage() {
     };
 
     useEffect(() => {
-        // This effect will run once on mount to set initial dates
-        // and then can be triggered to generate a report.
-        // handleGenerateReport(); // We can optionally call it here or wait for user action.
-    }, []);
+        // Efecto para cambiar de página
+        if (reportData) {
+            fetchExtractData(currentPage);
+        }
+    }, [currentPage]);
+
+    const handlePreviousPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+        }
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            setCurrentPage(currentPage + 1);
+        }
+    };
 
     const handleGeneratePDF = async () => {
-        if (!reportData || !extractData) {
+        if (!reportData) {
             setError("No hay datos para generar el PDF. Genere un reporte primero.");
             return;
         }
@@ -217,6 +260,29 @@ export default function EstractoVentasPage() {
         try {
             setLoading(true);
             const token = localStorage.getItem('token') || '';
+
+            // Obtener todos los datos para el PDF (sin paginación)
+            let allExtractData: any[] = [];
+            let extractUrl = '';
+            
+            if (extractType === 'monthly') {
+                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/monthly/${year}/${month}?for_pdf=true`;
+            } else if (extractType === 'daily') {
+                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/daily/${dailyDate}?for_pdf=true`;
+            } else { // range
+                extractUrl = `http://127.0.0.1:8053/api/v1/services/extracts/range?start_date=${rangeStartDate}&end_date=${rangeEndDate}&for_pdf=true`;
+            }
+
+            const fullDataResponse = await fetch(extractUrl, { 
+                headers: { 'Authorization': `bearer ${token}` } 
+            });
+            
+            if (!fullDataResponse.ok) {
+                throw new Error('Error al obtener datos completos para PDF');
+            }
+            
+            const fullDataJson = await fullDataResponse.json();
+            allExtractData = fullDataJson.data || [];
 
             let period = '';
             if (extractType === 'monthly') {
@@ -236,8 +302,9 @@ export default function EstractoVentasPage() {
                 },
                 body: JSON.stringify({
                     report_data: reportData,
-                    extract_data: extractData,
-                    period: period
+                    extract_data: allExtractData,
+                    period: period,
+                    use_logo: true
                 })
             });
 
@@ -306,7 +373,7 @@ export default function EstractoVentasPage() {
                     <div className="flex items-center space-x-2">
                         <Button 
                             onClick={handleGeneratePDF} 
-                            disabled={loading || !reportData || !extractData || extractData.length === 0}
+                            disabled={loading || !reportData}
                             variant="outline"
                             className="flex items-center"
                         >
@@ -497,7 +564,7 @@ export default function EstractoVentasPage() {
                         </div>
                         <div>
                             {/* Ventas por Método de Pago */}
-                            <Card>
+                            <Card className="mb-8">
                                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
                                     Ventas por Método de Pago
                                 </h2>
@@ -536,30 +603,72 @@ export default function EstractoVentasPage() {
                                     </table>
                                 </div>
                             </Card>
+
+                            {/* Nueva sección: Transferencias por Cuenta */}
+                            {reportData?.transferencias_por_cuenta && reportData.transferencias_por_cuenta.length > 0 && (
+                                <Card>
+                                    <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                                        Transferencias por Cuenta
+                                    </h2>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Trans.</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {reportData.transferencias_por_cuenta.map((cuenta: any, index: number) => (
+                                                    <tr key={index} className="hover:bg-gray-50 transition-colors">
+                                                        <td className="px-6 py-4 whitespace-normal text-sm font-medium text-gray-900">
+                                                            {cuenta.cuenta_origen}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                            {cuenta.cantidad_transacciones}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                                                            {formatPrice(cuenta.valor_total)}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </Card>
+                            )}
                         </div>
                     </div>
 
-                    {/* Extract Table */}
+                    {/* Extract Table with Pagination */}
                     <Card className="mt-8">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                            Extracto Detallado
-                        </h2>
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4">
+                            <h2 className="text-xl font-semibold text-gray-900">
+                                Extracto Detallado
+                            </h2>
+                            <div className="flex items-center space-x-2">
+                                <p className="text-sm text-gray-500">
+                                    Vista resumida. Descargue el PDF para ver todos los detalles.
+                                </p>
+                                <Badge variant="outline">
+                                    {totalRecords} registros en total
+                                </Badge>
+                            </div>
+                        </div>
+                        
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factura</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hora</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendedor</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Variante</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fact.</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pago</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referencia</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -568,21 +677,30 @@ export default function EstractoVentasPage() {
                                             <tr key={index} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{item.invoice_number}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.invoice_date}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.invoice_time}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.cliente}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.vendedor}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.product_name}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.product_variant || '-'}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.quantity}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{formatPrice(item.unit_price)}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{formatPrice(item.subtotal)}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{formatPrice(item.total_amount)}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.payment_method}</td>
+                                                <td className="px-4 py-3 whitespace-normal text-sm text-gray-900">
+                                                    {item.payment_method}
+                                                    {item.payment_source_account && 
+                                                     (item.payment_method.toLowerCase().includes('transferencia') || 
+                                                      item.payment_method.toLowerCase().includes('transfer') || 
+                                                      item.payment_method.toLowerCase().includes('digital')) && (
+                                                        <div className="mt-1 text-xs text-gray-500">
+                                                            Cuenta: {item.payment_source_account}
+                                                        </div>
+                                                     )
+                                                    }
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                                    {item.payment_reference || '-'}
+                                                </td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={12} className="px-4 py-4 text-center text-sm text-gray-500">
+                                            <td colSpan={8} className="px-4 py-4 text-center text-sm text-gray-500">
                                                 No hay datos de extracto para el período seleccionado.
                                             </td>
                                         </tr>
@@ -590,6 +708,44 @@ export default function EstractoVentasPage() {
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6 mt-4">
+                                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-sm text-gray-700">
+                                            Mostrando <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> a <span className="font-medium">{Math.min(currentPage * pageSize, totalRecords)}</span> de <span className="font-medium">{totalRecords}</span> resultados
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <nav className="flex items-center space-x-2">
+                                            <button
+                                                onClick={handlePreviousPage}
+                                                disabled={currentPage === 1}
+                                                className="relative inline-flex items-center px-2 py-2 rounded-md bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <span className="sr-only">Anterior</span>
+                                                <ChevronLeft className="h-5 w-5" />
+                                            </button>
+                                            
+                                            <span className="text-sm font-medium text-gray-700">
+                                                Página {currentPage} de {totalPages}
+                                            </span>
+                                            
+                                            <button
+                                                onClick={handleNextPage}
+                                                disabled={currentPage === totalPages}
+                                                className="relative inline-flex items-center px-2 py-2 rounded-md bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <span className="sr-only">Siguiente</span>
+                                                <ChevronRight className="h-5 w-5" />
+                                            </button>
+                                        </nav>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </Card>
                 </>
             )}
