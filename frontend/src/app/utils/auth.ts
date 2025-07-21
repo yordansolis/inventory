@@ -88,7 +88,24 @@ export const getUserId = (): number => {
 export const fetchCurrentUser = async (): Promise<any> => {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8052';
-    const headers = getAuthHeaders();
+    const token = localStorage.getItem('authToken');
+    
+    console.log('Fetching current user with:', {
+      apiUrl,
+      tokenPresent: !!token,
+      tokenLength: token ? token.length : 0
+    });
+
+    if (!token) {
+      console.warn('No authentication token found');
+      logout();
+      return null;
+    }
+
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
     
     const response = await fetch(`${apiUrl}/api/v1/users/auth/me`, {
       method: 'GET',
@@ -96,10 +113,22 @@ export const fetchCurrentUser = async (): Promise<any> => {
     });
     
     if (!response.ok) {
-      throw new Error('Error al obtener datos del usuario');
+      // Log the full response for debugging
+      const errorText = await response.text();
+      console.error('User fetch error details:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
+      // Throw a more informative error
+      throw new Error(`Error al obtener datos del usuario: ${response.status} ${response.statusText}`);
     }
     
     const userData = await response.json();
+    
+    console.log('User data fetched successfully:', userData);
     
     // Guardar el ID del usuario y el rol en localStorage
     if (userData && userData.id) {
@@ -112,8 +141,17 @@ export const fetchCurrentUser = async (): Promise<any> => {
     }
     
     return userData;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error al obtener datos del usuario:', error);
+    
+    // If the error is a network error or authentication problem, log out the user
+    if (error instanceof TypeError || 
+        (error instanceof Error && 
+         (error.message.includes('401') || error.message.includes('403')))) {
+      console.warn('Authentication error detected, logging out');
+      logout();
+    }
+    
     return null;
   }
 };

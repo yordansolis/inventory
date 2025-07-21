@@ -60,16 +60,65 @@ export default function FacturacionSection({ productosVendibles, productosConsum
   const [notificacionExito, setNotificacionExito] = useState(false);
   const [mensajeExito, setMensajeExito] = useState("");
 
-  // Efecto para ocultar la notificación después de 5 segundos
+  // Nuevos estados para domiciliarios
+  const [domiciliarios, setDomiciliarios] = useState([]);
+  const [domiciliarioSeleccionado, setDomiciliarioSeleccionado] = useState(null);
+  const [errorDomiciliarios, setErrorDomiciliarios] = useState(null);
+
+  // Efecto para cargar domiciliarios cuando se habilita domicilio
   useEffect(() => {
-    if (notificacionExito) {
-      const timer = setTimeout(() => {
-        setNotificacionExito(false);
-      }, 5000);
-      
-      return () => clearTimeout(timer);
+    const fetchDomiciliarios = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://localhost:8000';
+        const token = localStorage.getItem('authToken');
+        
+        if (!token) {
+          console.error("No se encontró token de autenticación");
+          setErrorDomiciliarios("No autenticado");
+          return;
+        }
+        
+        const response = await fetch(`${apiUrl}/api/v1/services/domiciliarios`, {
+          headers: {
+            'Authorization': `bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Error al obtener domiciliarios');
+        }
+        
+        const data = await response.json();
+        setDomiciliarios(data);
+      } catch (error) {
+        console.error("Error al cargar domiciliarios:", error);
+        setErrorDomiciliarios(error.message);
+      }
+    };
+
+    // Solo cargar domiciliarios si el domicilio está habilitado
+    if (domicilio) {
+      fetchDomiciliarios();
     }
-  }, [notificacionExito]);
+  }, [domicilio]);
+
+  // Efecto para establecer automáticamente la tarifa del domiciliario seleccionado
+  useEffect(() => {
+    if (domiciliarioSeleccionado) {
+      const domiciliario = domiciliarios.find(d => d.id === domiciliarioSeleccionado);
+      if (domiciliario) {
+        setTarifaDomicilio(domiciliario.tarifa);
+        setDisplayTarifaDomicilio(formatPrice(domiciliario.tarifa));
+        setNombreDomiciliario(domiciliario.nombre);
+      }
+    } else {
+      // Reset domicilio-related fields when no domiciliario is selected
+      setTarifaDomicilio(0);
+      setDisplayTarifaDomicilio("");
+      setNombreDomiciliario("");
+    }
+  }, [domiciliarioSeleccionado, domiciliarios]);
 
   // Nuevos estados para la búsqueda y filtros
   const [busquedaProducto, setBusquedaProducto] = useState("");
@@ -247,9 +296,13 @@ export default function FacturacionSection({ productosVendibles, productosConsum
     setMontoPagado(0);
     setDisplayMontoPagado("");
     setCuentaReferencia("");
+    
+    // Resetear estados de domiciliarios
+    setDomiciliarioSeleccionado(null);
     setNombreDomiciliario("");
     setTarifaDomicilio(0);
     setDisplayTarifaDomicilio("");
+    setErrorDomiciliarios(null);
   };
 
   const validarFormulario = () => {
@@ -270,8 +323,14 @@ export default function FacturacionSection({ productosVendibles, productosConsum
       errores.push("El nombre del cliente es obligatorio");
     }
 
-    if (domicilio && !direccion.trim()) {
-      errores.push("La dirección es obligatoria para domicilios");
+    if (domicilio) {
+      if (!direccion.trim()) {
+        errores.push("La dirección es obligatoria para domicilios");
+      }
+
+      if (!domiciliarioSeleccionado) {
+        errores.push("Debe seleccionar un domiciliario");
+      }
     }
 
     // Validación de teléfono más flexible
@@ -998,15 +1057,35 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Nombre del Domiciliario
                     </label>
-                    <input
-                      type="text"
-                      value={nombreDomiciliario}
-                      onChange={(e) =>
-                        setNombreDomiciliario(e.target.value)
-                      }
+                    <select
+                      value={domiciliarioSeleccionado || ""}
+                      onChange={(e) => {
+                        const selectedValue = e.target.value;
+                        setDomiciliarioSeleccionado(selectedValue ? parseInt(selectedValue) : "");
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Nombre del domiciliario"
-                    />
+                    >
+                      <option value="">Seleccionar Domiciliario</option>
+                      {domiciliarios.map((domiciliario) => (
+                        <option key={domiciliario.id} value={domiciliario.id}>
+                          {domiciliario.nombre} - Tel: {domiciliario.telefono}
+                        </option>
+                      ))}
+                    </select>
+                    {errorDomiciliarios && (
+                      <p className="text-xs text-red-500 mt-1">
+                        <AlertTriangle className="inline-block h-4 w-4 mr-1" />
+                        {errorDomiciliarios === "No autenticado" 
+                          ? "Por favor, inicie sesión nuevamente" 
+                          : "No se pudieron cargar los domiciliarios"}
+                      </p>
+                    )}
+                    {domiciliarios.length === 0 && domicilio && !errorDomiciliarios && (
+                      <p className="text-xs text-yellow-600 mt-1">
+                        <AlertTriangle className="inline-block h-4 w-4 mr-1" />
+                        Cargando domiciliarios...
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1015,30 +1094,9 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                     <input
                       type="text"
                       value={displayTarifaDomicilio}
-                      onChange={(e) => {
-                        const rawValue = e.target.value.replace(/[^0-9.]/g, '');
-                        const numericValue = parseFloat(rawValue) || 0;
-                        setTarifaDomicilio(numericValue);
-                        setDisplayTarifaDomicilio(rawValue);
-                      }}
-                      onFocus={(e) => {
-                        if (tarifaDomicilio === 0) {
-                          setDisplayTarifaDomicilio("");
-                        } else {
-                          setDisplayTarifaDomicilio(tarifaDomicilio.toString());
-                        }
-                      }}
-                      onBlur={(e) => {
-                        const numericValue = parseFloat(e.target.value) || 0;
-                        setTarifaDomicilio(numericValue);
-                        if (numericValue === 0) {
-                          setDisplayTarifaDomicilio("");
-                        } else {
-                          setDisplayTarifaDomicilio(formatPrice(numericValue));
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="0"
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
+                      placeholder="Tarifa automática"
                     />
                   </div>
                 </>
@@ -1175,7 +1233,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
 
               <div className="space-y-4 text-sm">
                 <div className="text-center border-b pb-4">
-                  <h3 className="font-bold text-lg">Sistema de Inventario</h3>
+                  <h3 className="font-bold text-lg">Dulce Vida</h3>
                   <p className="text-gray-600">Factura de Venta</p>
                 </div>
 

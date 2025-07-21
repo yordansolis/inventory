@@ -5,7 +5,7 @@ import { LoadingProvider } from "./utils/LoadingContext";
 import LoadingSpinner from "./components/LoadingSpinner";
 
 export const metadata: Metadata = {
-  title: "Sistema de Inventario",
+  title: "Dulce Vida",
   description: "Sistema de gestión de inventario",
   icons: {
     icon: [

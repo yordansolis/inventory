@@ -95,7 +95,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
               </div>
               <span className={`text-xl font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
-                Sistema de Inventario
+                Dulce Vida
               </span>
             </div>
           </div>

@@ -122,7 +122,7 @@ export default function InventoryLogin() {
             </div>
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2 tracking-tight">
-            Sistema de Inventario
+            Dulce Vida
           </h1>
           <p className="text-base text-pink-600">
             Inicia sesión para continuar
@@ -256,7 +256,7 @@ export default function InventoryLogin() {
         {/* Footer */}
         <div className="text-center mt-8 pt-6 border-t border-pink-100">
           <p className="text-pink-400 text-sm">
-            © 2025 Sistema de Inventario. Todos los derechos reservados.
+            © 2025 Dulce Vida. Todos los derechos reservados.
           </p>
         </div>
       </div>
