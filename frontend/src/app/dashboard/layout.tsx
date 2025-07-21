@@ -136,7 +136,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Main Content */}
-        <div className="flex relative">
+        <div className="flex relative overflow-x-hidden">
           {/* Sidebar */}
           <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
            md:translate-x-0 fixed
@@ -190,7 +190,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
 
           {/* Main Content Area - where child pages will be rendered */}
-          <div className={`flex-1 p-6 ${isFeminine ? 'bg-gradient-to-br from-pink-50 to-white' : 'bg-gray-50'}`}>
+          <div className={`flex-1 px-4 py-6 ${isFeminine ? 'bg-gradient-to-br from-pink-50 to-white' : 'bg-gray-50'}`}>
             {children}
           </div>
         </div>

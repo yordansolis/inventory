@@ -631,7 +631,28 @@ export default function SuministroPage() {
     );
   }, []);
 
-  // Badge and getStockAlertBadge components removed since we no longer track stock status
+  const Badge = useMemo(() => ({ children, variant = "default", className = "" }: { children: React.ReactNode; variant?: "default" | "success" | "warning" | "danger"; className?: string }) => {
+    const variants = {
+      default: "bg-gray-100 text-gray-800",
+      success: "bg-green-100 text-green-800",
+      warning: "bg-yellow-100 text-yellow-800",
+      danger: "bg-red-100 text-red-800"
+    };
+    return (
+      <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium ${variants[variant]} ${className}`}>
+        {children}
+      </span>
+    );
+  }, []);
+
+  const getStockAlertBadge = useCallback((producto: ConsumableProduct) => {
+    // Determine the stock status based on cantidadUtilizada and minimo
+    if (producto.cantidadUtilizada <= producto.minimo) {
+      return <Badge variant="danger">Stock Bajo</Badge>;
+    }
+    // You can add more conditions here for 'warning' or 'success' if needed
+    return null; // No badge if stock is fine
+  }, [Badge]);
 
   const filteredProducts = useMemo(() => {
     if (!searchTerm) {
@@ -951,6 +972,9 @@ export default function SuministroPage() {
                     Precio Presentación
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
+                    Cantidad Utilizada
+                  </th>
+                  <th className="p-4 text-left font-semibold text-gray-600">
                     Valor Unitario
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
@@ -958,6 +982,9 @@ export default function SuministroPage() {
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
                     Stock Mínimo
+                  </th>
+                  <th className="p-4 text-left font-semibold text-gray-600">
+                    Estado de Stock
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
                     Proveedor
@@ -983,6 +1010,9 @@ export default function SuministroPage() {
                       ${formatCurrencyWithoutTrailingZeros(producto.precioPresentacion)}
                     </td>
                     <td className="p-4 text-gray-700">
+                      {producto.cantidadUtilizada} {producto.unidadMedida}
+                    </td>
+                    <td className="p-4 text-gray-700">
                       ${formatCurrencyWithoutTrailingZeros(producto.valorUnitario)}
                     </td>
                     <td className="p-4 text-gray-700">
@@ -990,6 +1020,9 @@ export default function SuministroPage() {
                     </td>
                     <td className="p-4 text-gray-700">
                       {producto.minimo} {producto.unidadMedida}
+                    </td>
+                    <td className="p-4 text-gray-700">
+                      {getStockAlertBadge(producto)}
                     </td>
                     <td className="p-4 text-gray-700">
                       {producto.sitioReferencia}
