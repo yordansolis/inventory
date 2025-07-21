@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import FacturacionSection from "../../../../components/FacturacionSection";
 import { getAuthHeaders } from "../../utils/auth";
+import { AlertTriangle } from "lucide-react"; // Added for error icon
 
 // Define types for our data
 interface ProductoVendible {
@@ -34,15 +35,26 @@ interface DebugInfo {
   insumoCount: number;
 }
 
+// Add a new interface for error handling
+interface ApiError {
+  message: string;
+  status?: number;
+  details?: string;
+}
+
 export default function InventoryDashboard() {
   const [productosVendibles, setProductosVendibles] = useState<ProductoVendible[]>([]);
   const [productosConsumibles, setProductosConsumibles] = useState<ProductoConsumible[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
   const [debug, setDebug] = useState<DebugInfo>({} as DebugInfo);
 
   const fetchData = useCallback(async () => {
     try {
+      // Reset previous errors
+      setError(null);
+      setLoading(true);
+
       // Try different ports based on the README.md
       const possiblePorts = [8000, 8081, 8089, 8052];
       let stockData = null;
@@ -56,7 +68,6 @@ export default function InventoryDashboard() {
       const envApiUrl = process.env.NEXT_PUBLIC_BACKEND;
       if (envApiUrl) {
         apiUrl = envApiUrl;
-        // console.log("Trying API URL from env:", apiUrl);
         const headers = getAuthHeaders();
         
         try {
@@ -79,9 +90,14 @@ export default function InventoryDashboard() {
               insumosData = await insumosResponse.json();
               success = true;
             }
+          } else {
+            // Handle non-200 responses
+            const errorData = await stockResponse.json().catch(() => ({}));
+            throw new Error(errorData.detail || `Error al obtener stock: ${stockResponse.status}`);
           }
         } catch (e) {
           console.warn("Failed with env URL:", e);
+          throw e;
         }
       }
       
@@ -117,10 +133,24 @@ export default function InventoryDashboard() {
                 insumosData = await insumosResponse.json();
                 success = true;
                 break; // Found a working port
+              } else {
+                // Handle non-200 responses for insumos
+                const errorData = await insumosResponse.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Error al obtener insumos: ${insumosResponse.status}`);
               }
+            } else {
+              // Handle non-200 responses for stock
+              const errorData = await stockResponse.json().catch(() => ({}));
+              throw new Error(errorData.detail || `Error al obtener stock: ${stockResponse.status}`);
             }
           } catch (e) {
             console.warn(`Failed with port ${port}:`, e);
+            // Set detailed error information
+            setError({
+              message: "No se pudo conectar a la API",
+              status: stockResponse?.status,
+              details: e instanceof Error ? e.message : "Error desconocido"
+            });
           }
         }
       }
@@ -183,7 +213,14 @@ export default function InventoryDashboard() {
       setLoading(false);
     } catch (error) {
       console.error("Error fetching data:", error);
-      setError(error instanceof Error ? error.message : 'Error desconocido');
+      
+      // Set comprehensive error information
+      setError({
+        message: "Error al cargar datos",
+        details: error instanceof Error ? error.message : "Error desconocido",
+        status: error instanceof Error && 'status' in error ? (error as any).status : undefined
+      });
+      
       setLoading(false);
       
       // No fallback data, just set empty arrays
@@ -204,8 +241,24 @@ export default function InventoryDashboard() {
     <>
       {error && (
         <div className="text-red-500 p-4 mb-4 bg-red-50 rounded">
-          Error: {error}
-          <pre className="text-xs mt-2 overflow-auto max-h-40">Debug: {JSON.stringify(debug, null, 2)}</pre>
+          <div className="flex items-center mb-2">
+            <AlertTriangle className="h-5 w-5 mr-2" />
+            <h3 className="font-semibold">Error: {error.message}</h3>
+          </div>
+          {error.status && (
+            <p className="text-sm mb-1">Código de estado: {error.status}</p>
+          )}
+          {error.details && (
+            <pre className="text-xs mt-2 overflow-auto max-h-40 bg-red-100 p-2 rounded">
+              Detalles: {error.details}
+            </pre>
+          )}
+          <button 
+            onClick={fetchData} 
+            className="mt-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Reintentar
+          </button>
         </div>
       )}
       <FacturacionSection

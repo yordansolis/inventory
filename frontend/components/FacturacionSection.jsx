@@ -65,6 +65,22 @@ export default function FacturacionSection({ productosVendibles, productosConsum
   const [domiciliarioSeleccionado, setDomiciliarioSeleccionado] = useState(null);
   const [errorDomiciliarios, setErrorDomiciliarios] = useState(null);
 
+  // Add new state for form errors near the top of the component
+  const [formErrors, setFormErrors] = useState({
+    general: '',
+    cliente: '',
+    domicilio: {
+      address: null,
+      phone: null,
+      domiciliary: null
+    },
+    telefono: '',
+    metodoPago: '',
+    montoPagado: '',
+    carrito: '',
+    referenciaPago: '' // New field for reference errors
+  });
+
   // Efecto para cargar domiciliarios cuando se habilita domicilio
   useEffect(() => {
     const fetchDomiciliarios = async () => {
@@ -305,58 +321,231 @@ export default function FacturacionSection({ productosVendibles, productosConsum
     setErrorDomiciliarios(null);
   };
 
-  const validarFormulario = () => {
-    const errores = [];
-    console.log("Validando formulario...");
-    console.log("Carrito:", carrito);
-    console.log("Adiciones:", adicionesCarrito);
-    console.log("Cliente:", cliente);
-    console.log("Domicilio:", domicilio, "Dirección:", direccion);
-    console.log("Teléfono:", telefono);
-    console.log("Monto pagado:", montoPagado, "Total:", calcularTotal + (domicilio ? tarifaDomicilio : 0));
+  // Enhanced validation method with separate concerns
+  const validateMontoPagado = () => {
+    // Step 1: Calculate total amount to pay
+    const totalAPagar = calcularTotal + (domicilio ? tarifaDomicilio : 0);
+    
+    // Prepare an error object with different validation aspects
+    const errors = {
+      amount: null,
+      reference: null
+    };
 
-    if (carrito.length === 0 && adicionesCarrito.length === 0) {
-      errores.push("Debe agregar al menos un producto o adición al carrito");
+    // Step 2: Validate payment amount first
+    if (montoPagado === 0) {
+      errors.amount = `Ingrese el monto pagado. Total a pagar: ${formatPrice(totalAPagar)}`;
+    } else if (isNaN(montoPagado)) {
+      errors.amount = "El monto pagado debe ser un número válido";
+    } else if (montoPagado < 0) {
+      errors.amount = "El monto pagado no puede ser negativo";
     }
 
-    if (!cliente.trim()) {
-      errores.push("El nombre del cliente es obligatorio");
+    // Step 3: Validate based on payment method
+    switch (metodoPago) {
+      case "efectivo":
+        // For cash, just warn if payment is significantly less
+        if (montoPagado > 0 && montoPagado < totalAPagar * 0.5) {
+          errors.amount = `El monto pagado parece ser muy bajo. Total a pagar: ${formatPrice(totalAPagar)}`;
+        }
+        break;
+
+      case "tarjeta":
+      case "transferencia":
+      case "nequi":
+      case "bancolombia":
+      case "banco_av_villas":
+      case "daviplata":
+        // Validate reference number
+        const cleanedReference = cuentaReferencia ? cuentaReferencia.trim() : '';
+        
+        // Check if reference is provided
+        if (!cleanedReference) {
+          errors.reference = `Ingrese el número de referencia para ${metodoPago}`;
+        } else {
+          // Specific validation based on payment method
+          switch (metodoPago) {
+            case "tarjeta":
+              if (!/^[0-9]{4}(-?[0-9]{4}){3}$/.test(cleanedReference)) {
+                errors.reference = "Número de tarjeta inválido (formato: XXXX-XXXX-XXXX-XXXX)";
+              }
+              break;
+            
+            case "transferencia":
+            case "bancolombia":
+            case "banco_av_villas":
+              if (cleanedReference.length < 6) {
+                errors.reference = `Referencia de ${metodoPago} debe tener al menos 6 caracteres`;
+              }
+              break;
+            
+            case "nequi":
+            case "daviplata":
+              if (!/^(3\d{9})$/.test(cleanedReference)) {
+                errors.reference = `Número de ${metodoPago} inválido (10 dígitos, comenzando con 3)`;
+              }
+              break;
+          }
+        }
+
+        // Validate payment amount for non-cash methods
+        if (!errors.amount) {
+          if (montoPagado < totalAPagar) {
+            errors.amount = `Monto pagado debe ser al menos ${formatPrice(totalAPagar)}`;
+          } else {
+            // Prevent excessively high payments
+            const MAX_MULTIPLIER = 5;
+            const maxAllowedPayment = totalAPagar * MAX_MULTIPLIER;
+            
+            if (montoPagado > maxAllowedPayment) {
+              errors.amount = `Monto pagado excede el límite máximo de ${formatPrice(maxAllowedPayment)}`;
+            }
+          }
+        }
+        break;
     }
 
-    if (domicilio) {
-      if (!direccion.trim()) {
-        errores.push("La dirección es obligatoria para domicilios");
-      }
-
-      if (!domiciliarioSeleccionado) {
-        errores.push("Debe seleccionar un domiciliario");
-      }
-    }
-
-    // Validación de teléfono más flexible
-    if (telefono && telefono.trim() !== "" && !/^\d{7,10}$/.test(telefono.replace(/\s/g, ""))) {
-      errores.push("El teléfono debe tener entre 7 y 10 dígitos");
-    }
-
-    // Solo validamos el monto pagado si hay productos en el carrito
-    // y si no es efectivo (para permitir pago exacto después)
-    if ((carrito.length > 0 || adicionesCarrito.length > 0) && metodoPago !== "efectivo") {
-      const totalAPagar = calcularTotal + (domicilio ? tarifaDomicilio : 0);
-      if (montoPagado < totalAPagar) {
-        errores.push(`El monto pagado (${formatPrice(montoPagado)}) no puede ser menor al total de la factura (${formatPrice(totalAPagar)})`);
-      }
-    }
-
-    console.log("Errores de validación:", errores);
-    return errores;
+    // Return the errors object
+    return errors;
   };
 
+  // Enhanced validation for delivery details with granular error tracking
+  const validateDeliveryDetails = () => {
+    // Create a detailed error object
+    const deliveryErrors = {
+      address: null,
+      phone: null,
+      domiciliary: null
+    };
+
+    // If delivery is not selected, no need to validate further
+    if (!domicilio) {
+      return deliveryErrors;
+    }
+
+    // Step 1: Check if delivery address is filled
+    if (!direccion || !direccion.trim()) {
+      deliveryErrors.address = "La dirección de entrega es obligatoria";
+    }
+
+    // Step 2: Validate phone number for delivery
+    const cleanedPhone = telefono ? telefono.replace(/\s/g, '') : '';
+    if (!cleanedPhone) {
+      deliveryErrors.phone = "El teléfono es obligatorio para domicilio";
+    } else if (!/^\d{7,10}$/.test(cleanedPhone)) {
+      deliveryErrors.phone = "Debe ingresar un teléfono válido (7-10 dígitos)";
+    }
+
+    // Step 3: Check domiciliary selection
+    if (!domiciliarioSeleccionado) {
+      deliveryErrors.domiciliary = "Debe seleccionar un domiciliario para el envío";
+    } else {
+      // Optional: Additional checks for domiciliary
+      const domiciliarioSelecto = domiciliarios.find(d => d.id === domiciliarioSeleccionado);
+      if (!domiciliarioSelecto) {
+        deliveryErrors.domiciliary = "El domiciliario seleccionado no es válido";
+      }
+    }
+
+    return deliveryErrors;
+  };
+
+  // Modify the existing validation method to incorporate detailed delivery details validation
+  const validarFormulario = () => {
+    // Reset previous errors
+    const newErrors = {
+      general: '',
+      cliente: '',
+      domicilio: {
+        address: null,
+        phone: null,
+        domiciliary: null
+      },
+      telefono: '',
+      metodoPago: '',
+      montoPagado: '',
+      carrito: '',
+      referenciaPago: '' // Clear reference error on successful validation
+    };
+
+    // Validate cart
+    if (carrito.length === 0 && adicionesCarrito.length === 0) {
+      newErrors.carrito = "Debe agregar al menos un producto o adición al carrito";
+    }
+
+    // Validate client name
+    if (!cliente.trim()) {
+      newErrors.cliente = "El nombre del cliente es obligatorio";
+    }
+
+    // Validate delivery details (if delivery is selected)
+    if (domicilio) {
+      const deliveryErrors = validateDeliveryDetails();
+      
+      // Combine delivery errors into a single domicilio error
+      const combinedDeliveryError = [
+        deliveryErrors.address,
+        deliveryErrors.phone,
+        deliveryErrors.domiciliary
+      ].filter(error => error !== null).join(". ");
+
+      if (combinedDeliveryError) {
+        newErrors.domicilio = {
+          address: deliveryErrors.address,
+          phone: deliveryErrors.phone,
+          domiciliary: deliveryErrors.domiciliary
+        };
+      }
+    }
+
+    // Validate payment amount
+    const paymentValidation = validateMontoPagado(); // Get the object with amount and reference errors
+    if (paymentValidation.amount) {
+      newErrors.montoPagado = paymentValidation.amount;
+    }
+    if (paymentValidation.reference) {
+      newErrors.referenciaPago = paymentValidation.reference; // Assign to the new field
+    }
+
+    // Check if there are any errors
+    const hasErrors = 
+      Object.values(newErrors).some(error => 
+        error !== '' && 
+        (typeof error !== 'object' || Object.values(error).some(subError => subError !== null))
+      );
+    
+    if (hasErrors) {
+      setFormErrors(newErrors);
+      return false;
+    }
+
+    // Clear any previous errors if validation passes
+    setFormErrors({
+      general: '',
+      cliente: '',
+      domicilio: {
+        address: null,
+        phone: null,
+        domiciliary: null
+      },
+      telefono: '',
+      metodoPago: '',
+      montoPagado: '',
+      carrito: '',
+      referenciaPago: '' // Clear reference error on successful validation
+    });
+
+    return true;
+  };
+
+  // Modify procesarFactura to use the new validation
   const procesarFactura = () => {
     console.log("Intentando procesar factura");
-    const errores = validarFormulario();
+    
+    // Use the new validation method
+    const isValid = validarFormulario();
 
-    if (errores.length > 0) {
-      alert("Errores en el formulario:\n" + errores.join("\n"));
+    if (!isValid) {
       return;
     }
 
@@ -951,6 +1140,12 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nombre del cliente"
                 />
+                {formErrors.cliente && (
+                  <p className="text-xs text-red-500 mt-1">
+                    <AlertTriangle className="inline-block h-4 w-4 mr-1" />
+                    {formErrors.cliente}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1001,21 +1196,82 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                     type="text"
                     value={direccion}
                     onChange={(e) => setDireccion(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 
+                      ${formErrors.domicilio.address 
+                        ? 'border-red-500 bg-red-50 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-blue-500'}`}
                     placeholder="Dirección completa"
                   />
+                  {formErrors.domicilio.address && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center">
+                      <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
+                      {formErrors.domicilio.address}
+                    </p>
+                  )}
                 </div>
                 <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Teléfono
-                              </label>
-                              <input
-                                type="tel"
-                                value={telefono}
-                                onChange={(e) => setTelefono(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Teléfono del cliente"
-                              />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Teléfono
+                  </label>
+                  <input
+                    type="tel"
+                    value={telefono}
+                    onChange={(e) => setTelefono(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 
+                      ${formErrors.domicilio.phone 
+                        ? 'border-red-500 bg-red-50 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-blue-500'}`}
+                    placeholder="Teléfono del cliente"
+                  />
+                  {formErrors.domicilio.phone && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center">
+                      <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
+                      {formErrors.domicilio.phone}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nombre del Domiciliario
+                  </label>
+                  <select
+                    value={domiciliarioSeleccionado || ""}
+                    onChange={(e) => {
+                      const selectedValue = e.target.value;
+                      setDomiciliarioSeleccionado(selectedValue ? parseInt(selectedValue) : "");
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 
+                      ${formErrors.domicilio.domiciliary 
+                        ? 'border-red-500 bg-red-50 focus:ring-red-500' 
+                        : 'border-gray-300 focus:ring-blue-500'}`}
+                  >
+                    <option value="">Seleccionar Domiciliario</option>
+                    {domiciliarios.map((domiciliario) => (
+                      <option key={domiciliario.id} value={domiciliario.id}>
+                        {domiciliario.nombre} - Tel: {domiciliario.telefono}
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.domicilio.domiciliary && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center">
+                      <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
+                      {formErrors.domicilio.domiciliary}
+                    </p>
+                  )}
+                  {errorDomiciliarios && (
+                    <p className="text-xs text-yellow-600 mt-1">
+                      <AlertTriangle className="inline-block h-4 w-4 mr-1" />
+                      {errorDomiciliarios === "No autenticado" 
+                        ? "Por favor, inicie sesión nuevamente" 
+                        : "No se pudieron cargar los domiciliarios"}
+                    </p>
+                  )}
+                  {domiciliarios.length === 0 && domicilio && !errorDomiciliarios && (
+                    <p className="text-xs text-yellow-600 mt-1">
+                      <AlertTriangle className="inline-block h-4 w-4 mr-1" />
+                      Cargando domiciliarios...
+                    </p>
+                  )}
                 </div>
                 </>
               )}
@@ -1033,60 +1289,57 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                   <option value="tarjeta">Tarjeta</option>
                   <option value="transferencia">Transferencia</option>
                   <option value="nequi">Nequi</option>
+                  <option value="bancolombia">Bancolombia</option>
+                  <option value="banco_av_villas">Banco AV Villas</option>
+                  <option value="daviplata">Daviplata</option>
                 </select>
               </div>
 
               {metodoPago !== "efectivo" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cuenta/Referencia
+                    Número de Referencia *
+                    <span className="text-xs text-gray-500 ml-2">
+                      {
+                        metodoPago === "tarjeta" ? "(Número de tarjeta)" :
+                        metodoPago === "transferencia" ? "(Referencia de transferencia)" :
+                        metodoPago === "nequi" ? "(Número de celular Nequi)" :
+                        metodoPago === "bancolombia" ? "(Número de Referencia Bancolombia)" :
+                        metodoPago === "banco_av_villas" ? "(Número de Referencia Banco AV Villas)" :
+                        metodoPago === "daviplata" ? "(Número de celular Daviplata)" :
+                        ""
+                      }
+                    </span>
                   </label>
                   <input
                     type="text"
                     value={cuentaReferencia}
                     onChange={(e) => setCuentaReferencia(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Número de cuenta o referencia"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2
+                      ${formErrors.referenciaPago
+                        ? 'border-red-500 bg-red-50 focus:ring-red-500'
+                        : 'border-gray-300 focus:ring-blue-500'}`}
+                    placeholder={
+                      metodoPago === "tarjeta" ? "XXXX-XXXX-XXXX-XXXX" :
+                      metodoPago === "transferencia" ? "Número de referencia" :
+                      metodoPago === "nequi" ? "Número de celular" :
+                      metodoPago === "bancolombia" ? "Número de Referencia Bancolombia" :
+                      metodoPago === "banco_av_villas" ? "Número de Referencia Banco AV Villas" :
+                      metodoPago === "daviplata" ? "Número de celular Daviplata" :
+                      "Número de referencia" // Default case
+                    }
                   />
+                  {formErrors.referenciaPago && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center">
+                      <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
+                      {formErrors.referenciaPago}
+                    </p>
+                  )}
                 </div>
               )}
 
               {domicilio && (
                 <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre del Domiciliario
-                    </label>
-                    <select
-                      value={domiciliarioSeleccionado || ""}
-                      onChange={(e) => {
-                        const selectedValue = e.target.value;
-                        setDomiciliarioSeleccionado(selectedValue ? parseInt(selectedValue) : "");
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Seleccionar Domiciliario</option>
-                      {domiciliarios.map((domiciliario) => (
-                        <option key={domiciliario.id} value={domiciliario.id}>
-                          {domiciliario.nombre} - Tel: {domiciliario.telefono}
-                        </option>
-                      ))}
-                    </select>
-                    {errorDomiciliarios && (
-                      <p className="text-xs text-red-500 mt-1">
-                        <AlertTriangle className="inline-block h-4 w-4 mr-1" />
-                        {errorDomiciliarios === "No autenticado" 
-                          ? "Por favor, inicie sesión nuevamente" 
-                          : "No se pudieron cargar los domiciliarios"}
-                      </p>
-                    )}
-                    {domiciliarios.length === 0 && domicilio && !errorDomiciliarios && (
-                      <p className="text-xs text-yellow-600 mt-1">
-                        <AlertTriangle className="inline-block h-4 w-4 mr-1" />
-                        Cargando domiciliarios...
-                      </p>
-                    )}
-                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Tarifa Domicilio
@@ -1134,6 +1387,12 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="0"
                 />
+                {formErrors.montoPagado && (
+                  <p className="text-xs text-red-500 mt-1">
+                    <AlertTriangle className="inline-block h-4 w-4 mr-1" />
+                    {formErrors.montoPagado}
+                  </p>
+                )}
               </div>
 
               {/* <div>
