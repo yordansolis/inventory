@@ -42,7 +42,7 @@ interface Producto {
   created_at: string;
   receta: ProductRecipeItem[];
   categoria_nombre?: string;
-  stock_quantity?: number;
+  // stock_quantity?: number;
 }
 
 interface ProductoFormData {
@@ -133,11 +133,11 @@ export default function ProductsPage() {
       cell: info => info.getValue() || getCategoryName(info.row.original.category_id),
       enableSorting: true,
     }),
-    columnHelper.accessor('stock_quantity', {
-      header: 'Stock',
-      cell: info => info.getValue() !== undefined ? info.getValue() : 'N/A',
-      enableSorting: true,
-    }),
+    // columnHelper.accessor('stock_quantity', {
+    //   header: 'Stock',
+    //   cell: info => info.getValue() !== undefined ? info.getValue() : 'N/A',
+    //   enableSorting: true,
+    // }),
     columnHelper.accessor('created_at', {
       header: 'Creado En',
       cell: info => mounted && info.getValue() ? formatDateToDDMMYYYY(info.getValue()) : 'N/A',
@@ -272,7 +272,7 @@ export default function ProductsPage() {
         id: item.id,
         nombre: item.nombre_insumo,
         unidadMedida: item.unidad || 'unidad (u)',
-        cantidad_utilizada: item.cantidad_utilizada || 0
+        cantidad_utilizada: item.cantidad_por_producto || 0
       })));
     } catch (err: any) {
       setError(`Error al cargar insumos: ${err.message}`);
