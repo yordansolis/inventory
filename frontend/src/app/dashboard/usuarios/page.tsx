@@ -22,7 +22,35 @@ interface User {
   email: string;
   estado: 'activo' | 'inactivo';
   fechaCreacion: string;
+  permisos: {
+    facturar: boolean;
+    verVentas: boolean;
+  };
 }
+
+// Switch component
+const Switch = ({ checked, onChange, disabled = false }: { checked: boolean; onChange: (checked: boolean) => void; disabled?: boolean }) => {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      className={`${checked ? 'bg-blue-600' : 'bg-gray-200'} 
+        relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent 
+        transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2
+        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      onClick={() => !disabled && onChange(!checked)}
+    >
+      <span
+        aria-hidden="true"
+        className={`${checked ? 'translate-x-5' : 'translate-x-0'}
+          pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 
+          transition duration-200 ease-in-out`}
+      />
+    </button>
+  );
+};
 
 export default function UsersManagement() {
   // Estado para manejar usuarios
@@ -87,7 +115,11 @@ export default function UsersManagement() {
           username: user.username,
           email: user.email,
           estado: user.is_active ? 'activo' : 'inactivo',
-          fechaCreacion: new Date(user.created_at || Date.now()).toLocaleDateString('es-CO')
+          fechaCreacion: new Date(user.created_at || Date.now()).toLocaleDateString('es-CO'),
+          permisos: {
+            facturar: user.permissions?.facturar || false,
+            verVentas: user.permissions?.verVentas || false
+          }
         }));
         // console.log(formattedUsers);
         
@@ -116,6 +148,7 @@ export default function UsersManagement() {
         username: user.username,
         email: user.email,
         estado: user.estado,
+        permisos: user.permisos || { facturar: false, verVentas: false }
       });
       setIsEditing(true);
     } else {
@@ -124,6 +157,10 @@ export default function UsersManagement() {
         email: '',
         password: '',
         estado: 'activo',
+        permisos: {
+          facturar: true, // Por defecto activado
+          verVentas: false
+        }
       });
       setIsEditing(false);
     }
@@ -156,6 +193,7 @@ export default function UsersManagement() {
         const updateData: any = {
           username: currentUser.username,
           email: currentUser.email,
+          permissions: currentUser.permisos
         };
         
         // Solo incluir contraseña si se ha proporcionado una nueva
@@ -183,7 +221,8 @@ export default function UsersManagement() {
           ...user,
           username: updatedUser.username,
           email: updatedUser.email,
-          estado: updatedUser.is_active ? 'activo' : 'inactivo'
+          estado: updatedUser.is_active ? 'activo' : 'inactivo',
+          permisos: updatedUser.permissions
         } : user));
       } else {
         // Llamada a la API para crear usuario (corregido para usar endpoint de admin)
@@ -195,9 +234,8 @@ export default function UsersManagement() {
           body: JSON.stringify({
             username: currentUser.username,
             email: currentUser.email,
-            password: currentUser.password
-            // Nota: Es posible que el backend requiera un 'role_id'. 
-            // Si después de este cambio hay un error, lo añadiremos.
+            password: currentUser.password,
+            permissions: currentUser.permisos
           })
         });
         
@@ -214,7 +252,8 @@ export default function UsersManagement() {
           username: currentUser.username,
           email: currentUser.email,
           estado: 'activo',
-          fechaCreacion: new Date().toLocaleDateString('es-CO')
+          fechaCreacion: new Date().toLocaleDateString('es-CO'),
+          permisos: currentUser.permisos
         }]);
       }
       
@@ -273,7 +312,7 @@ export default function UsersManagement() {
   );
 
   // Componente Badge personalizado
-  const Badge = ({ children, variant = "default" }: { children: React.ReactNode; variant?: "default" | "success" | "info" | "warning" | "danger" }) => {
+  const Badge = ({ children, variant = "default", className = "" }: { children: React.ReactNode; variant?: "default" | "success" | "info" | "warning" | "danger"; className?: string }) => {
     const variants = {
       default: "bg-gray-100 text-gray-800",
       success: "bg-green-100 text-green-800",
@@ -283,7 +322,7 @@ export default function UsersManagement() {
     };
 
     return (
-      <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${variants[variant]}`}>
+      <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${variants[variant]} ${className}`}>
         {children}
       </span>
     );
@@ -393,9 +432,21 @@ export default function UsersManagement() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant={user.estado === 'activo' ? 'success' : 'danger'}>
-                          {user.estado === 'activo' ? 'Activo' : 'Inactivo'}
-                        </Badge>
+                        <div className="flex flex-col space-y-1">
+                          <Badge variant={user.estado === 'activo' ? 'success' : 'danger'}>
+                            {user.estado === 'activo' ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                          {user.permisos?.facturar && (
+                            <Badge variant="info" className="text-xs">
+                              Facturación
+                            </Badge>
+                          )}
+                          {user.permisos?.verVentas && (
+                            <Badge variant="info" className="text-xs">
+                              Ver Ventas
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.fechaCreacion}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -545,6 +596,45 @@ export default function UsersManagement() {
                     value={currentUser.email}
                     onChange={(e) => setCurrentUser({...currentUser, email: e.target.value})}
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-4">
+                    Permisos
+                  </label>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-900">Permiso para Facturar</span>
+                        <span className="text-sm text-gray-500">Permite al usuario crear y gestionar facturas</span>
+                      </div>
+                      <Switch
+                        checked={currentUser.permisos?.facturar || false}
+                        onChange={(checked) => setCurrentUser({
+                          ...currentUser,
+                          permisos: {
+                            ...currentUser.permisos,
+                            facturar: checked
+                          }
+                        })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-900">Permiso para Ver Ventas del Día</span>
+                        <span className="text-sm text-gray-500">Permite al usuario ver el reporte de ventas diarias</span>
+                      </div>
+                      <Switch
+                        checked={currentUser.permisos?.verVentas || false}
+                        onChange={(checked) => setCurrentUser({
+                          ...currentUser,
+                          permisos: {
+                            ...currentUser.permisos,
+                            verVentas: checked
+                          }
+                        })}
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <div className="flex justify-between items-center">

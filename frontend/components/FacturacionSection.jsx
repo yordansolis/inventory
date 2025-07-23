@@ -37,6 +37,30 @@ import {
 } from "./ui/alert-dialog";
 import ItemListDisplay from "./ItemListDisplay";
 
+// Switch component
+const Switch = ({ checked, onChange, disabled = false }) => {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      className={`${checked ? 'bg-red-400' : 'bg-gray-200'} 
+        relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent 
+        transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2
+        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      onClick={() => !disabled && onChange(!checked)}
+    >
+      <span
+        aria-hidden="true"
+        className={`${checked ? 'translate-x-5' : 'translate-x-0'}
+          pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 
+          transition duration-200 ease-in-out`}
+      />
+    </button>
+  );
+};
+
 // Verificar que React está disponible
 console.log("React disponible:", typeof React);
 console.log("useState disponible:", typeof useState);
@@ -1252,21 +1276,17 @@ export default function FacturacionSection({ productosVendibles, productosConsum
 
               </div>
 
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="domicilio"
-                  checked={domicilio}
-                  onChange={(e) => setDomicilio(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label
-                  htmlFor="domicilio"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  ¿Es domicilio?
-                </label>
-              </div>
+              <div className="flex items-center justify-between space-x-2 mb-4">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-900">Es Domicilio</span>
+                    <span className="text-sm text-gray-500">Activar si el pedido es para entrega a domicilio</span>
+                  </div>
+                  <Switch
+                    checked={domicilio}
+                    onChange={(checked) => setDomicilio(checked)}
+                    
+                  />
+                </div>
 
               {domicilio && (
                 <>
