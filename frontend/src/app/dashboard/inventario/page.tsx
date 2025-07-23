@@ -92,8 +92,9 @@ export default function InventoryDashboard() {
                 <Button 
                   variant="default" 
                   size="lg" 
-                  className="w-full bg-slate-700 hover:bg-slate-800 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 group-hover:scale-105 flex items-center justify-center gap-2"
+                  className="w-full bg-blue-600 hover:bg-slate-800 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 group-hover:scale-105 flex items-center justify-center gap-2 cursor-pointer"
                 >
+                 
                   Gestionar
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -120,7 +121,7 @@ export default function InventoryDashboard() {
                 <Button 
                   variant="default" 
                   size="lg" 
-                  className="w-full bg-slate-700 hover:bg-slate-800 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 group-hover:scale-105 flex items-center justify-center gap-2"
+                  className="w-full bg-blue-600 hover:bg-slate-800 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 group-hover:scale-105 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   Gestionar
                   <ArrowRight className="h-4 w-4" />
@@ -148,7 +149,7 @@ export default function InventoryDashboard() {
                 <Button 
                   variant="default" 
                   size="lg" 
-                  className="w-full bg-slate-700 hover:bg-slate-800 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 group-hover:scale-105 flex items-center justify-center gap-2"
+                  className="w-full bg-blue-600 hover:bg-slate-800 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 group-hover:scale-105 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   Gestionar
                   <ArrowRight className="h-4 w-4" />

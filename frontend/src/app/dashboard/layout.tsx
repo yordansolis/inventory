@@ -55,13 +55,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Definir los elementos del menú
   const baseMenuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/dashboard' },
+    { id: 'dashboard', label: 'Inicio', icon: Home, href: '/dashboard' },
     { id: 'facturar', label: 'Facturar', icon: DollarSign, href: '/dashboard/factura' },
     { id: 'inventario', label: 'Inventario', icon: Package, href: '/dashboard/inventario' },
     { id: 'extracto-ventas', label: 'Extracto Ventas', icon: ShoppingCart, href: '/dashboard/estracto-ventas' },
     { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3, href: '/dashboard/estadisticas' },
     { id: 'domicilios', label: 'Domicilios', icon: Truck, href: '/dashboard/domicilios' },
-    { id: 'adiciones', label: 'Adiciones', icon: Plus, href: '/dashboard/adiciones' },
+    // { id: 'adiciones', label: 'Adiciones', icon: Plus, href: '/dashboard/adiciones' },
     { id: 'programacion-camisetas', label: 'Programación Camisetas', icon: Shirt, href: '/dashboard/programacion-camisetas' },
   ];
   
@@ -78,7 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex items-center">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className={`md:hidden mr-4 p-2 ${isFeminine ? 'rounded-full hover:bg-pink-50 text-pink-600 focus:ring-pink-300' : 'rounded-lg hover:bg-gray-100 text-gray-600 focus:ring-primary-500'} focus:outline-none focus:ring-2`}
+              className={`md:hidden mr-4 p-2 cursor-pointer ${isFeminine ? 'rounded-full hover:bg-pink-50 text-pink-600 focus:ring-pink-300' : 'rounded-lg hover:bg-gray-100 text-gray-600 focus:ring-primary-500'} focus:outline-none focus:ring-2`}
             >
               {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -104,7 +104,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Botón de cambio de tema */}
             <button
               onClick={toggleTheme}
-              className={`p-2 ${isFeminine 
+              className={`p-2 cursor-pointer ${isFeminine 
                 ? 'rounded-full bg-pink-100 hover:bg-pink-200 text-pink-700' 
                 : 'rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700'} 
                 flex items-center focus:outline-none transition-colors duration-200`}
@@ -122,7 +122,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className={`text-sm font-medium hidden sm:block ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{username || 'Usuario'}</span>
               <button
                 onClick={handleLogout}
-                className={`p-2 ${isFeminine 
+                className={`p-2 cursor-pointer  ${isFeminine 
                   ? 'rounded-full hover:bg-pink-50 text-rose-600 focus:ring-pink-300' 
                   : 'rounded-lg hover:bg-gray-100 text-red-600 focus:ring-red-500'} 
                   flex items-center focus:outline-none focus:ring-2`}

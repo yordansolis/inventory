@@ -240,7 +240,7 @@ export default function Dashboard() {
 
     return (
       <button
-        className={`inline-flex items-center justify-center ${isFeminine ? 'rounded-full' : 'rounded-md'} font-medium ${isFeminine ? 'transition-all duration-200' : 'transition-colors'} ${variants[variant]} ${sizes[size]} ${className}`}
+        className={`inline-flex cursor-pointer items-center justify-center ${isFeminine ? 'rounded-full' : 'rounded-md'} font-medium ${isFeminine ? 'transition-all duration-200' : 'transition-colors'} ${variants[variant]} ${sizes[size]} ${className}`}
         {...props}
       >
         {children}
@@ -256,7 +256,7 @@ export default function Dashboard() {
           <p className="mt-4 text-gray-900 font-medium">{error}</p>
           <button 
             onClick={() => window.location.reload()}
-            className={`mt-4 px-4 py-2 ${isFeminine 
+            className={`mt-4 px-4  cursor-pointer py-2 ${isFeminine 
               ? 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white rounded-full transition-all duration-200'
               : 'bg-primary-600 text-white rounded-md hover:bg-primary-700'}`}
           >
@@ -421,7 +421,7 @@ export default function Dashboard() {
                 disabled={currentPage === 1}
                 className={`${
                   currentPage === 1 
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed cursor-pointer' 
                     : `${isFeminine ? 'bg-pink-100 text-pink-600 hover:bg-pink-200' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`
                 } p-2 rounded-md`}
               >
@@ -472,7 +472,7 @@ export default function Dashboard() {
                 disabled={currentPage === totalPages || totalPages === 0}
                 className={`${
                   currentPage === totalPages || totalPages === 0
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed cursor-pointer' 
                     : `${isFeminine ? 'bg-pink-100 text-pink-600 hover:bg-pink-200' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`
                 } p-2 rounded-md`}
               >
