@@ -270,17 +270,13 @@ export default function FacturacionSection({ productosVendibles, productosConsum
     console.log("Intentando agregar al carrito:", producto);
     const itemExistente = carrito.find((item) => item.id === producto.id);
     if (itemExistente) {
-      setCarrito(
-        carrito.map((item) =>
-          item.id === producto.id
-            ? { ...item, cantidad: item.cantidad + 1 }
-            : item
-        )
-      );
+      // Si el producto ya existe en el carrito, no hacemos nada
+      console.log("Producto ya existe en el carrito, use los botones +/- para modificar la cantidad");
+      return;
     } else {
       setCarrito([...carrito, { ...producto, cantidad: 1 }]);
+      console.log("Carrito después de agregar:", [...carrito, { ...producto, cantidad: 1 }]);
     }
-    console.log("Carrito después de agregar:", [...carrito, { ...producto, cantidad: 1 }]);
   };
 
   const agregarAdicion = (adicion) => {
