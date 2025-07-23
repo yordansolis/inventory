@@ -10,7 +10,8 @@ import {
   TrendingUp,
   Search,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 import { useTheme } from '../utils/ThemeContext';
 import { useApi } from '../utils/api';
@@ -80,6 +81,20 @@ interface LowStockProduct {
   estado: string;
 }
 
+interface InsumoProduct {
+  id: number;
+  nombre_insumo: string;
+  unidad: string;
+  cantidad_unitaria: number;
+  precio_presentacion: number;
+  valor_unitario: number;
+  cantidad_utilizada: number;
+  cantidad_por_producto: number;
+  valor_utilizado: number;
+  stock_minimo: number;
+  sitio_referencia: string;
+}
+
 export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [stockSummary, setStockSummary] = useState<StockSummary | null>(null);
@@ -128,35 +143,76 @@ export default function Dashboard() {
           }
           
           try {
-            // Fetch stock overview
-            const stockResponse = await fetch(`${apiUrl}/api/v1/services/stock/summary/overview`, {
+            // Cargar datos de stock desde la API de insumos
+            const insumosResponse = await fetch(`${apiUrl}/api/v1/insumos`, {
               headers
             });
             
-            if (stockResponse.ok) {
-              const stockResult = await stockResponse.json();
-              setStockSummary(stockResult);
+            if (insumosResponse.ok) {
+              const insumosData = await insumosResponse.json();
+              
+              if (Array.isArray(insumosData)) {
+                // Calcular métricas de stock basadas en los insumos
+                const totalProductos = insumosData.length;
+                const stockBajo = insumosData.filter(item => {
+                  const stockDisponible = item.cantidad_unitaria - item.cantidad_utilizada;
+                  return stockDisponible <= item.stock_minimo && item.stock_minimo > 0;
+                }).length;
+                
+                const sinStock = insumosData.filter(item => 
+                  (item.cantidad_unitaria - item.cantidad_utilizada) <= 0
+                ).length;
+                
+                const disponibles = totalProductos - stockBajo - sinStock;
+                
+                // Crear resumen de stock
+                const stockSummaryData: StockSummary = {
+                  total_productos: totalProductos,
+                  productos_sin_stock: sinStock,
+                  productos_stock_bajo: stockBajo,
+                  productos_disponibles: disponibles,
+                  fecha_actualizacion: new Date().toISOString(),
+                  porcentaje_sin_stock: (sinStock / totalProductos) * 100,
+                  porcentaje_stock_bajo: (stockBajo / totalProductos) * 100,
+                  porcentaje_disponibles: (disponibles / totalProductos) * 100
+                };
+                
+                setStockSummary(stockSummaryData);
+                
+                // Crear lista de productos con stock bajo
+                const productosConStockBajo = insumosData
+                  .map((insumo: InsumoProduct) => {
+                    const stockDisponible = insumo.cantidad_unitaria - insumo.cantidad_utilizada;
+                    if (stockDisponible <= insumo.stock_minimo && insumo.stock_minimo > 0) {
+                      return {
+                        id: insumo.id,
+                        nombre: insumo.nombre_insumo,
+                        cantidad: stockDisponible,
+                        minimo: insumo.stock_minimo,
+                        estado: stockDisponible <= (insumo.stock_minimo * 0.5) ? 'critical' : 'warning'
+                      };
+                    }
+                    return null;
+                  })
+                  .filter((item): item is LowStockProduct => item !== null)
+                  // Ordenar por criticidad: primero los críticos y luego por porcentaje más bajo de stock
+                  .sort((a, b) => {
+                    if (a.estado === 'critical' && b.estado !== 'critical') return -1;
+                    if (a.estado !== 'critical' && b.estado === 'critical') return 1;
+                    
+                    const pctA = a.cantidad / a.minimo;
+                    const pctB = b.cantidad / b.minimo;
+                    return pctA - pctB;
+                  });
+                
+                setLowStockProducts(productosConStockBajo);
+              }
             } else {
-              setError('Error al cargar resumen de stock');
+              throw new Error('Error al cargar insumos');
             }
           } catch (stockError) {
+            console.error('Error al procesar datos de stock:', stockError);
             setError('Error al cargar resumen de stock');
-          }
-          
-          try {
-            // Fetch low stock products
-            const lowStockResponse = await fetch(`${apiUrl}/api/v1/services/stock/low`, {
-              headers
-            });
-            
-            if (lowStockResponse.ok) {
-              const lowStockResult = await lowStockResponse.json();
-              setLowStockProducts(lowStockResult.productos || []);
-            } else {
-              setError('Error al cargar productos con stock bajo');
-            }
-          } catch (lowStockError) {
-            setError('Error al cargar productos con stock bajo');
           }
         });
       } catch (err) {
@@ -246,6 +302,88 @@ export default function Dashboard() {
         {children}
       </button>
     );
+  };
+
+  const refreshStockData = async () => {
+    try {
+      await withLoading(async () => {
+        const token = localStorage.getItem('authToken') || '';
+        const headers = {
+          'Authorization': `bearer ${token}`
+        };
+        const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8053';
+        
+        // Cargar datos de stock desde la API de insumos
+        const insumosResponse = await fetch(`${apiUrl}/api/v1/insumos`, {
+          headers
+        });
+        
+        if (insumosResponse.ok) {
+          const insumosData = await insumosResponse.json();
+          
+          if (Array.isArray(insumosData)) {
+            // Calcular métricas de stock basadas en los insumos
+            const totalProductos = insumosData.length;
+            const stockBajo = insumosData.filter(item => {
+              const stockDisponible = item.cantidad_unitaria - item.cantidad_utilizada;
+              return stockDisponible <= item.stock_minimo && item.stock_minimo > 0;
+            }).length;
+            
+            const sinStock = insumosData.filter(item => 
+              (item.cantidad_unitaria - item.cantidad_utilizada) <= 0
+            ).length;
+            
+            const disponibles = totalProductos - stockBajo - sinStock;
+            
+            // Crear resumen de stock
+            const stockSummaryData: StockSummary = {
+              total_productos: totalProductos,
+              productos_sin_stock: sinStock,
+              productos_stock_bajo: stockBajo,
+              productos_disponibles: disponibles,
+              fecha_actualizacion: new Date().toISOString(),
+              porcentaje_sin_stock: (sinStock / totalProductos) * 100,
+              porcentaje_stock_bajo: (stockBajo / totalProductos) * 100,
+              porcentaje_disponibles: (disponibles / totalProductos) * 100
+            };
+            
+            setStockSummary(stockSummaryData);
+            
+            // Crear lista de productos con stock bajo
+            const productosConStockBajo = insumosData
+              .map((insumo: InsumoProduct) => {
+                const stockDisponible = insumo.cantidad_unitaria - insumo.cantidad_utilizada;
+                if (stockDisponible <= insumo.stock_minimo && insumo.stock_minimo > 0) {
+                  return {
+                    id: insumo.id,
+                    nombre: insumo.nombre_insumo,
+                    cantidad: stockDisponible,
+                    minimo: insumo.stock_minimo,
+                    estado: stockDisponible <= (insumo.stock_minimo * 0.5) ? 'critical' : 'warning'
+                  };
+                }
+                return null;
+              })
+              .filter((item): item is LowStockProduct => item !== null)
+              // Ordenar por criticidad: primero los críticos y luego por porcentaje más bajo de stock
+              .sort((a, b) => {
+                if (a.estado === 'critical' && b.estado !== 'critical') return -1;
+                if (a.estado !== 'critical' && b.estado === 'critical') return 1;
+                
+                const pctA = a.cantidad / a.minimo;
+                const pctB = b.cantidad / b.minimo;
+                return pctA - pctB;
+              });
+            
+            setLowStockProducts(productosConStockBajo);
+          }
+        } else {
+          throw new Error('Error al cargar insumos');
+        }
+      });
+    } catch (err) {
+      setError('Error actualizando datos de inventario. Por favor intente nuevamente.');
+    }
   };
 
   if (error) {
@@ -484,37 +622,230 @@ export default function Dashboard() {
       </Card>
 
       {/* Low Stock Alert */}
+      <Card className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <h2 className={`text-xl font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+              Estado del Inventario
+            </h2>
+            <button 
+              onClick={refreshStockData} 
+              className={`ml-2 p-1.5 ${isFeminine ? 'hover:bg-pink-100 text-pink-600' : 'hover:bg-gray-100 text-gray-600'} rounded-full transition-colors`}
+              title="Actualizar datos de inventario"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+          <Badge variant={lowStockProducts.length > 0 ? "danger" : "success"} size="lg">
+            {lowStockProducts.length > 0 
+              ? `${lowStockProducts.length} productos con stock bajo`
+              : "Inventario OK"
+            }
+          </Badge>
+        </div>
+        
+        {stockSummary && (
+          <div className={`grid grid-cols-3 gap-4 p-4 mb-6 ${isFeminine ? 'bg-pink-50' : 'bg-gray-50'} rounded-lg`}>
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-1">Stock Disponible</p>
+              <p className={`text-xl font-bold ${isFeminine ? 'text-green-600' : 'text-green-700'}`}>
+                {stockSummary.productos_disponibles || 0}
+              </p>
+              <p className="text-xs text-gray-500">
+                {stockSummary.porcentaje_disponibles ? `${Math.round(stockSummary.porcentaje_disponibles)}%` : '0%'}
+              </p>
+              {/* Progress Bar */}
+              <div className="w-full bg-gray-200 h-2 mt-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-green-500 h-full" 
+                  style={{ width: `${stockSummary.porcentaje_disponibles || 0}%` }}
+                ></div>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-1">Stock Bajo</p>
+              <p className={`text-xl font-bold ${isFeminine ? 'text-amber-600' : 'text-amber-700'}`}>
+                {stockSummary.productos_stock_bajo || 0}
+              </p>
+              <p className="text-xs text-gray-500">
+                {stockSummary.porcentaje_stock_bajo ? `${Math.round(stockSummary.porcentaje_stock_bajo)}%` : '0%'}
+              </p>
+              {/* Progress Bar */}
+              <div className="w-full bg-gray-200 h-2 mt-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-amber-500 h-full" 
+                  style={{ width: `${stockSummary.porcentaje_stock_bajo || 0}%` }}
+                ></div>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-1">Sin Stock</p>
+              <p className={`text-xl font-bold ${isFeminine ? 'text-rose-600' : 'text-red-700'}`}>
+                {stockSummary.productos_sin_stock || 0}
+              </p>
+              <p className="text-xs text-gray-500">
+                {stockSummary.porcentaje_sin_stock ? `${Math.round(stockSummary.porcentaje_sin_stock)}%` : '0%'}
+              </p>
+              {/* Progress Bar */}
+              <div className="w-full bg-gray-200 h-2 mt-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-red-500 h-full" 
+                  style={{ width: `${stockSummary.porcentaje_sin_stock || 0}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Combined visual representation of stock */}
+        {stockSummary && (
+          <div className="mb-6 p-4 border border-gray-100 rounded-lg">
+            <p className="text-sm font-medium text-gray-600 mb-3">Distribución del inventario</p>
+            <div className="flex h-6 w-full rounded-lg overflow-hidden">
+              <div 
+                className="bg-green-500 h-full transition-all duration-500 ease-in-out" 
+                style={{ width: `${stockSummary.porcentaje_disponibles || 0}%` }}
+                title={`Stock disponible: ${stockSummary.productos_disponibles || 0} productos (${Math.round(stockSummary.porcentaje_disponibles || 0)}%)`}
+              ></div>
+              <div 
+                className="bg-amber-500 h-full transition-all duration-500 ease-in-out" 
+                style={{ width: `${stockSummary.porcentaje_stock_bajo || 0}%` }}
+                title={`Stock bajo: ${stockSummary.productos_stock_bajo || 0} productos (${Math.round(stockSummary.porcentaje_stock_bajo || 0)}%)`}
+              ></div>
+              <div 
+                className="bg-red-500 h-full transition-all duration-500 ease-in-out" 
+                style={{ width: `${stockSummary.porcentaje_sin_stock || 0}%` }}
+                title={`Sin stock: ${stockSummary.productos_sin_stock || 0} productos (${Math.round(stockSummary.porcentaje_sin_stock || 0)}%)`}
+              ></div>
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-gray-500">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-green-500 mr-1 rounded-sm"></div>
+                <span>Disponible</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-amber-500 mr-1 rounded-sm"></div>
+                <span>Stock bajo</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-red-500 mr-1 rounded-sm"></div>
+                <span>Sin stock</span>
+              </div>
+            </div>
+            {stockSummary.fecha_actualizacion && (
+              <p className="text-xs text-gray-400 mt-3 text-right">
+                Actualizado: {new Date(stockSummary.fecha_actualizacion).toLocaleString()}
+              </p>
+            )}
+          </div>
+        )}
+        
+        {lowStockProducts.length > 0 ? (
+          <div className="space-y-3">
+            <h3 className="font-medium text-gray-700 mb-2 flex items-center">
+              <AlertTriangle className={`h-4 w-4 mr-1.5 ${isFeminine ? 'text-rose-500' : 'text-red-500'}`} />
+              Productos que requieren reabastecimiento
+            </h3>
+            {lowStockProducts.slice(0, 5).map((producto, index) => (
+              <div key={`producto-${producto.id}-${index}`} className={`flex items-center justify-between p-3 ${
+                producto.estado === 'critical' 
+                  ? isFeminine ? 'bg-rose-50 border border-rose-200' : 'bg-red-50 border border-red-200'
+                  : isFeminine ? 'bg-amber-50 border border-amber-200' : 'bg-yellow-50 border border-yellow-200'
+              } rounded-lg`}>
+                <div>
+                  <p className={`font-medium ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{producto.nombre}</p>
+                  <div className="flex items-center mt-1">
+                    <div className="w-full max-w-[100px] bg-gray-200 h-2 rounded-full overflow-hidden mr-3">
+                      <div 
+                        className={`h-full ${producto.cantidad <= producto.minimo * 0.5 ? 'bg-red-500' : 'bg-amber-500'}`}
+                        style={{ width: `${Math.min(100, Math.round((producto.cantidad / producto.minimo) * 100))}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      <span className={producto.cantidad <= producto.minimo * 0.5 ? 'font-medium text-red-600' : ''}>
+                        {producto.cantidad}
+                      </span>
+                      <span className="mx-1">/</span>
+                      <span>{producto.minimo}</span>
+                      <span className="ml-2 text-xs">
+                        ({Math.round((producto.cantidad / producto.minimo) * 100)}%)
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <Badge 
+                  variant={producto.cantidad <= producto.minimo * 0.5 ? "danger" : "warning"} 
+                  size="default"
+                >
+                  {producto.cantidad <= producto.minimo * 0.5 ? 'Crítico' : 'Bajo'}
+                </Badge>
+              </div>
+            ))}
+            
+            <div className="flex justify-between items-center mt-4">
+              <p className="text-sm text-gray-500">
+                {lowStockProducts.length > 5 ? `Mostrando 5 de ${lowStockProducts.length} productos con stock bajo` : ''}
+              </p>
+              <Button
+                onClick={() => window.location.href = '/dashboard/inventario/suministro'}
+                className={`flex items-center ${isFeminine ? 'bg-pink-600 hover:bg-pink-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+              >
+                Ir a gestión de suministros
+                <Eye className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className={`p-3 ${isFeminine ? 'bg-green-100' : 'bg-green-100'} rounded-full mb-3`}>
+              <ShoppingCart className={`h-6 w-6 ${isFeminine ? 'text-green-600' : 'text-green-600'}`} />
+            </div>
+            <p className="text-center text-gray-600 mb-2">¡Todo bajo control! No hay productos con stock bajo</p>
+            <Button
+              size="sm"
+              onClick={() => window.location.href = '/dashboard/inventario/suministro'}
+              className={`mt-2 ${isFeminine ? 'bg-pink-600 hover:bg-pink-700' : ''}`}
+            >
+              Ir a Inventario
+              <Eye className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* Payment Methods */}
       <Card>
         <div className="flex items-center justify-between mb-4">
           <h2 className={`text-xl font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
-            Alertas de Stock Bajo
+            Métodos de Pago
           </h2>
-          <Badge variant="danger" size="lg">
-            {lowStockProducts.length} productos
+          <Badge variant="info" size="lg">
+            {dashboardData?.metodos_pago?.length || 0} métodos
           </Badge>
         </div>
-        {lowStockProducts.length > 0 ? (
-          <div className="space-y-3">
-            {lowStockProducts.map((producto, index) => (
-              <div key={`producto-${producto.id}-${index}`} className={`flex items-center justify-between p-3 ${isFeminine ? 'bg-rose-50 border border-rose-200' : 'bg-red-50 border border-red-200'} rounded-lg`}>
-                <div>
-                  <p className={`font-medium ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{producto.nombre}</p>
-                  <p className="text-sm text-gray-600">
-                    Stock: {producto.cantidad} | Mínimo: {producto.minimo}
-                  </p>
-                </div>
-                <Button 
-                  variant="danger" 
-                  size="sm"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Reabastecer
-                </Button>
-              </div>
-            ))}
+        {dashboardData?.metodos_pago && dashboardData.metodos_pago.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className={`min-w-full divide-y ${isFeminine ? 'divide-pink-100' : 'divide-gray-200'}`}>
+              <thead className={isFeminine ? 'bg-pink-50' : 'bg-gray-50'}>
+                <tr>
+                  <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Método</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Ventas</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Total</th>
+                </tr>
+              </thead>
+              <tbody className={`bg-white divide-y ${isFeminine ? 'divide-pink-100' : 'divide-gray-200'}`}>
+                {dashboardData.metodos_pago.map((metodo, index) => (
+                  <tr key={index} className={`hover:${isFeminine ? 'bg-pink-50' : 'bg-gray-50'} transition-colors`}>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{metodo.payment_method}</td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm`}>{metodo.count}</td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold`}>{formatPrice(metodo.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <p className="text-center text-gray-500 py-4">No hay productos con stock bajo</p>
+          <p className="text-center text-gray-500 py-4">No hay métodos de pago registrados.</p>
         )}
       </Card>
     </>
