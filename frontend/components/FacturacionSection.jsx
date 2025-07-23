@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 
 import {
   ShoppingCart,
@@ -59,6 +59,56 @@ export default function FacturacionSection({ productosVendibles, productosConsum
   // Estado para notificación de éxito
   const [notificacionExito, setNotificacionExito] = useState(false);
   const [mensajeExito, setMensajeExito] = useState("");
+
+  // Nuevos estados para categorías
+  const [categorias, setCategorias] = useState([]);
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
+  const [loadingCategorias, setLoadingCategorias] = useState(true);
+  const [errorCategorias, setErrorCategorias] = useState(null);
+
+  // Función para cargar categorías
+  const cargarCategorias = useCallback(async () => {
+    try {
+      setLoadingCategorias(true);
+      setErrorCategorias(null);
+      
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://localhost:8000';
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        throw new Error("No se encontró token de autenticación");
+      }
+      
+      const response = await fetch(`${apiUrl}/api/v1/categories`, {
+        headers: {
+          'Authorization': `bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar las categorías');
+      }
+      
+      const data = await response.json();
+      // Normalizar los datos de las categorías
+      const categoriasNormalizadas = (Array.isArray(data) ? data : []).map(cat => ({
+        id: cat.id,
+        nombre: cat.name || cat.nombre || cat.nombre_categoria || '(Sin nombre)',
+      }));
+      setCategorias(categoriasNormalizadas);
+    } catch (error) {
+      console.error("Error al cargar categorías:", error);
+      setErrorCategorias(error.message);
+    } finally {
+      setLoadingCategorias(false);
+    }
+  }, []);
+
+  // Efecto para cargar categorías al montar el componente
+  useEffect(() => {
+    cargarCategorias();
+  }, [cargarCategorias]);
 
   // Nuevos estados para domiciliarios
   const [domiciliarios, setDomiciliarios] = useState([]);
@@ -187,15 +237,27 @@ export default function FacturacionSection({ productosVendibles, productosConsum
 
   // Filtrar productos según búsqueda
   const productosFiltrados = useMemo(() => {
-    if (!busquedaProducto) return productosVendibles || [];
-    return (productosVendibles || []).filter(
-      (producto) =>
-        producto.nombre
-          .toLowerCase()
-          .includes(busquedaProducto.toLowerCase()) ||
+    if (!productosVendibles) return [];
+    
+    let productos = productosVendibles;
+
+    // Primero filtrar por categoría si hay una seleccionada
+    if (categoriaSeleccionada) {
+      productos = productos.filter(producto => 
+        producto.tipo.toLowerCase() === categoriaSeleccionada.nombre.toLowerCase()
+      );
+    }
+
+    // Luego filtrar por búsqueda si hay texto
+    if (busquedaProducto) {
+      productos = productos.filter(producto =>
+        producto.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
         producto.tipo.toLowerCase().includes(busquedaProducto.toLowerCase())
-    );
-  }, [busquedaProducto, productosVendibles]);
+      );
+    }
+
+    return productos;
+  }, [busquedaProducto, productosVendibles, categoriaSeleccionada]);
 
   // Filtrar adiciones según búsqueda
   const adicionesFiltradas = useMemo(() => {
@@ -1082,42 +1144,85 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                 ? "Adiciones Disponibles"
                 : "Productos Disponibles"}
             </h2>
-            
-            {/* Lista simplificada para depuración */}
-            {/* <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold mb-2">Lista Simplificada (DEPURACIÓN):</h4>
-              {(productosFiltrados || []).map((producto, index) => (
-                <div key={producto.id || index} className="flex justify-between items-center py-2 border-b">
-                  <div>
-                    <span className="font-medium">{producto.nombre}</span>
-                    <span className="text-sm text-gray-600 ml-2">
-                      Stock: {producto.stock + 1} | Precio: {formatPrice(producto.precio)}
-                    </span>
-                  </div>
 
-                  <button
-                    onClick={() => {
-                      console.log("SIMPLE: Clic en agregar producto:", producto);
-                      agregarAlCarrito(producto);
-                    }}
-                    className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 cursor-pointer"
-                  >
-                    + Agregar Simple
-                  </button>
+            {!mostrarAdiciones && (
+              <div className="mb-6">
+                <div className="flex flex-wrap gap-2">
+                  {categorias.map((categoria) => {
+                    const count = productosVendibles?.filter(
+                      (p) => p.tipo.toLowerCase() === categoria.nombre.toLowerCase()
+                    ).length || 0;
+                    
+                    const isSelected = categoriaSeleccionada?.id === categoria.id;
+                    
+                    return (
+                      <button
+                        key={categoria.id}
+                        onClick={() => setCategoriaSeleccionada(categoria)}
+                        className={`
+                          inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium
+                          border transition-all duration-200 shadow-sm
+                          ${isSelected
+                            ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }
+                          focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
+                        `}
+                      >
+                        {categoria.nombre}
+                        <span className={`
+                          ml-1.5 px-1.5 py-0.5 text-xs rounded-full
+                          ${isSelected
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-600'
+                          }
+                        `}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
-              {(!productosFiltrados || productosFiltrados.length === 0) && (
-                <p className="text-gray-500 text-center py-4">No hay productos disponibles</p>
-              )}
-            </div> */}
+                {loadingCategorias && (
+                  <div className="flex items-center text-sm text-gray-500 mt-2">
+                    <svg className="animate-spin h-4 w-4 mr-2 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Cargando categorías...
+                  </div>
+                )}
+                {errorCategorias && (
+                  <div className="flex items-center text-sm text-red-500 mt-2">
+                    <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {errorCategorias}
+                  </div>
+                )}
+              </div>
+            )}
 
-            {/* Componente original */}
-            <ItemListDisplay
-              items={mostrarAdiciones ? adicionesFiltradas : productosFiltrados}
-              onAddItem={mostrarAdiciones ? agregarAdicion : agregarAlCarrito}
-              formatPrice={formatPrice}
-              badgeVariant={mostrarAdiciones ? "purple" : "info"}
-            />
+            {/* Lista de productos */}
+            {!mostrarAdiciones && categoriaSeleccionada ? (
+              <ItemListDisplay
+                items={productosFiltrados}
+                onAddItem={agregarAlCarrito}
+                formatPrice={formatPrice}
+                badgeVariant="info"
+              />
+            ) : !mostrarAdiciones ? (
+              <div className="text-center py-8 text-gray-500">
+                Selecciona una categoría para ver los productos
+              </div>
+            ) : (
+              <ItemListDisplay
+                items={adicionesFiltradas}
+                onAddItem={agregarAdicion}
+                formatPrice={formatPrice}
+                badgeVariant="purple"
+              />
+            )}
           </Card>
         </div>
 
