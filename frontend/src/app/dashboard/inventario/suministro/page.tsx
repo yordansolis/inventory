@@ -12,7 +12,8 @@ interface ConsumableProduct {
   unidadMedida: string;
   cantidadUnitaria: number; // Changed from presentacionCantidad
   precioPresentacion: number;
-  cantidadUtilizada: number; // Para control de stock
+  cantidadUtilizada: number; // Representa el stock actual disponible
+  cantidadActual?: number; // Nueva: Para control de stock
   cantidadPorProducto: number; // Nueva: Cantidad utilizada por producto en recetas
   minimo: number;
   valorUnitario: number; // Calculated field
@@ -182,6 +183,7 @@ export default function SuministroPage() {
             cantidadUnitaria: product.cantidad_unitaria || 0,
             precioPresentacion: product.precio_presentacion || 0,
             cantidadUtilizada: product.cantidad_utilizada || 0,
+            cantidadActual: product.cantidad_utilizada || 0, // cantidadUtilizada es lo que queda en stock
             cantidadPorProducto: product.cantidad_por_producto || 0,
             minimo: product.stock_minimo,
             valorUnitario: product.valor_unitario || 0,
@@ -460,6 +462,7 @@ export default function SuministroPage() {
               cantidadUnitaria: parsedCantidadUnitaria,
               precioPresentacion: parsedPrecioPresentacion,
               cantidadUtilizada: parsedCantidadUtilizada,
+              cantidadActual: parsedCantidadUtilizada, // cantidadUtilizada es lo que queda en stock
               cantidadPorProducto: parsedCantidadPorProducto,
               minimo: parsedMinimo,
               valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
@@ -476,6 +479,7 @@ export default function SuministroPage() {
             cantidadUnitaria: parsedCantidadUnitaria,
             precioPresentacion: parsedPrecioPresentacion,
             cantidadUtilizada: parsedCantidadUtilizada,
+            cantidadActual: parsedCantidadUtilizada, // cantidadUtilizada es lo que queda en stock
             cantidadPorProducto: parsedCantidadPorProducto,
             minimo: parsedMinimo,
             valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
@@ -646,12 +650,20 @@ export default function SuministroPage() {
   }, []);
 
   const getStockAlertBadge = useCallback((producto: ConsumableProduct) => {
-    // Determine the stock status based on cantidadUtilizada and minimo
-    if (producto.cantidadUtilizada <= producto.minimo) {
-      return <Badge variant="danger">Stock Bajo</Badge>;
+    const stockActual = producto.cantidadUtilizada;
+    const stockMinimo = producto.minimo;
+    const unidad = producto.unidadMedida;
+
+    if (stockActual <= stockMinimo) {
+      // Stock en o por debajo del mínimo
+      return <Badge variant="danger">Stock Bajo ({stockActual} {unidad})</Badge>;
+    } else if (stockActual <= stockMinimo * 2) {
+      // Stock entre el mínimo y el doble del mínimo
+      return <Badge variant="warning">Stock Medio ({stockActual} {unidad})</Badge>;
+    } else {
+      // Stock mayor al doble del mínimo
+      return <Badge variant="success">Stock OK ({stockActual} {unidad})</Badge>;
     }
-    // You can add more conditions here for 'warning' or 'success' if needed
-    return null; // No badge if stock is fine
   }, [Badge]);
 
   const filteredProducts = useMemo(() => {
@@ -742,7 +754,7 @@ export default function SuministroPage() {
 
           <div>
             <label htmlFor="cantidadUnitaria" className="block text-sm font-medium text-gray-700 mb-1">
-              Cantidad de Presentación *
+              Cantidad de Disponible *
             </label>
             <input
               type="text"
@@ -836,7 +848,7 @@ export default function SuministroPage() {
 
           <div>
             <label htmlFor="cantidadUtilizada" className="block text-sm font-medium text-gray-700 mb-1">
-              Cantidad Utilizada (Control de Stock)
+              Stock Actual
             </label>
             <input
               type="text"
@@ -847,7 +859,7 @@ export default function SuministroPage() {
               placeholder="Ej: 50 o 0,5"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Este campo es para control interno de stock. No afecta a las recetas.
+              Este campo representa la cantidad actual disponible en stock.
             </p>
           </div>
 
@@ -972,7 +984,7 @@ export default function SuministroPage() {
                     Precio Presentación
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
-                    Cantidad Utilizada
+                    Stock Actual
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
                     Valor Unitario

@@ -206,7 +206,7 @@ export default function InventoryLogin() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-pink-600"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-pink-600 cursor-pointer"
                 >
                   {showPassword ? (
                     <HiEyeOff className="h-6 w-6" />
@@ -228,7 +228,7 @@ export default function InventoryLogin() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 focus:ring-pink-400 text-white text-base font-medium py-4 rounded-lg transition-all duration-200 shadow-sm"
+              className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 focus:ring-pink-400 text-white text-base font-medium py-4 rounded-lg transition-all duration-200 shadow-sm cursor-pointer"
               size="lg"
             >
               {loading ? (
