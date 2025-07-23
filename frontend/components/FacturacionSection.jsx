@@ -1479,6 +1479,17 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                     {formErrors.montoPagado}
                   </p>
                 )}
+                <p className="text-sm text-gray-600 mt-2 flex items-center justify-between">
+                  <span>Total a pagar:</span>
+                  <span className="font-semibold text-gray-900">
+                    {formatPrice(calcularTotal + (domicilio ? tarifaDomicilio : 0))}
+                  </span>
+                </p>
+                {domicilio && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    (Incluye tarifa de domicilio: {formatPrice(tarifaDomicilio)})
+                  </p>
+                )}
               </div>
 
               {/* <div>
