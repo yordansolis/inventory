@@ -1161,7 +1161,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                         onClick={() => setCategoriaSeleccionada(categoria)}
                         className={`
                           inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium
-                          border transition-all duration-200 shadow-sm
+                          border transition-all duration-200 shadow-sm cursor-pointer
                           ${isSelected
                             ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
                             : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'

@@ -848,7 +848,7 @@ export default function SuministroPage() {
 
           <div>
             <label htmlFor="cantidadUtilizada" className="block text-sm font-medium text-gray-700 mb-1">
-              Stock Actual
+              Cantidad Utilizada
             </label>
             <input
               type="text"
@@ -984,7 +984,7 @@ export default function SuministroPage() {
                     Precio Presentación
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
-                    Stock Actual
+                    Cantidad Utilizada
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
                     Valor Unitario
