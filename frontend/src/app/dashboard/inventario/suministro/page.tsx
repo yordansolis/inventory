@@ -650,19 +650,39 @@ export default function SuministroPage() {
   }, []);
 
   const getStockAlertBadge = useCallback((producto: ConsumableProduct) => {
-    const stockActual = producto.cantidadUtilizada;
+    // cantidad_unitaria is the total quantity purchased
+    // cantidad_utilizada is how much has been used so far
+    // So remaining stock = cantidad_unitaria - cantidad_utilizada
+    const stockTotal = producto.cantidadUnitaria;
+    const cantidadUsada = producto.cantidadUtilizada;
+    const stockActual = stockTotal - cantidadUsada;
     const stockMinimo = producto.minimo;
     const unidad = producto.unidadMedida;
 
-    if (stockActual <= stockMinimo) {
-      // Stock en o por debajo del mínimo
-      return <Badge variant="danger">Stock Bajo ({stockActual} {unidad})</Badge>;
-    } else if (stockActual <= stockMinimo * 2) {
-      // Stock entre el mínimo y el doble del mínimo
-      return <Badge variant="warning">Stock Medio ({stockActual} {unidad})</Badge>;
-    } else {
-      // Stock mayor al doble del mínimo
+    if (stockMinimo <= 0) {
+      // If no minimum stock is set, we can't determine the status properly.
       return <Badge variant="success">Stock OK ({stockActual} {unidad})</Badge>;
+    }
+
+    // Calculate percentage of remaining stock compared to minimum
+    const stockPercentage = (stockActual / stockMinimo) * 100;
+    const formattedPercentage = Math.round(stockPercentage); // Round to whole number
+    
+    // Define thresholds for alerts
+    const criticalThreshold = 50; // 50% of minimum stock or less is critical
+    
+    if (stockActual <= 0) {
+      // No stock available
+      return <Badge variant="danger">Sin Stock (0 {unidad})</Badge>;
+    } else if (stockPercentage <= criticalThreshold) {
+      // Stock is critically low (50% or less of the minimum)
+      return <Badge variant="danger">Stock Crítico ({stockActual} {unidad} - {formattedPercentage}% del mínimo)</Badge>;
+    } else if (stockActual <= stockMinimo) {
+      // Stock is below or equal to minimum, but not critical
+      return <Badge variant="warning">Stock Bajo ({stockActual}/{stockMinimo} {unidad} - {formattedPercentage}%)</Badge>;
+    } else {
+      // Stock is above minimum (OK)
+      return <Badge variant="success">Stock OK ({stockActual}/{stockMinimo} {unidad})</Badge>;
     }
   }, [Badge]);
 
@@ -678,6 +698,13 @@ export default function SuministroPage() {
     );
   }, [productosConsumibles, searchTerm]);
 
+  // Calculate number of products with low stock
+  const lowStockCount = useMemo(() => {
+    return productosConsumibles.filter(producto => 
+      producto.minimo > 0 && (producto.cantidadUnitaria - producto.cantidadUtilizada) <= producto.minimo
+    ).length;
+  }, [productosConsumibles]);
+
   // Calcular productos para la página actual
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
@@ -691,6 +718,20 @@ export default function SuministroPage() {
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Suministros</h1>
+      
+      {lowStockCount > 0 && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-md flex items-start">
+          <AlertCircle className="h-5 w-5 text-amber-500 mr-2 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-medium text-amber-800">Alerta de Stock</h3>
+            <p className="text-sm text-amber-700 mt-1">
+              {lowStockCount === 1 
+                ? 'Hay 1 producto por debajo del nivel mínimo de stock.' 
+                : `Hay ${lowStockCount} productos por debajo del nivel mínimo de stock.`}
+            </p>
+          </div>
+        </div>
+      )}
       
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md flex items-start">
@@ -984,7 +1025,7 @@ export default function SuministroPage() {
                     Precio Presentación
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
-                    Cantidad Utilizada
+                    Stock Disponible
                   </th>
                   <th className="p-4 text-left font-semibold text-gray-600">
                     Valor Unitario
@@ -1021,8 +1062,8 @@ export default function SuministroPage() {
                     <td className="p-4 text-gray-700">
                       ${formatCurrencyWithoutTrailingZeros(producto.precioPresentacion)}
                     </td>
-                    <td className="p-4 text-gray-700">
-                      {producto.cantidadUtilizada} {producto.unidadMedida}
+                    <td className={`p-4 ${(producto.cantidadUnitaria - producto.cantidadUtilizada) <= producto.minimo ? 'font-medium text-amber-700' : 'text-gray-700'}`}>
+                      {producto.cantidadUnitaria - producto.cantidadUtilizada} {producto.unidadMedida}
                     </td>
                     <td className="p-4 text-gray-700">
                       ${formatCurrencyWithoutTrailingZeros(producto.valorUnitario)}
@@ -1034,7 +1075,16 @@ export default function SuministroPage() {
                       {producto.minimo} {producto.unidadMedida}
                     </td>
                     <td className="p-4 text-gray-700">
-                      {getStockAlertBadge(producto)}
+                      <div className="group relative cursor-help">
+                        {getStockAlertBadge(producto)}
+                        {(producto.cantidadUnitaria - producto.cantidadUtilizada) <= producto.minimo && (
+                          <div className="absolute z-10 hidden group-hover:block mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded shadow-lg">
+                            <p className="font-medium">Alerta de Stock</p>
+                            <p className="mt-1">El stock actual ({producto.cantidadUnitaria - producto.cantidadUtilizada} {producto.unidadMedida}) está por debajo del mínimo recomendado ({producto.minimo} {producto.unidadMedida}).</p>
+                            <p className="mt-1">Se recomienda reabastecer este producto.</p>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-gray-700">
                       {producto.sitioReferencia}
