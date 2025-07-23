@@ -220,6 +220,19 @@ def create_tables():
     )
     """
     
+    # Tabla de permisos de usuarios
+    user_permissions_table = """
+    CREATE TABLE IF NOT EXISTS user_permissions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        facturar BOOLEAN DEFAULT FALSE,
+        verVentas BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """
+    
     # Tabla de categorías
     categories_table = """
     CREATE TABLE IF NOT EXISTS categories (
@@ -358,6 +371,7 @@ def create_tables():
     tables = [
         roles_table,
         users_table,
+        user_permissions_table,
         categories_table,
         products_table,
         insumos_table,
@@ -382,6 +396,7 @@ def create_tables():
             "DROP TABLE IF EXISTS products;",
             "DROP TABLE IF EXISTS insumos;",
             "DROP TABLE IF EXISTS categories;",
+            "DROP TABLE IF EXISTS user_permissions;",
             "DROP TABLE IF EXISTS users;",
             "DROP TABLE IF EXISTS roles;"
         ]

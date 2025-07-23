@@ -91,7 +91,7 @@ GET /api/v1/admin/users/1
 ### Crear un Nuevo Usuario
 
 ```
-POST
+POST /api/v1/admin/users
 ```
 
 **Body (raw JSON):**
@@ -101,9 +101,22 @@ POST
   "username": "nuevo_empleado",
   "email": "empleado@ejemplo.com",
   "password": "Contraseña123,",
-  "role_id": 2
+  "role_id": 2,
+  "permissions": {
+    "facturar": true,
+    "verVentas": false
+  }
 }
 ```
+
+**Notas sobre los permisos:**
+
+- `facturar`: Si es `true`, el usuario puede acceder al módulo de facturación
+- `verVentas`: Si es `true`, el usuario puede acceder al módulo de extracto de ventas. **NOTA: Este permiso solo puede ser asignado a usuarios con role_id=1 (superusuarios)**.
+- Si no se especifican permisos, se asignarán permisos predeterminados según el rol del usuario:
+  - Superusuarios (role_id: 1): Tienen todos los permisos
+  - Staff (role_id: 2): Por defecto pueden facturar pero no ver ventas
+  - Otros roles: No tienen permisos por defecto
 
 ### Actualizar un Usuario
 
@@ -118,15 +131,29 @@ PUT /api/v1/admin/users/2
   "username": "empleado_actualizado",
   "email": "actualizado@ejemplo.com",
   "role_id": 3,
-  "is_active": true
+  "is_active": true,
+  "permissions": {
+    "facturar": true,
+    "verVentas": true
+  }
 }
 ```
+
+**Notas para actualización:**
+
+- Se pueden actualizar solo los permisos sin necesidad de modificar otros campos del usuario
+- Los permisos se sobrescriben completamente en cada actualización
 
 ### Desactivar un Usuario
 
 ```
 DELETE /api/v1/admin/users/3
 ```
+
+**Efectos:**
+
+- El usuario no podrá iniciar sesión
+- Si intenta acceder con un token previamente emitido, será redirigido al login
 
 ### Activar un Usuario Desactivado
 
@@ -144,7 +171,11 @@ PATCH /api/v1/admin/users/3/activate
   "role_id": 2,
   "is_active": true,
   "created_at": "2023-05-15T10:30:00",
-  "role_name": "staff"
+  "role_name": "staff",
+  "permissions": {
+    "facturar": true,
+    "verVentas": false
+  }
 }
 ```
 

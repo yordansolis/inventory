@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from enum import Enum
 
@@ -18,6 +18,11 @@ class RoleResponse(RoleBase):
     class Config:
         from_attributes = True
 
+# Esquema de permisos de usuario
+class UserPermissions(BaseModel):
+    facturar: bool = False
+    verVentas: bool = False
+
 # Esquemas de Usuario
 class UserBase(BaseModel):
     username: str
@@ -26,6 +31,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
     role_id: Optional[int] = 2  # Por defecto, rol de staff
+    permissions: Optional[UserPermissions] = None
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
@@ -33,6 +39,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     role_id: Optional[int] = None
     is_active: Optional[bool] = None
+    permissions: Optional[Dict[str, bool]] = None
 
 class UserResponse(UserBase):
     id: int
@@ -40,6 +47,7 @@ class UserResponse(UserBase):
     is_active: bool
     created_at: datetime
     role_name: Optional[str] = None
+    permissions: Optional[Dict[str, bool]] = None
 
     class Config:
         from_attributes = True

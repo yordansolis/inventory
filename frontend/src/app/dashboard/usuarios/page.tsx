@@ -270,25 +270,35 @@ export default function UsersManagement() {
   // Manejar cambio de estado de usuario
   const handleToggleStatus = async (id: number) => {
     try {
-      const user = users.find(u => u.id === id);
-      if (!user) return;
+      const userToToggle = users.find(u => u.id === id);
+      if (!userToToggle) return;
       
-      const newStatus = user.estado === 'activo' ? 'inactivo' : 'activo';
+      const currentStatus = userToToggle.estado;
+      const newStatus = currentStatus === 'activo' ? 'inactivo' : 'activo';
       const headers = getAuthHeaders();
       
-      // Llamada a la API para actualizar estado
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/admin/users/${id}`, {
-        method: 'DELETE',
-        headers
-      });
+      let response;
+      if (newStatus === 'inactivo') {
+        // Desactivar usuario (usar DELETE)
+        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/admin/users/${id}`, {
+          method: 'DELETE',
+          headers
+        });
+      } else {
+        // Activar usuario (usar PATCH)
+        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/admin/users/${id}/activate`, {
+          method: 'PATCH',
+          headers
+        });
+      }
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || 'Error al cambiar estado del usuario');
       }
       
-      // Actualizar estado en la lista
-      setUsers(users.map(user => 
+      // Si la operación fue exitosa, actualizar la lista de usuarios
+      setUsers(prevUsers => prevUsers.map(user => 
         user.id === id 
           ? { ...user, estado: newStatus } 
           : user
@@ -622,6 +632,9 @@ export default function UsersManagement() {
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-gray-900">Permiso para Ver Ventas del Día</span>
                         <span className="text-sm text-gray-500">Permite al usuario ver el reporte de ventas diarias</span>
+                        {currentUser.role_id !== 1 && (
+                          <span className="text-xs text-red-500 mt-1">Solo disponible para administradores</span>
+                        )}
                       </div>
                       <Switch
                         checked={currentUser.permisos?.verVentas || false}
@@ -632,6 +645,7 @@ export default function UsersManagement() {
                             verVentas: checked
                           }
                         })}
+                        disabled={currentUser.role_id !== 1}
                       />
                     </div>
                   </div>

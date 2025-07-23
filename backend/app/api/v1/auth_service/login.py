@@ -38,6 +38,7 @@ def get_password_hash(password):
 
 def get_user(username: str) -> Optional[dict]:
     """Obtener usuario de la base de datos"""
+    # Consulta principal para obtener datos del usuario y su rol
     query = """
     SELECT u.*, r.name as role_name 
     FROM users u 
@@ -45,6 +46,51 @@ def get_user(username: str) -> Optional[dict]:
     WHERE u.username = %s
     """
     user = execute_query(query, (username,), fetch_one=True)
+    
+    if user:
+        # Consultar permisos de la tabla user_permissions
+        permissions_query = """
+        SELECT facturar, verVentas
+        FROM user_permissions
+        WHERE user_id = %s
+        """
+        permissions = execute_query(permissions_query, (user["id"],), fetch_one=True)
+        
+        if permissions:
+            # Si el usuario tiene permisos personalizados, usarlos
+            # Pero asegurarse que solo los administradores (role_id 1) puedan ver ventas
+            user["permissions"] = {
+                "facturar": bool(permissions["facturar"]),
+                "verVentas": bool(permissions["verVentas"]) and user["role_id"] == 1
+            }
+        else:
+            # Si no tiene permisos personalizados, asignar permisos según el rol
+            if user["role_id"] == 1:  # Superuser - tiene todos los permisos
+                user["permissions"] = {
+                    "facturar": True,
+                    "verVentas": True
+                }
+            else:
+                user["permissions"] = {
+                    "facturar": user["role_id"] in [1, 2],  # Superuser y staff pueden facturar
+                    "verVentas": False  # Solo superuser puede ver ventas
+                }
+            
+            # Crear un registro de permisos para este usuario
+            insert_permissions_query = """
+            INSERT INTO user_permissions (user_id, facturar, verVentas)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE facturar = VALUES(facturar), verVentas = VALUES(verVentas)
+            """
+            execute_query(
+                insert_permissions_query,
+                (
+                    user["id"],
+                    user["permissions"]["facturar"],
+                    user["permissions"]["verVentas"]
+                )
+            )
+    
     return user
 
 
@@ -147,6 +193,15 @@ async def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Verificar si el usuario está activo
+    if not user["is_active"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user["username"]}, expires_delta=access_token_expires
@@ -181,6 +236,7 @@ async def read_users_me(
         is_active=current_user["is_active"],
         created_at=current_user["created_at"],
         role_id=current_user["role_id"],
-        role_name=current_user.get("role_name")
+        role_name=current_user.get("role_name"),
+        permissions=current_user.get("permissions", {"facturar": False, "verVentas": False})
     )
 

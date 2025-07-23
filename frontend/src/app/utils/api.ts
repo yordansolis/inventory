@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useLoading } from './LoadingContext';
+import { getAuthHeaders } from './auth';
 
 // Tipos para las respuestas de la API
 interface ApiResponse<T> {
@@ -21,7 +22,7 @@ export function useApi() {
     try {
       return await apiCallFn();
     } catch (error) {
-      console.error("Error en la petición API:", error);
+      console.error("Error en la petición API:", error instanceof Error ? error.message : 'Error desconocido');
       throw error;
     } finally {
       // Aseguramos que el spinner siempre se oculte, incluso si hay errores
@@ -33,26 +34,42 @@ export function useApi() {
   const get = useCallback(async <T>(url: string): Promise<ApiResponse<T>> => {
     return withLoading(async () => {
       try {
-        const token = localStorage.getItem('token') || '';
-        const response = await fetch(url, {
-          headers: {
-            'Authorization': `bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const headers = getAuthHeaders(); // Usar la función de auth.ts para obtener los headers
+
+        const response = await fetch(url, { headers });
 
         if (response.ok) {
-          const data = await response.json();
-          return { data, status: response.status };
+          // Para respuestas vacías o no JSON
+          if (response.status === 204) {
+            return { status: response.status }; // No content
+          }
+          
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            return { data, status: response.status };
+          } else {
+            return { status: response.status };
+          }
         } else {
-          const errorData = await response.json().catch(() => ({}));
-          return { 
-            error: errorData.detail || 'Error en la petición', 
-            status: response.status 
-          };
+          let errorMessage = 'Error en la petición';
+          try {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const errorData = await response.json();
+              errorMessage = errorData.detail || errorMessage;
+            } else {
+              const errorText = await response.text();
+              if (errorText) errorMessage = errorText;
+            }
+          } catch (parseError) {
+            console.warn('No se pudo parsear el error:', parseError);
+          }
+          
+          return { error: errorMessage, status: response.status };
         }
       } catch (error) {
-        console.error('Error en la petición:', error);
+        console.error('Error en la petición:', error instanceof Error ? error.message : 'Error desconocido');
         return { 
           error: 'Error de conexión', 
           status: 0 
@@ -65,28 +82,46 @@ export function useApi() {
   const post = useCallback(async <T>(url: string, body: any): Promise<ApiResponse<T>> => {
     return withLoading(async () => {
       try {
-        const token = localStorage.getItem('token') || '';
+        const headers = getAuthHeaders();
+        
         const response = await fetch(url, {
           method: 'POST',
-          headers: {
-            'Authorization': `bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
+          headers,
           body: JSON.stringify(body)
         });
 
         if (response.ok) {
-          const data = await response.json();
-          return { data, status: response.status };
+          // Para respuestas vacías o no JSON
+          if (response.status === 204) {
+            return { status: response.status }; // No content
+          }
+          
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            return { data, status: response.status };
+          } else {
+            return { status: response.status };
+          }
         } else {
-          const errorData = await response.json().catch(() => ({}));
-          return { 
-            error: errorData.detail || 'Error en la petición', 
-            status: response.status 
-          };
+          let errorMessage = 'Error en la petición';
+          try {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const errorData = await response.json();
+              errorMessage = errorData.detail || errorMessage;
+            } else {
+              const errorText = await response.text();
+              if (errorText) errorMessage = errorText;
+            }
+          } catch (parseError) {
+            console.warn('No se pudo parsear el error:', parseError);
+          }
+          
+          return { error: errorMessage, status: response.status };
         }
       } catch (error) {
-        console.error('Error en la petición:', error);
+        console.error('Error en la petición:', error instanceof Error ? error.message : 'Error desconocido');
         return { 
           error: 'Error de conexión', 
           status: 0 
@@ -99,28 +134,46 @@ export function useApi() {
   const put = useCallback(async <T>(url: string, body: any): Promise<ApiResponse<T>> => {
     return withLoading(async () => {
       try {
-        const token = localStorage.getItem('token') || '';
+        const headers = getAuthHeaders();
+        
         const response = await fetch(url, {
           method: 'PUT',
-          headers: {
-            'Authorization': `bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
+          headers,
           body: JSON.stringify(body)
         });
 
         if (response.ok) {
-          const data = await response.json();
-          return { data, status: response.status };
+          // Para respuestas vacías o no JSON
+          if (response.status === 204) {
+            return { status: response.status }; // No content
+          }
+          
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            return { data, status: response.status };
+          } else {
+            return { status: response.status };
+          }
         } else {
-          const errorData = await response.json().catch(() => ({}));
-          return { 
-            error: errorData.detail || 'Error en la petición', 
-            status: response.status 
-          };
+          let errorMessage = 'Error en la petición';
+          try {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const errorData = await response.json();
+              errorMessage = errorData.detail || errorMessage;
+            } else {
+              const errorText = await response.text();
+              if (errorText) errorMessage = errorText;
+            }
+          } catch (parseError) {
+            console.warn('No se pudo parsear el error:', parseError);
+          }
+          
+          return { error: errorMessage, status: response.status };
         }
       } catch (error) {
-        console.error('Error en la petición:', error);
+        console.error('Error en la petición:', error instanceof Error ? error.message : 'Error desconocido');
         return { 
           error: 'Error de conexión', 
           status: 0 
@@ -133,27 +186,45 @@ export function useApi() {
   const del = useCallback(async <T>(url: string): Promise<ApiResponse<T>> => {
     return withLoading(async () => {
       try {
-        const token = localStorage.getItem('token') || '';
+        const headers = getAuthHeaders();
+        
         const response = await fetch(url, {
           method: 'DELETE',
-          headers: {
-            'Authorization': `bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+          headers
         });
 
         if (response.ok) {
-          const data = await response.json().catch(() => ({}));
-          return { data, status: response.status };
+          // Para respuestas vacías o no JSON
+          if (response.status === 204) {
+            return { status: response.status }; // No content
+          }
+          
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            return { data, status: response.status };
+          } else {
+            return { status: response.status };
+          }
         } else {
-          const errorData = await response.json().catch(() => ({}));
-          return { 
-            error: errorData.detail || 'Error en la petición', 
-            status: response.status 
-          };
+          let errorMessage = 'Error en la petición';
+          try {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const errorData = await response.json();
+              errorMessage = errorData.detail || errorMessage;
+            } else {
+              const errorText = await response.text();
+              if (errorText) errorMessage = errorText;
+            }
+          } catch (parseError) {
+            console.warn('No se pudo parsear el error:', parseError);
+          }
+          
+          return { error: errorMessage, status: response.status };
         }
       } catch (error) {
-        console.error('Error en la petición:', error);
+        console.error('Error en la petición:', error instanceof Error ? error.message : 'Error desconocido');
         return { 
           error: 'Error de conexión', 
           status: 0 

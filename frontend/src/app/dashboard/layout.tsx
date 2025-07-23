@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation'; // For active link highlighting
+import { usePathname } from 'next/navigation';
 import {
   ShoppingCart,
   Package,
@@ -21,23 +21,39 @@ import {
   Palette
 } from 'lucide-react';
 import AuthGuard from '../components/AuthGuard';
-import { logout, getUsername, getUserRole } from '../utils/auth';
+import { logout, getUsername, getUserRole, fetchCurrentUser } from '../utils/auth';
 import { useTheme } from '../utils/ThemeContext';
+import { UserPermissions } from '../utils/permissions';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [username, setUsername] = useState('');
   const [userRole, setUserRole] = useState<number>(0);
-  const pathname = usePathname(); // Get current pathname for active link styling
+  const [userPermissions, setUserPermissions] = useState<UserPermissions | null>(null);
+  const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const isFeminine = theme === 'feminine';
 
   useEffect(() => {
-    // Obtener nombre de usuario y rol del localStorage
-    setUsername(getUsername());
-    setUserRole(getUserRole());
+    const initializeUser = async () => {
+      setUsername(getUsername());
+      setUserRole(getUserRole());
+      
+      try {
+        const userData = await fetchCurrentUser();
+        if (userData) {
+          setUserPermissions({
+            facturar: userData.permissions?.facturar || false,
+            verVentas: userData.permissions?.verVentas || false,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    initializeUser();
     
-    // Asegurarse de que el favicon se cargue correctamente
     const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
     if (!link) {
       const newLink = document.createElement('link');
@@ -53,22 +69,40 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     logout();
   };
 
-  // Definir los elementos del menú
-  const baseMenuItems = [
-    { id: 'dashboard', label: 'Inicio', icon: Home, href: '/dashboard' },
-    { id: 'facturar', label: 'Facturar', icon: DollarSign, href: '/dashboard/factura' },
-    { id: 'inventario', label: 'Inventario', icon: Package, href: '/dashboard/inventario' },
-    { id: 'extracto-ventas', label: 'Extracto Ventas', icon: ShoppingCart, href: '/dashboard/estracto-ventas' },
-    { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3, href: '/dashboard/estadisticas' },
-    { id: 'domicilios', label: 'Domicilios', icon: Truck, href: '/dashboard/domicilios' },
-    // { id: 'adiciones', label: 'Adiciones', icon: Plus, href: '/dashboard/adiciones' },
-    { id: 'programacion-camisetas', label: 'Programación Camisetas', icon: Shirt, href: '/dashboard/programacion-camisetas' },
+  // Función para determinar si mostrar dashboard
+  const shouldShowDashboard = () => {
+    return userPermissions?.facturar && userPermissions?.verVentas;
+  };
+
+  // Definir los elementos del menú con sus requisitos de permisos
+  const menuItems = [
+    // Dashboard solo se muestra si tiene ambos permisos
+    ...(shouldShowDashboard() ? [
+      { id: 'dashboard', label: 'Inicio', icon: Home, href: '/dashboard', requiresPermission: null }
+    ] : []),
+    // Mostrar facturación si tiene permiso
+    ...(userPermissions?.facturar ? [
+      { id: 'facturar', label: 'Facturar', icon: DollarSign, href: '/dashboard/factura', requiresPermission: 'facturar' }
+    ] : []),
+    // Mostrar extracto de ventas si tiene permiso
+    ...(userPermissions?.verVentas ? [
+      { id: 'extracto-ventas', label: 'Extracto Ventas', icon: ShoppingCart, href: '/dashboard/estracto-ventas', requiresPermission: 'verVentas' }
+    ] : []),
+    // Los siguientes items solo se muestran para roles administrativos (no es 2)
+    ...(userRole !== 2 ? [
+      { id: 'inventario', label: 'Inventario', icon: Package, href: '/dashboard/inventario', requiresPermission: null },
+      { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3, href: '/dashboard/estadisticas', requiresPermission: null },
+      { id: 'domicilios', label: 'Domicilios', icon: Truck, href: '/dashboard/domicilios', requiresPermission: null },
+      { id: 'programacion-camisetas', label: 'Programación Camisetas', icon: Shirt, href: '/dashboard/programacion-camisetas', requiresPermission: null },
+      { id: 'usuarios', label: 'Usuarios', icon: Users, href: '/dashboard/usuarios', requiresPermission: null }
+    ] : [])
   ];
-  
-  // Agregar la sección de Usuarios solo si el rol no es 2
-  const menuItems = userRole !== 2 
-    ? [...baseMenuItems, { id: 'usuarios', label: 'Usuarios', icon: Users, href: '/dashboard/usuarios' }]
-    : baseMenuItems;
+
+  // Filtrar elementos del menú basado en permisos
+  const filteredMenuItems = menuItems.filter(item => {
+    if (!item.requiresPermission) return true;
+    return userPermissions?.[item.requiresPermission as keyof UserPermissions];
+  });
 
   return (
     <AuthGuard>
@@ -101,7 +135,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Botón de cambio de tema */}
             <button
               onClick={toggleTheme}
               className={`p-2 cursor-pointer ${isFeminine 
@@ -155,14 +188,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   />
                 </div>
               </div>
-              {menuItems.map((item) => {
+              {filteredMenuItems.map((item) => {
                 const IconComponent = item.icon;
                 const isActive = (item.href === '/dashboard' && pathname === '/dashboard') || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                 return (
                   <Link
                     key={item.id}
                     href={item.href}
-                    onClick={() => setSidebarOpen(false)} // Close sidebar on navigation
+                    onClick={() => setSidebarOpen(false)}
                     className={`w-full flex items-center px-6 py-3 text-left text-sm font-medium transition-colors ${
                       isActive
                         ? isFeminine 
@@ -189,7 +222,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             />
           )}
 
-          {/* Main Content Area - where child pages will be rendered */}
+          {/* Main Content Area */}
           <div className={`flex-1 px-4 py-6 ${isFeminine ? 'bg-gradient-to-br from-pink-50 to-white' : 'bg-gray-50'}`}>
             {children}
           </div>

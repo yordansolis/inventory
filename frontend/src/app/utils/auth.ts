@@ -113,16 +113,42 @@ export const fetchCurrentUser = async (): Promise<any> => {
     });
     
     if (!response.ok) {
-      // Log the full response for debugging
-      const errorText = await response.text();
-      console.error('User fetch error details:', {
-        status: response.status,
-        statusText: response.statusText,
-        errorText,
-        headers: Object.fromEntries(response.headers.entries())
-      });
+      // Handle inactive user specifically
+      if (response.status === 400) {
+        try {
+          const errorData = await response.json();
+          if (errorData.detail === "Inactive user") {
+            console.warn('Inactive user account detected');
+            // Instead of logging out immediately, just clear the token
+            localStorage.removeItem('authToken');
+            window.location.href = '/login?error=inactive';
+            return null;
+          }
+        } catch (parseError) {
+          // Fall through to general error handling if we can't parse the response
+        }
+      }
       
-      // Throw a more informative error
+      // Log the full response for debugging but handle potential errors
+      try {
+        const errorText = await response.text();
+        // Only log error details if we have meaningful text
+        if (errorText && errorText.trim() !== '') {
+          console.error('User fetch error details:', {
+            status: response.status,
+            statusText: response.statusText,
+            errorText: errorText.substring(0, 500), // Limit text size in case it's very large
+            headers: Object.fromEntries([...response.headers].filter(([key]) => key !== 'set-cookie')) // Filter out sensitive headers
+          });
+        } else {
+          console.error('User fetch failed with status:', response.status, response.statusText);
+        }
+      } catch (parseError) {
+        // If there's an error parsing the error response, just log the status
+        console.error('User fetch failed with status:', response.status, response.statusText);
+      }
+      
+      // For other errors, throw a generic error
       throw new Error(`Error al obtener datos del usuario: ${response.status} ${response.statusText}`);
     }
     
@@ -142,7 +168,7 @@ export const fetchCurrentUser = async (): Promise<any> => {
     
     return userData;
   } catch (error: unknown) {
-    console.error('Error al obtener datos del usuario:', error);
+    console.error('Error al obtener datos del usuario:', error instanceof Error ? error.message : 'Error desconocido');
     
     // If the error is a network error or authentication problem, log out the user
     if (error instanceof TypeError || 

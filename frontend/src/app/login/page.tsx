@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Label, TextInput, Button, Alert, Spinner } from 'flowbite-react';
 import { HiEye, HiEyeOff, HiInformationCircle } from 'react-icons/hi';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 
 export default function InventoryLogin() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -15,6 +17,27 @@ export default function InventoryLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Verificar si hay errores en los parámetros de la URL
+  useEffect(() => {
+    const errorParam = searchParams?.get('error');
+    
+    if (errorParam) {
+      switch(errorParam) {
+        case 'inactive':
+          setError('Tu cuenta ha sido desactivada. Por favor contacta al administrador.');
+          break;
+        case 'auth':
+          setError('Sesión expirada. Por favor inicia sesión nuevamente.');
+          break;
+        case 'nopermissions':
+          setError('No tienes permisos para acceder al sistema. Por favor contacta al administrador.');
+          break;
+        default:
+          setError('Error de autenticación. Por favor inicia sesión nuevamente.');
+      }
+    }
+  }, [searchParams]);
 
   // Verificar si ya hay una sesión activa
   useEffect(() => {
@@ -73,7 +96,25 @@ export default function InventoryLogin() {
       });
       
       if (!response.ok) {
-        throw new Error('Credenciales inválidas');
+        // Intentar obtener el mensaje de error detallado
+        let errorMessage = 'Credenciales inválidas';
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json();
+            
+            // Verificar si es un error de cuenta inactiva
+            if (response.status === 403 && errorData.detail === "User account is inactive") {
+              errorMessage = 'Esta cuenta ha sido desactivada. Por favor contacte al administrador.';
+            } else if (errorData.detail) {
+              errorMessage = errorData.detail;
+            }
+          }
+        } catch (parseError) {
+          console.warn('Error al parsear respuesta de error:', parseError);
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -94,8 +135,22 @@ export default function InventoryLogin() {
         }
       }
       
-      // Redirigir usando el router de Next.js
-      router.push('/dashboard');
+      // Verificar permisos del usuario para determinar a dónde redirigir
+      let redirectPath = '/dashboard';
+      
+      if (data.user?.permissions) {
+        const permissions = data.user.permissions;
+        
+        // Si tiene un solo permiso, redirigir directo a la página correspondiente
+        if (permissions.facturar && !permissions.verVentas) {
+          redirectPath = '/dashboard/factura';
+        } else if (!permissions.facturar && permissions.verVentas) {
+          redirectPath = '/dashboard/estracto-ventas';
+        }
+      }
+      
+      // Redirigir según los permisos
+      router.push(redirectPath);
       
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
