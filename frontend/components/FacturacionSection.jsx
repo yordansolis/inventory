@@ -1004,7 +1004,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                         onClick={() =>
                           actualizarCantidad(item.id, item.cantidad - 1)
                         }
-                        className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center"
+                        className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center cursor-pointer"
                       >
                         -
                       </button>
@@ -1015,14 +1015,14 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                         onClick={() =>
                           actualizarCantidad(item.id, item.cantidad + 1)
                         }
-                        className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center"
+                        className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center cursor-pointer"
                         disabled={item.cantidad >= item.stock}
                       >
                         +
                       </button>
                       <button
                         onClick={() => eliminarDelCarrito(item.id)}
-                        className="ml-2 text-red-600 hover:text-red-800"
+                        className="ml-2 text-red-600 hover:text-red-800 cursor-pointer"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -1052,7 +1052,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                         onClick={() =>
                           actualizarCantidadAdicion(item.id, item.cantidad - 1)
                         }
-                        className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center"
+                        className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center cursor-pointer"
                       >
                         -
                       </button>
@@ -1063,14 +1063,14 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                         onClick={() =>
                           actualizarCantidadAdicion(item.id, item.cantidad + 1)
                         }
-                        className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center"
+                        className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center cursor-pointer"
                         disabled={item.cantidad >= item.stock}
                       >
                         +
                       </button>
                       <button
                         onClick={() => eliminarAdicion(item.id)}
-                        className="ml-2 text-red-600 hover:text-red-800"
+                        className="ml-2 text-red-600 hover:text-red-800 cursor-pointer"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -1099,25 +1099,6 @@ export default function FacturacionSection({ productosVendibles, productosConsum
             )}
           </Card>
 
-          {/* Botones de filtro */}
-          <div className="flex space-x-4">
-            <Button
-              variant={!mostrarAdiciones ? "default" : "info"}
-              onClick={() => setMostrarAdiciones(false)}
-              className="flex-1 cursor-pointer"
-            >
-              <Package className="h-4 w-4 mr-2" />
-              Productos ({productosFiltrados.length})
-            </Button>
-            <Button
-              variant={mostrarAdiciones ? "default" : "info"}
-              onClick={() => setMostrarAdiciones(true)}
-              className="flex-1 cursor-pointer"
-            >
-              <Star className="h-4 w-4 mr-2" />
-              Adiciones ({adicionesFiltradas.length})
-            </Button>
-          </div>
           {/* Input de búsqueda para productos y adiciones */}
           <div className="mb-4">
             <label htmlFor="search" className="sr-only">
@@ -1139,7 +1120,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
           </div>
           {/* Productos o Adiciones Disponibles */}
           <Card>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4 ">
               {mostrarAdiciones
                 ? "Adiciones Disponibles"
                 : "Productos Disponibles"}
@@ -1160,7 +1141,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                         key={categoria.id}
                         onClick={() => setCategoriaSeleccionada(categoria)}
                         className={`
-                          inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium
+                          inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium uppercase
                           border transition-all duration-200 shadow-sm cursor-pointer
                           ${isSelected
                             ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
@@ -1548,11 +1529,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
             <AlertDialog open={alertDialogOpen} onOpenChange={setAlertDialogOpen}>
               <Button
                 onClick={procesarFactura}
-                className="flex-1 
-                cursor-pointer
-                bg-blue-600
-                 text-white rounded hover:bg-blue-700"
-
+                className="flex-1 cursor-pointer bg-blue-600 text-white rounded hover:bg-blue-700"
                 disabled={carrito.length === 0 && adicionesCarrito.length === 0}
               >
                 <DollarSign className="h-4 w-4 mr-2" />
@@ -1573,7 +1550,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            <Button variant="danger" onClick={limpiarFormulario}>
+            <Button variant="danger" onClick={limpiarFormulario} className="cursor-pointer">
               Limpiar
             </Button>
           </div>
@@ -1589,7 +1566,7 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                 <h2 className="text-2xl font-bold text-gray-900">Factura #{ultimaFactura.id}</h2>
                 <button
                   onClick={cerrarFacturaYRecargar}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-500 hover:text-gray-700 cursor-pointer"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -1748,10 +1725,10 @@ export default function FacturacionSection({ productosVendibles, productosConsum
               </div>
 
               <div className="mt-6 flex space-x-3">
-                <Button onClick={() => window.print()} className="flex-1">
+                <Button onClick={() => window.print()} className="flex-1 cursor-pointer">
                   Imprimir
                 </Button>
-                <Button variant="danger" onClick={cerrarFacturaYRecargar}>
+                <Button variant="danger" onClick={cerrarFacturaYRecargar} className="cursor-pointer">
                   Cerrar
                 </Button>
               </div>
