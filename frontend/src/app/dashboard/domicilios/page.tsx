@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../utils/auth';
+import toast, { Toaster } from 'react-hot-toast'; // Import toast and Toaster
 
 interface Domiciliario {
   id: number;
@@ -16,15 +17,9 @@ interface DomiciliarioFormData {
   tarifa: string;
 }
 
-interface ApiError {
-  message: string;
-  visible: boolean;
-}
-
 export default function DomiciliosPage() {
   const [domiciliarios, setDomiciliarios] = useState<Domiciliario[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<ApiError>({ message: '', visible: false });
   const { getToken } = useAuth();
 
   const [formData, setFormData] = useState<DomiciliarioFormData>({
@@ -34,6 +29,72 @@ export default function DomiciliosPage() {
   });
 
   const [editingId, setEditingId] = useState<number | null>(null);
+
+  // Custom toast styles
+  const showSuccessToast = useCallback((message: string) => {
+    toast.success(message, {
+      duration: 3000,
+      position: "top-center",
+      style: {
+        background: '#10B981',
+        color: 'white',
+        padding: '16px',
+        borderRadius: '8px',
+      },
+      iconTheme: {
+        primary: 'white',
+        secondary: '#10B981',
+      },
+    });
+  }, []);
+
+  const showErrorToast = useCallback((message: string) => {
+    toast.error(message, {
+      duration: 4000,
+      position: "top-center",
+      style: {
+        background: '#EF4444',
+        color: 'white',
+        padding: '16px',
+        borderRadius: '8px',
+      },
+      iconTheme: {
+        primary: 'white',
+        secondary: '#EF4444',
+      },
+    });
+  }, []);
+
+  // Handle delete confirmation with custom toast
+  const handleDeleteConfirmation = useCallback((domiciliario: Domiciliario) => {
+    toast((t) => (
+      <div className="flex flex-col gap-2">
+        <div className="text-sm font-medium">
+          ¿Está seguro de eliminar a {domiciliario.nombre}?
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              handleDeleteDomiciliario(domiciliario.id);
+              toast.dismiss(t.id);
+            }}
+            className="bg-red-600 text-white px-3 py-1 rounded-md text-xs"
+          >
+            Eliminar
+          </button>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="bg-gray-200 text-gray-700 px-3 py-1 rounded-md text-xs"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 6000,
+      position: "top-center",
+    });
+  }, []);
 
   // Cargar domiciliarios al montar el componente
   useEffect(() => {
@@ -59,10 +120,7 @@ export default function DomiciliosPage() {
       setDomiciliarios(data);
     } catch (err) {
       console.error('Error al cargar domiciliarios:', err);
-      setError({
-        message: err instanceof Error ? err.message : 'Error al cargar domiciliarios',
-        visible: true
-      });
+      showErrorToast(err instanceof Error ? err.message : 'Error al cargar domiciliarios');
     } finally {
       setIsLoading(false);
     }
@@ -84,10 +142,7 @@ export default function DomiciliosPage() {
     
     if (!formData.nombre.trim() || !formData.telefono.trim() || 
         (formData.tarifa !== '' && (parsedTarifa === null || isNaN(parsedTarifa)))) {
-      setError({
-        message: 'Por favor, complete todos los campos obligatorios y asegúrese de que la tarifa sea un número válido.',
-        visible: true
-      });
+      showErrorToast('Por favor, complete todos los campos obligatorios y asegúrese de que la tarifa sea un número válido.');
       return;
     }
 
@@ -123,6 +178,7 @@ export default function DomiciliosPage() {
         );
         
         setEditingId(null);
+        showSuccessToast(`Domiciliario "${formData.nombre}" actualizado con éxito`);
       } else {
         // Crear nuevo domiciliario
         const response = await fetch('/api/v1/users/services/domiciliarios/', {
@@ -143,18 +199,16 @@ export default function DomiciliosPage() {
         
         // Añadir al estado local
         setDomiciliarios(prev => [...prev, newDomiciliario]);
+        showSuccessToast(`Domiciliario "${formData.nombre}" creado con éxito`);
       }
 
       // Limpiar formulario
       setFormData({ nombre: '', telefono: '', tarifa: '' });
     } catch (err) {
       console.error('Error:', err);
-      setError({
-        message: err instanceof Error ? err.message : 'Error al procesar la solicitud',
-        visible: true
-      });
+      showErrorToast(err instanceof Error ? err.message : 'Error al procesar la solicitud');
     }
-  }, [formData, editingId, getToken]);
+  }, [formData, editingId, getToken, showSuccessToast, showErrorToast]);
 
   const handleEditDomiciliario = useCallback((domiciliario: Domiciliario) => {
     setFormData({ 
@@ -182,22 +236,16 @@ export default function DomiciliosPage() {
 
       // Eliminar del estado local
       setDomiciliarios(prev => prev.filter(d => d.id !== id));
+      showSuccessToast('Domiciliario eliminado con éxito');
     } catch (err) {
       console.error('Error:', err);
-      setError({
-        message: err instanceof Error ? err.message : 'Error al eliminar el domiciliario',
-        visible: true
-      });
+      showErrorToast(err instanceof Error ? err.message : 'Error al eliminar el domiciliario');
     }
-  }, [getToken]);
+  }, [getToken, showSuccessToast, showErrorToast]);
 
   const handleCancelEdit = useCallback(() => {
     setFormData({ nombre: '', telefono: '', tarifa: '' });
     setEditingId(null);
-  }, []);
-
-  const handleCloseError = useCallback(() => {
-    setError(prev => ({ ...prev, visible: false }));
   }, []);
 
   // Optimización: Memoizar componentes para evitar re-renders
@@ -253,17 +301,6 @@ export default function DomiciliosPage() {
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Gestión de Domiciliarios</h1>
-      
-      {/* Mensaje de error */}
-      {error.visible && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start">
-          <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-          <div className="flex-grow">{error.message}</div>
-          <button onClick={handleCloseError} className="text-red-500 hover:text-red-700">
-            &times;
-          </button>
-        </div>
-      )}
       
       <Card className="mb-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
@@ -394,11 +431,7 @@ export default function DomiciliosPage() {
                         <Button 
                           variant="danger" 
                           size="sm" 
-                          onClick={() => {
-                            if (confirm(`¿Está seguro de eliminar a ${domiciliario.nombre}?`)) {
-                              handleDeleteDomiciliario(domiciliario.id);
-                            }
-                          }}
+                          onClick={() => handleDeleteConfirmation(domiciliario)}
                           title="Eliminar domiciliario"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -412,6 +445,9 @@ export default function DomiciliosPage() {
           </div>
         )}
       </Card>
+      
+      {/* Add Toaster component for toast notifications */}
+      <Toaster />
     </div>
   );
 }
