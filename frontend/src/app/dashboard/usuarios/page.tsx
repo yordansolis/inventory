@@ -820,50 +820,7 @@ export default function UsersManagement() {
                     />
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Permisos
-                    </label>
-                    <div className="space-y-4 bg-gray-50 p-3 rounded-md">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 mr-3">
-                          <span className="text-sm font-medium text-gray-900 block">Permiso para Facturar</span>
-                          <span className="text-xs text-gray-500">Permite al usuario crear y gestionar facturas</span>
-                        </div>
-                        <Switch
-                          checked={currentUser.permisos?.facturar || false}
-                          onChange={(checked) => setCurrentUser({
-                            ...currentUser,
-                            permisos: {
-                              ...currentUser.permisos,
-                              facturar: checked
-                            }
-                          })}
-                        />
-                      </div>
-                      
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 mr-3">
-                          <span className="text-sm font-medium text-gray-900 block">Permiso para Ver Ventas del Día</span>
-                          <span className="text-xs text-gray-500">Permite al usuario ver el reporte de ventas diarias</span>
-                          {currentUser.role_id !== 1 && (
-                            <span className="text-xs text-red-500 block mt-1">Solo disponible para administradores</span>
-                          )}
-                        </div>
-                        <Switch
-                          checked={currentUser.permisos?.verVentas || false}
-                          onChange={(checked) => setCurrentUser({
-                            ...currentUser,
-                            permisos: {
-                              ...currentUser.permisos,
-                              verVentas: checked
-                            }
-                          })}
-                          disabled={currentUser.role_id !== 1}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  
                   
                   <div>
                     <div className="flex justify-between items-center mb-1">
