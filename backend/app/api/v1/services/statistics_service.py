@@ -437,6 +437,77 @@ class StatisticsService:
                 "metodos_pago": []
             }
 
+    @staticmethod
+    def get_sales_summary_by_date() -> Dict[str, Any]:
+        """
+        Obtiene un resumen de las ventas totales agrupadas por fecha.
+        
+        Returns:
+            Dict con una lista de ventas por fecha.
+        """
+        try:
+            connection = get_db_connection()
+            if not connection:
+                raise HTTPException(status_code=500, detail="No se pudo establecer conexión con la base de datos")
+
+            cursor = None
+            try:
+                cursor = connection.cursor(pymysql.cursors.DictCursor)
+                
+                # Consulta muy básica que debería funcionar sin problemas
+                query = """
+                    SELECT 
+                        invoice_date AS fecha_texto,
+                        SUM(total_amount) AS total
+                    FROM purchases
+                    WHERE is_cancelled = 0
+                    GROUP BY fecha_texto
+                    ORDER BY fecha_texto;
+                """
+                
+                try:
+                    cursor.execute(query)
+                    
+                    sales_summary = []
+                    for row in cursor.fetchall():
+                        sales_summary.append({
+                            "fecha": row["fecha_texto"],
+                            "total": float(row["total"]) if row["total"] else 0.0
+                        })
+                    
+                    return {"sales_summary": sales_summary}
+                except Exception as query_error:
+                    print(f"Error en la consulta: {query_error}")
+                    
+                    # Si la consulta falla, intentar una consulta aún más simple
+                    fallback_query = """
+                        SELECT 
+                            SUM(total_amount) AS total_general
+                        FROM purchases
+                        WHERE is_cancelled = 0;
+                    """
+                    
+                    cursor.execute(fallback_query)
+                    result = cursor.fetchone()
+                    
+                    return {
+                        "message": "No se pudieron agrupar las ventas por fecha debido a problemas con los datos",
+                        "total_general": float(result["total_general"]) if result and result["total_general"] else 0.0
+                    }
+                
+            finally:
+                if cursor:
+                    cursor.close()
+                if connection:
+                    connection.close()
+
+        except Exception as e:
+            print(f"Error obteniendo resumen de ventas por fecha: {str(e)}")
+            return {
+                "error": f"Error al obtener resumen de ventas por fecha: {str(e)}",
+                "sales_summary": []
+            }
+
 # Endpoint para obtener estadísticas generales
 @router_statistics.get("/")
 async def get_app_statistics():
@@ -574,3 +645,12 @@ async def get_delivery_metrics():
             status_code=500,
             detail=f"Error al obtener métricas de entrega: {str(e)}"
         ) 
+
+# Endpoint para obtener resumen de ventas por fecha
+@router_statistics.get("/sales-summary-by-date")
+async def get_sales_summary_by_date():
+    """
+    Obtiene un resumen de las ventas totales agrupadas por fecha.
+    """
+    summary = StatisticsService.get_sales_summary_by_date()
+    return summary 

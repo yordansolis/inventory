@@ -58,6 +58,11 @@ def read_root():
 app.include_router(router_user, prefix="/api/v1/users", tags=["usuarios"])
 app.include_router(router_services, prefix="/api/v1/services", tags=["services"])
 
+# Incluir el router de estadísticas
+from api.v1.services.statistics_service import router_statistics
+app.include_router(router_statistics, prefix="/api/v1/services/statistics", tags=["statistics"])
+
+
 # Incluir rutas de gestión de usuarios y roles
 from api.v1.crud_users.router_users import router_crud_users
 from api.v1.router_roles.router_roles import router_roles

@@ -2,38 +2,23 @@
 
 import React, { useEffect, useState } from 'react';
 import { 
-  BarChart3, 
   TrendingUp, 
-  Calendar, 
   ShoppingBag, 
   DollarSign, 
   Package, 
-  Truck, 
-  CreditCard,
   AlertTriangle
 } from 'lucide-react';
 import { 
-  BarChart, 
-  Bar, 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
+
   Tooltip, 
   Legend, 
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
-  
-
-
-
-  // Agregar estas nuevas importaciones para el gráfico de área
-  Area,
-  AreaChart
 } from 'recharts';
+import SalesChart from './SalesChart';
+import WeeklySalesChart from './WeeklySalesChart';
 
 // Interfaces for API responses
 interface GeneralStats {
@@ -449,274 +434,19 @@ export default function EstadisticasPage() {
         </Card>
       </div>
 
-      {/* Time Range Selector */}
-      <div className="flex items-center mb-6 space-x-3">
-        <Button 
-          variant={timeRange === 'day' ? 'default' : 'outline'} 
-          active={timeRange === 'day'}
-          onClick={() => setTimeRange('day')}
-        >
-          Diario
-        </Button>
-        <Button 
-          variant={timeRange === 'week' ? 'default' : 'outline'} 
-          active={timeRange === 'week'}
-          onClick={() => setTimeRange('week')}
-        >
-          Semanal
-        </Button>
-        <Button 
-          variant={timeRange === 'month' ? 'default' : 'outline'} 
-          active={timeRange === 'month'}
-          onClick={() => setTimeRange('month')}
-        >
-          Mensual
-        </Button>
-        <Button 
-          variant={timeRange === 'year' ? 'default' : 'outline'} 
-          active={timeRange === 'year'}
-          onClick={() => setTimeRange('year')}
-        >
-          Anual
-        </Button>
+      {/* Sales Charts */}
+      <div className="grid grid-cols-1 gap-8 mb-8">
+        <SalesChart />
+        <WeeklySalesChart />
       </div>
+
+      {/* Time Range Selector */}
+     
 
       {/* Sales Over Time Chart */}
-      <Card className="mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Ventas por {timeRange === 'day' ? 'Día' : timeRange === 'week' ? 'Semana' : timeRange === 'month' ? 'Mes' : 'Año'}
-          </h2>
-          <Badge variant="info">
-            {timeData.length} períodos
-          </Badge>
-        </div>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            {timeRange === 'week' ? (
-              <BarChart
-                data={timeData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
-              >
-                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="fecha" 
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: '#6b7280', fontSize: 12 }}
-                  tickFormatter={(value) => {
-                    // Extract just the first date from "start - end" format
-                    return value.split(' - ')[0];
-                  }}
-                />
-                <YAxis 
-                  yAxisId="right" 
-                  orientation="right" 
-                  stroke="#82ca9d"
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => formatPrice(value).replace('$', '')}
-                  tick={{ fill: '#6b7280', fontSize: 12 }}
-                />
-                <Tooltip 
-                  formatter={(value: any, name: string) => {
-                    if (name === "Ingresos") return formatPrice(value);
-                    return value;
-                  }}
-                  labelFormatter={(label) => `Semana: ${label}`}
-                  contentStyle={{ 
-                    backgroundColor: 'white', 
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-                    border: 'none',
-                    padding: '10px'
-                  }}
-                />
-                <Legend 
-                  verticalAlign="top" 
-                  height={36} 
-                  iconType="circle"
-                  iconSize={8}
-                  wrapperStyle={{ paddingBottom: '10px' }}
-                />
-                <Bar 
-                  yAxisId="right" 
-                  dataKey="ingresos" 
-                  name="Ingresos" 
-                  fill="#82ca9d" 
-                  radius={[4, 4, 0, 0]}
-                  barSize={40}
-                >
-                  {timeData.map((entry, index) => (
-                    <Cell key={`cell-income-${index}`} fill={index % 2 === 0 ? '#82ca9d' : '#a7e9c3'} />
-                  ))}
-                </Bar>
-                <Bar 
-                  yAxisId="right" 
-                  dataKey="total_ventas" 
-                  name="Cantidad de Ventas" 
-                  fill="#8884d8" 
-                  radius={[4, 4, 0, 0]}
-                  barSize={20}
-                  style={{ opacity: 0.7 }}
-                >
-                  {timeData.map((entry, index) => (
-                    <Cell key={`cell-sales-${index}`} fill={index % 2 === 0 ? '#8884d8' : '#a4a1e3'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            ) : (
-              <BarChart
-                data={timeData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="fecha" />
-                <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-                <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                <Tooltip 
-                  formatter={(value: any) => formatPrice(value)}
-                  labelFormatter={(label) => `Fecha: ${label}`}
-                />
-                <Legend />
-                <Bar yAxisId="left" dataKey="total_ventas" name="Cantidad de Ventas" fill="#8884d8" />
-                <Bar yAxisId="right" dataKey="ingresos" name="Ingresos" fill="#82ca9d" />
-              </BarChart>
-            )}
-          </ResponsiveContainer>
-        </div>
-        {timeRange === 'week' && timeData.length > 0 && (
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-500">Semana con más ventas</span>
-                <Badge variant="success">Top</Badge>
-              </div>
-              {(() => {
-                const maxSalesWeek = timeData.reduce((max, item) => 
-                  (item.total_ventas || 0) > (max.total_ventas || 0) ? item : max, 
-                  { fecha: 'Sin datos', total_ventas: 0, ingresos: 0 }
-                );
-                return (
-                  <div className="mt-2">
-                    <p className="text-lg font-semibold">{maxSalesWeek.fecha}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-sm text-gray-600">
-                        {maxSalesWeek.total_ventas} ventas
-                      </span>
-                      <span className="text-sm font-medium text-green-600">
-                        {formatPrice(maxSalesWeek.ingresos)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-500">Promedio semanal</span>
-                <Badge variant="info">Info</Badge>
-              </div>
-              {(() => {
-                const totalIngresos = timeData.reduce((sum, item) => sum + (item.ingresos || 0), 0);
-                const totalVentas = timeData.reduce((sum, item) => sum + (item.total_ventas || 0), 0);
-                const avgIngresos = timeData.length ? totalIngresos / timeData.length : 0;
-                const avgVentas = timeData.length ? totalVentas / timeData.length : 0;
-                
-                return (
-                  <div className="mt-2">
-                    <p className="text-lg font-semibold">{formatPrice(avgIngresos)}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-sm text-gray-600">
-                        {avgVentas.toFixed(1)} ventas/semana
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-      </Card>
-
+    
       {/* Top Products and Delivery Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Top Products */}
-        <Card>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Productos Más Vendidos
-            </h2>
-            <div className="flex items-center space-x-2">
-              <input
-                type="date"
-                value={dateRange.startDate}
-                onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
-                className="px-2 py-1 text-sm border border-gray-300 rounded-md"
-              />
-              <span>-</span>
-              <input
-                type="date"
-                value={dateRange.endDate}
-                onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
-                className="px-2 py-1 text-sm border border-gray-300 rounded-md"
-              />
-            </div>
-          </div>
-          {topProducts && topProducts.productos_mas_vendidos.length > 0 ? (
-            <div className="space-y-4">
-              {topProducts.productos_mas_vendidos.map((product, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{product.producto}</p>
-                    <p className="text-sm text-gray-600">{product.variante}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900">{formatPrice(product.ingresos)}</p>
-                    <p className="text-sm text-gray-600">{product.cantidad_vendida} unidades</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-gray-500 py-12">No hay datos disponibles</p>
-          )}
-        </Card>
-
-        {/* Delivery vs Direct Sales */}
-        <Card>
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            Ventas Directas vs. Domicilios
-          </h2>
-          {deliveryMetrics && deliveryMetrics.domicilios_vs_directa.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={deliveryData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    nameKey="name"
-                    label={false}
-                  >
-                    {deliveryData.map((entry, index) => (
-                      <Cell key={`cell-delivery-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: any) => formatPrice(value)} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="text-center text-gray-500 py-12">No hay datos disponibles</p>
-          )}
-        </Card>
-      </div>
+      
 
       {/* Payment Methods */}
       <Card>
@@ -783,8 +513,6 @@ export default function EstadisticasPage() {
           <p className="text-center text-gray-500 py-12">No hay datos disponibles</p>
         )}
       </Card>
-
-      
     </div>
   );
 }
