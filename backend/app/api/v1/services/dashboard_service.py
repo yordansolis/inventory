@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from datetime import date, datetime, timedelta
-from typing import Dict, List, Any, Optional
+from datetime import date, timedelta
+from typing import Dict,  Any
 from .stock_service import StockService
 from .purchase_service import PurchaseService
 

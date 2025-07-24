@@ -1,8 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Path
-from typing import Optional, List, Dict
+from typing import  List, Dict
 from datetime import datetime, date
-from database.db  import execute_query, get_db_connection
-import pymysql
+from database.db  import execute_query
 
 router_extracts = APIRouter()
 

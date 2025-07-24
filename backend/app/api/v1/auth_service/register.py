@@ -5,7 +5,7 @@ from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
 import re, os
-from typing import Optional, Dict
+from typing import Optional
 from schemas.schemas import UserResponse, UserCreate, UserResponseToken
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
@@ -23,7 +23,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 class Settings:
     ALGORITHM: str = str(os.getenv("ALGORITHM", ""))
     SECRET_KEY: str = os.getenv("SECRET_KEY", "")
-    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 
 settings = Settings()
 

@@ -2,11 +2,11 @@ from fastapi import APIRouter, Response, Body
 from fastapi.responses import StreamingResponse
 from fpdf import FPDF
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 import locale
 import io
-import os
+
 from pathlib import Path
 
 # Set locale for currency formatting
