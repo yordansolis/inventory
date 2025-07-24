@@ -1240,10 +1240,10 @@ export default function SuministroPage() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                                <Button 
-          variant="danger" 
-          size="sm" 
-          onClick={() => {
+                        <Button 
+                          variant="danger" 
+                          size="sm" 
+                          onClick={() => {
             toast((t) => (
               <div className="flex flex-col gap-2">
                 <div className="text-sm font-medium">
@@ -1252,7 +1252,7 @@ export default function SuministroPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
-                      handleDeleteProduct(producto.id);
+                              handleDeleteProduct(producto.id);
                       toast.dismiss(t.id);
                     }}
                     className="bg-red-600 text-white px-3 py-1 rounded-md text-xs"
@@ -1271,11 +1271,11 @@ export default function SuministroPage() {
               duration: 6000,
               position: "top-center",
             });
-          }}
-          title="Eliminar producto"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+                          }}
+                          title="Eliminar producto"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>

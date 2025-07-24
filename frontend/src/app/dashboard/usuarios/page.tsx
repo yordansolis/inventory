@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   UserPlus,
   Edit,
@@ -15,6 +15,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { getAuthHeaders } from '../../utils/auth';
+import toast, { Toaster } from 'react-hot-toast'; // Import toast and Toaster
 
 interface User {
   id: number;
@@ -64,14 +65,125 @@ export default function UsersManagement() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [fetchError, setFetchError] = useState(''); // Keep fetchError for initial load errors
   const [showPassword, setShowPassword] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(true);
-  const [fetchError, setFetchError] = useState('');
 
   // Estado para paginación
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
+
+  // Custom toast styles
+  const showSuccessToast = useCallback((message: string) => {
+    toast.success(message, {
+      duration: 3000,
+      position: "top-center",
+      style: {
+        background: '#10B981',
+        color: 'white',
+        padding: '16px',
+        borderRadius: '8px',
+      },
+      iconTheme: {
+        primary: 'white',
+        secondary: '#10B981',
+      },
+    });
+  }, []);
+
+  const showErrorToast = useCallback((message: string) => {
+    toast.error(message, {
+      duration: 4000,
+      position: "top-center",
+      style: {
+        background: '#EF4444',
+        color: 'white',
+        padding: '16px',
+        borderRadius: '8px',
+      },
+      iconTheme: {
+        primary: 'white',
+        secondary: '#EF4444',
+      },
+    });
+  }, []);
+
+  // Manejar cambio de estado de usuario
+  const handleToggleStatus = useCallback(async (id: number) => {
+    try {
+      const userToToggle = users.find(u => u.id === id);
+      if (!userToToggle) return;
+      
+      const currentStatus = userToToggle.estado;
+      const newStatus = currentStatus === 'activo' ? 'inactivo' : 'activo';
+      const headers = getAuthHeaders();
+      
+      let response;
+      if (newStatus === 'inactivo') {
+        // Desactivar usuario (usar DELETE)
+        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/admin/users/${id}`, {
+          method: 'DELETE',
+          headers
+        });
+      } else {
+        // Activar usuario (usar PATCH)
+        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/admin/users/${id}/activate`, {
+          method: 'PATCH',
+          headers
+        });
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Error al cambiar estado del usuario');
+      }
+      
+      // Si la operación fue exitosa, actualizar la lista de usuarios
+      setUsers(prevUsers => prevUsers.map(user => 
+        user.id === id 
+          ? { ...user, estado: newStatus } 
+          : user
+      ));
+
+      showSuccessToast(`Usuario "${userToToggle.username}" ${newStatus === 'activo' ? 'activado' : 'desactivado'} con éxito`);
+
+    } catch (error: any) {
+      console.error('Error al cambiar estado del usuario:', error);
+      showErrorToast(error.message || 'Error al cambiar estado del usuario');
+    }
+  }, [users, showSuccessToast, showErrorToast]);
+
+  // Handle status toggle confirmation with custom toast
+  const handleToggleStatusConfirmation = useCallback((user: User) => {
+    const newStatus = user.estado === 'activo' ? 'inactivo' : 'activo';
+    toast((t) => (
+      <div className="flex flex-col gap-2">
+        <div className="text-sm font-medium">
+          ¿Está seguro de {newStatus === 'inactivo' ? 'desactivar' : 'activar'} a {user.username}?
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              handleToggleStatus(user.id);
+              toast.dismiss(t.id);
+            }}
+            className={`${newStatus === 'inactivo' ? 'bg-red-600' : 'bg-green-600'} text-white px-3 py-1 rounded-md text-xs`}
+          >
+            {newStatus === 'inactivo' ? 'Desactivar' : 'Activar'}
+          </button>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="bg-gray-200 text-gray-700 px-3 py-1 rounded-md text-xs"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 6000,
+      position: "top-center",
+    });
+  }, [handleToggleStatus]);
 
   // Filtrar usuarios por término de búsqueda
   const filteredUsers = users.filter(user => 
@@ -127,6 +239,7 @@ export default function UsersManagement() {
       } catch (error: any) {
         console.error('Error al cargar usuarios:', error);
         setFetchError(error.message || 'Error al cargar la lista de usuarios');
+        showErrorToast(error.message || 'Error al cargar la lista de usuarios');
       } finally {
         setLoadingUsers(false);
       }
@@ -141,7 +254,7 @@ export default function UsersManagement() {
   }, [searchTerm]);
 
   // Manejar apertura del modal para crear/editar usuario
-  const handleOpenModal = (user: User | null = null) => {
+  const handleOpenModal = useCallback((user: User | null = null) => {
     if (user) {
       setCurrentUser({
         id: user.id,
@@ -165,23 +278,23 @@ export default function UsersManagement() {
       setIsEditing(false);
     }
     setIsModalOpen(true);
-    setError('');
-  };
+    // Removed setError('') as it's no longer used for modal-specific errors
+  }, []);
 
   // Manejar cierre del modal
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
     setCurrentUser(null);
-    setError('');
-  };
+    // Removed setError('') as it's no longer used for modal-specific errors
+  }, []);
 
   // Manejar guardado de usuario
-  const handleSaveUser = async () => {
+  const handleSaveUser = useCallback(async () => {
     if (!currentUser) return;
     
     // Validaciones básicas
     if (!currentUser.username || !currentUser.email || (!isEditing && !currentUser.password)) {
-      setError('Por favor completa todos los campos obligatorios');
+      showErrorToast('Por favor completa todos los campos obligatorios');
       return;
     }
     
@@ -222,8 +335,12 @@ export default function UsersManagement() {
           username: updatedUser.username,
           email: updatedUser.email,
           estado: updatedUser.is_active ? 'activo' : 'inactivo',
+          fechaCreacion: new Date().toLocaleDateString('es-CO'), // Update creation date to current for consistency
           permisos: updatedUser.permissions
         } : user));
+
+        showSuccessToast(`Usuario "${updatedUser.username}" actualizado con éxito`);
+
       } else {
         // Llamada a la API para crear usuario (corregido para usar endpoint de admin)
         const headers = getAuthHeaders(); // Añadir cabeceras de autenticación
@@ -255,74 +372,32 @@ export default function UsersManagement() {
           fechaCreacion: new Date().toLocaleDateString('es-CO'),
           permisos: currentUser.permisos
         }]);
+
+        showSuccessToast(`Usuario "${newUser.username}" creado con éxito`);
       }
       
       handleCloseModal();
     } catch (error: any) {
-      setError(error.message || 'Error al procesar la solicitud');
+      showErrorToast(error.message || 'Error al procesar la solicitud');
     } finally {
       setLoading(false);
     }
-  };
-
-
-
-  // Manejar cambio de estado de usuario
-  const handleToggleStatus = async (id: number) => {
-    try {
-      const userToToggle = users.find(u => u.id === id);
-      if (!userToToggle) return;
-      
-      const currentStatus = userToToggle.estado;
-      const newStatus = currentStatus === 'activo' ? 'inactivo' : 'activo';
-      const headers = getAuthHeaders();
-      
-      let response;
-      if (newStatus === 'inactivo') {
-        // Desactivar usuario (usar DELETE)
-        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/admin/users/${id}`, {
-          method: 'DELETE',
-          headers
-        });
-      } else {
-        // Activar usuario (usar PATCH)
-        response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/admin/users/${id}/activate`, {
-          method: 'PATCH',
-          headers
-        });
-      }
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Error al cambiar estado del usuario');
-      }
-      
-      // Si la operación fue exitosa, actualizar la lista de usuarios
-      setUsers(prevUsers => prevUsers.map(user => 
-        user.id === id 
-          ? { ...user, estado: newStatus } 
-          : user
-      ));
-    } catch (error: any) {
-      console.error('Error al cambiar estado del usuario:', error);
-      alert(error.message || 'Error al cambiar estado del usuario');
-    }
-  };
+  }, [currentUser, isEditing, users, handleCloseModal, showSuccessToast, showErrorToast]);
 
   // Manejar mostrar/ocultar contraseña
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
+  const togglePasswordVisibility = useCallback(() => {
+    setShowPassword(prev => !prev);
+  }, []);
 
   // Componente Card personalizado
-  const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  const Card = useMemo(() => ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
     <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 ${className}`}>
       {children}
     </div>
-  );
+  ), []);
 
   // Componente Badge personalizado
-  const Badge = ({ children, variant = "default", className = "" }: { children: React.ReactNode; variant?: "default" | "success" | "info" | "warning" | "danger"; className?: string }) => {
+  const Badge = useMemo(() => ({ children, variant = "default", className = "" }: { children: React.ReactNode; variant?: "default" | "success" | "info" | "warning" | "danger"; className?: string }) => {
     const variants = {
       default: "bg-gray-100 text-gray-800",
       success: "bg-green-100 text-green-800",
@@ -336,10 +411,10 @@ export default function UsersManagement() {
         {children}
       </span>
     );
-  };
+  }, []);
 
   // Componente Button personalizado
-  const Button = ({ children, variant = "default", size = "default", className = "", disabled = false, ...props }: { children: React.ReactNode; variant?: "default" | "danger" | "outline"; size?: "default" | "sm"; className?: string; disabled?: boolean; [key: string]: any }) => {
+  const Button = useMemo(() => ({ children, variant = "default", size = "default", className = "", disabled = false, ...props }: { children: React.ReactNode; variant?: "default" | "danger" | "outline"; size?: "default" | "sm"; className?: string; disabled?: boolean; [key: string]: any }) => {
     const variants = {
       default: "bg-gray-900 text-white hover:bg-gray-800",
       danger: "bg-red-600 text-white hover:bg-red-700",
@@ -360,7 +435,7 @@ export default function UsersManagement() {
         {children}
       </button>
     );
-  };
+  }, []);
 
   return (
     <>
@@ -394,15 +469,7 @@ export default function UsersManagement() {
 
       {/* Users Table */}
       <Card>
-        {fetchError && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md flex items-start">
-            <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-medium text-red-800">Error al cargar usuarios</h3>
-              <p className="text-sm text-red-700 mt-1">{fetchError}</p>
-            </div>
-          </div>
-        )}
+        {/* Removed fetchError display as it will be handled by toast */}
         
         {loadingUsers ? (
           <div className="flex justify-center items-center py-12">
@@ -464,7 +531,7 @@ export default function UsersManagement() {
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            onClick={() => handleToggleStatus(user.id)}
+                            onClick={() => handleToggleStatusConfirmation(user)}
                           >
                             {user.estado === 'activo' ? 'Desactivar' : 'Activar'}
                           </Button>
@@ -577,11 +644,7 @@ export default function UsersManagement() {
               </button>
             </div>
             <div className="p-4">
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
+              {/* Removed old error display */}
               <div className="space-y-4">
                 <div>
                   <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
@@ -743,6 +806,7 @@ export default function UsersManagement() {
           </div>
         </div>
       )}
+      <Toaster />
     </>
   );
 }
