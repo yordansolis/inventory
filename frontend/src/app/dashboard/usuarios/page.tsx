@@ -440,11 +440,11 @@ export default function UsersManagement() {
   return (
     <>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">
           Gestión de Usuarios
         </h1>
-        <p className="text-gray-600">
+        <p className="text-gray-600 text-sm sm:text-base">
           Administra los usuarios del sistema
         </p>
       </div>
@@ -461,7 +461,7 @@ export default function UsersManagement() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button onClick={() => handleOpenModal()}>
+        <Button onClick={() => handleOpenModal()} className="w-full sm:w-auto">
           <UserPlus className="h-4 w-4 mr-2" />
           Nuevo Usuario
         </Button>
@@ -482,56 +482,60 @@ export default function UsersManagement() {
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto touch-scroll">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Creación</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Email</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Fecha Creación</th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {currentUsers.length > 0 ? (
                   currentUsers.map((user) => (
                     <tr key={user.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="h-10 w-10 flex-shrink-0 bg-gray-200 rounded-full flex items-center justify-center">
+                          <div className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 bg-gray-200 rounded-full flex items-center justify-center">
                             <span className="text-gray-600 font-medium">{user.username?.charAt(0) || '?'}</span>
                           </div>
-                          <div className="ml-4">
+                          <div className="ml-3 sm:ml-4">
                             <div className="text-sm font-medium text-gray-900">{user.username}</div>
+                            <div className="text-xs text-gray-500 sm:hidden">{user.email}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">{user.email}</td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-col space-y-1">
                           <Badge variant={user.estado === 'activo' ? 'success' : 'danger'}>
                             {user.estado === 'activo' ? 'Activo' : 'Inactivo'}
                           </Badge>
-                          {user.permisos?.facturar && (
-                            <Badge variant="info" className="text-xs">
-                              Facturación
-                            </Badge>
-                          )}
-                          {user.permisos?.verVentas && (
-                            <Badge variant="info" className="text-xs">
-                              Ver Ventas
-                            </Badge>
-                          )}
+                          <div className="flex flex-wrap gap-1">
+                            {user.permisos?.facturar && (
+                              <Badge variant="info" className="text-xs">
+                                Facturación
+                              </Badge>
+                            )}
+                            {user.permisos?.verVentas && (
+                              <Badge variant="info" className="text-xs">
+                                Ver Ventas
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.fechaCreacion}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">{user.fechaCreacion}</td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end space-x-2">
                           <Button 
                             variant="outline" 
                             size="sm" 
                             onClick={() => handleToggleStatusConfirmation(user)}
+                            className="hidden sm:inline-flex"
                           >
                             {user.estado === 'activo' ? 'Desactivar' : 'Activar'}
                           </Button>
@@ -541,6 +545,7 @@ export default function UsersManagement() {
                             onClick={() => handleOpenModal(user)}
                           >
                             <Edit className="h-4 w-4" />
+                            <span className="hidden sm:inline ml-1">Editar</span>
                           </Button>
                         </div>
                       </td>
@@ -548,7 +553,7 @@ export default function UsersManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan={5} className="px-4 sm:px-6 py-4 text-center text-sm text-gray-500">
                       {searchTerm ? 'No se encontraron usuarios con esa búsqueda' : 'No hay usuarios disponibles'}
                     </td>
                   </tr>
@@ -557,15 +562,15 @@ export default function UsersManagement() {
             </table>
             
             {/* Pagination */}
-            <div className="flex justify-between items-center mt-4 px-2">
-              <div className="text-sm text-gray-600">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-4 px-2 gap-3">
+              <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
                 {filteredUsers.length > 0 ? 
                   `Mostrando ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, filteredUsers.length)} de ${filteredUsers.length} usuarios` :
                   `0 usuarios encontrados`
                 }
               </div>
               {filteredUsers.length > 0 && (
-                <div className="flex space-x-2">
+                <div className="flex justify-center sm:justify-end space-x-2">
                   <button
                     onClick={() => paginate(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
@@ -580,21 +585,21 @@ export default function UsersManagement() {
                   
                   {/* Page numbers - show limited range */}
                   <div className="flex space-x-1">
-                    {Array.from({ length: Math.max(1, Math.min(5, totalPages)) }).map((_, idx) => {
+                    {Array.from({ length: Math.max(1, Math.min(totalPages < 3 ? totalPages : 3, totalPages)) }).map((_, idx) => {
                       // Calculate which page numbers to show
                       let pageNum;
-                      if (totalPages <= 5) {
-                        // If 5 or fewer pages, show all
+                      if (totalPages <= 3) {
+                        // If 3 or fewer pages, show all
                         pageNum = idx + 1;
-                      } else if (currentPage <= 3) {
-                        // If at start, show first 5
+                      } else if (currentPage <= 2) {
+                        // If at start, show first 3
                         pageNum = idx + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        // If at end, show last 5
-                        pageNum = totalPages - 4 + idx;
+                      } else if (currentPage >= totalPages - 1) {
+                        // If at end, show last 3
+                        pageNum = totalPages - 2 + idx;
                       } else {
-                        // Otherwise show current page and 2 on each side
-                        pageNum = currentPage - 2 + idx;
+                        // Otherwise show current page and 1 on each side
+                        pageNum = currentPage - 1 + idx;
                       }
                       
                       return (
@@ -633,8 +638,8 @@ export default function UsersManagement() {
 
       {/* Modal para crear/editar usuario */}
       {isModalOpen && currentUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md mx-auto max-h-[90vh] overflow-y-auto touch-scroll">
             <div className="flex justify-between items-center border-b p-4">
               <h3 className="text-lg font-semibold">
                 {isEditing ? 'Editar Usuario' : 'Nuevo Usuario'}
@@ -678,7 +683,7 @@ export default function UsersManagement() {
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-gray-900">Permiso para Facturar</span>
-                        <span className="text-sm text-gray-500">Permite al usuario crear y gestionar facturas</span>
+                        <span className="text-xs text-gray-500">Permite al usuario crear y gestionar facturas</span>
                       </div>
                       <Switch
                         checked={currentUser.permisos?.facturar || false}
@@ -694,7 +699,7 @@ export default function UsersManagement() {
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-gray-900">Permiso para Ver Ventas del Día</span>
-                        <span className="text-sm text-gray-500">Permite al usuario ver el reporte de ventas diarias</span>
+                        <span className="text-xs text-gray-500">Permite al usuario ver el reporte de ventas diarias</span>
                         {currentUser.role_id !== 1 && (
                           <span className="text-xs text-red-500 mt-1">Solo disponible para administradores</span>
                         )}

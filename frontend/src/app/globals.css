@@ -16,6 +16,9 @@
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Asegurar que los inputs siempre tengan fondo blanco y texto negro */
@@ -25,9 +28,42 @@ select {
   background-color: white !important;
   color: black !important;
   border-color: #e5e7eb !important;
+  font-size: 16px !important; /* Prevenir zoom en iOS */
 }
 
 /* Asegurar que los labels siempre sean negros */
 label {
   color: black !important;
+}
+
+/* Responsive utilities */
+.touch-scroll {
+  -webkit-overflow-scrolling: touch;
+  overflow-x: auto;
+}
+
+/* Prevent content from being hidden under fixed headers on mobile */
+.mobile-safe-padding {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Responsive text adjustments */
+@media (max-width: 640px) {
+  h1 {
+    font-size: 1.5rem !important;
+  }
+  h2 {
+    font-size: 1.25rem !important;
+  }
+  h3 {
+    font-size: 1.125rem !important;
+  }
+}
+
+/* Fix for iOS input elements */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }

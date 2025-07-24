@@ -251,7 +251,7 @@ export default function Dashboard() {
   const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
     <div className={`bg-white ${isFeminine 
       ? 'rounded-xl shadow-sm border border-pink-100' 
-      : 'rounded-lg shadow-md border border-gray-200'} p-6 ${className}`}>
+      : 'rounded-lg shadow-md border border-gray-200'} p-4 sm:p-6 ${className}`}>
       {children}
     </div>
   );
@@ -268,7 +268,7 @@ export default function Dashboard() {
 
     const sizes = {
       default: "px-2 py-1 text-xs",
-      lg: "px-3 py-1 text-sm"
+      lg: "px-2 sm:px-3 py-1 text-xs sm:text-sm"
     };
 
     return (
@@ -290,8 +290,8 @@ export default function Dashboard() {
     };
 
     const sizes = {
-      default: "px-4 py-2 text-sm",
-      sm: "px-3 py-1.5 text-xs"
+      default: "px-3 sm:px-4 py-2 text-xs sm:text-sm",
+      sm: "px-2 sm:px-3 py-1 sm:py-1.5 text-xs"
     };
 
     return (
@@ -388,13 +388,13 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
+      <div className="flex items-center justify-center min-h-[50vh] px-4">
+        <div className="text-center max-w-md mx-auto">
           <AlertTriangle className={`h-12 w-12 ${isFeminine ? 'text-rose-500' : 'text-red-600'} mx-auto`} />
-          <p className="mt-4 text-gray-900 font-medium">{error}</p>
+          <p className="mt-4 text-gray-900 font-medium text-sm sm:text-base">{error}</p>
           <button 
             onClick={() => window.location.reload()}
-            className={`mt-4 px-4  cursor-pointer py-2 ${isFeminine 
+            className={`mt-4 px-4 cursor-pointer py-2 text-sm ${isFeminine 
               ? 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white rounded-full transition-all duration-200'
               : 'bg-primary-600 text-white rounded-md hover:bg-primary-700'}`}
           >
@@ -406,81 +406,86 @@ export default function Dashboard() {
   }
 
   return (
-    <>
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className={`text-3xl font-bold ${isFeminine ? 'text-gray-800' : 'text-gray-900'} mb-2`}>
+      <div className="mb-6 sm:mb-8">
+        <h1 className={`text-2xl sm:text-3xl font-bold ${isFeminine ? 'text-gray-800' : 'text-gray-900'} mb-2`}>
           Dashboard
         </h1>
-        <p className={isFeminine ? 'text-pink-600' : 'text-gray-600'}>
+        <p className={`text-sm sm:text-base ${isFeminine ? 'text-pink-600' : 'text-gray-600'}`}>
           Resumen general de tu negocio
         </p>
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <Card key="sales-today">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Ventas Hoy</p>
-              <p className={`text-2xl font-bold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{dashboardData ? formatPrice(dashboardData.ventas_hoy) : '$0'}</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-2 sm:mb-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ventas Hoy</p>
+              <p className={`text-lg sm:text-2xl font-bold ${isFeminine ? 'text-gray-800' : 'text-gray-900'} break-words`}>
+                {dashboardData ? formatPrice(dashboardData.ventas_hoy) : '$0'}
+              </p>
             </div>
-            <div className={`p-3 ${isFeminine ? 'bg-pink-100' : 'bg-green-100'} rounded-full`}>
-              <TrendingUp className={`h-6 w-6 ${isFeminine ? 'text-pink-600' : 'text-green-600'}`} />
+            <div className={`p-2 sm:p-3 ${isFeminine ? 'bg-pink-100' : 'bg-green-100'} rounded-full self-end sm:self-auto`}>
+              <TrendingUp className={`h-4 w-4 sm:h-6 sm:w-6 ${isFeminine ? 'text-pink-600' : 'text-green-600'}`} />
             </div>
           </div>
         </Card>
 
         <Card key="sellable-products">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Productos Vendibles</p>
-              <p className={`text-2xl font-bold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{stockSummary?.total_productos || 0}</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-2 sm:mb-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Productos Vendibles</p>
+              <p className={`text-lg sm:text-2xl font-bold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                {stockSummary?.total_productos || 0}
+              </p>
             </div>
-            <div className={`p-3 ${isFeminine ? 'bg-pink-100' : 'bg-blue-100'} rounded-full`}>
-              <ShoppingCart className={`h-6 w-6 ${isFeminine ? 'text-pink-600' : 'text-blue-600'}`} />
+            <div className={`p-2 sm:p-3 ${isFeminine ? 'bg-pink-100' : 'bg-blue-100'} rounded-full self-end sm:self-auto`}>
+              <ShoppingCart className={`h-4 w-4 sm:h-6 sm:w-6 ${isFeminine ? 'text-pink-600' : 'text-blue-600'}`} />
             </div>
           </div>
         </Card>
 
         <Card key="low-stock">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Stock Bajo</p>
-              <p className={`text-2xl font-bold ${isFeminine ? 'text-rose-600' : 'text-red-600'}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-2 sm:mb-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Stock Bajo</p>
+              <p className={`text-lg sm:text-2xl font-bold ${isFeminine ? 'text-rose-600' : 'text-red-600'}`}>
                 {stockSummary?.productos_stock_bajo || 0}
               </p>
             </div>
-            <div className={`p-3 ${isFeminine ? 'bg-rose-100' : 'bg-red-100'} rounded-full`}>
-              <AlertTriangle className={`h-6 w-6 ${isFeminine ? 'text-rose-600' : 'text-red-600'}`} />
+            <div className={`p-2 sm:p-3 ${isFeminine ? 'bg-rose-100' : 'bg-red-100'} rounded-full self-end sm:self-auto`}>
+              <AlertTriangle className={`h-4 w-4 sm:h-6 sm:w-6 ${isFeminine ? 'text-rose-600' : 'text-red-600'}`} />
             </div>
           </div>
         </Card>
 
         <Card key="deliveries">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">Domicilios</p>
-              <p className={`text-2xl font-bold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-2 sm:mb-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Domicilios</p>
+              <p className={`text-lg sm:text-2xl font-bold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
                 {dashboardData?.domicilios || 0}
               </p>
             </div>
-            <div className={`p-3 ${isFeminine ? 'bg-pink-100' : 'bg-purple-100'} rounded-full`}>
-              <Truck className={`h-6 w-6 ${isFeminine ? 'text-pink-600' : 'text-purple-600'}`} />
+            <div className={`p-2 sm:p-3 ${isFeminine ? 'bg-pink-100' : 'bg-purple-100'} rounded-full self-end sm:self-auto`}>
+              <Truck className={`h-4 w-4 sm:h-6 sm:w-6 ${isFeminine ? 'text-pink-600' : 'text-purple-600'}`} />
             </div>
           </div>
         </Card>
       </div>
 
       {/* Recent Sales */}
-      <Card className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className={`text-xl font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+      <Card className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
+          <h2 className={`text-lg sm:text-xl font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
             Ventas Recientes
           </h2>
           <Button size="sm">
-            <Eye className="h-4 w-4 mr-2" />
-            Ver todas
+            <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Ver todas</span>
+            <span className="sm:hidden">Ver</span>
           </Button>
         </div>
         
@@ -488,12 +493,12 @@ export default function Dashboard() {
         <div className="mb-4">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-gray-400" />
+              <Search className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
             </div>
             <input
               type="text"
-              placeholder="Buscar por cliente, producto o número de factura..."
-              className={`pl-10 pr-4 py-2 w-full border ${isFeminine ? 'border-pink-200 focus:ring-pink-500 focus:border-pink-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'} rounded-md`}
+              placeholder="Buscar por cliente, producto o factura..."
+              className={`pl-8 sm:pl-10 pr-4 py-2 w-full border text-sm ${isFeminine ? 'border-pink-200 focus:ring-pink-500 focus:border-pink-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'} rounded-md`}
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -503,39 +508,86 @@ export default function Dashboard() {
           </div>
         </div>
         
-        <div className="overflow-x-auto">
+        {/* Mobile Cards View */}
+        <div className="block sm:hidden space-y-3">
+          {currentSales && currentSales.length > 0 ? (
+            currentSales.map((venta) => (
+              <div key={venta.invoice_number} className={`p-4 border ${isFeminine ? 'border-pink-100 bg-pink-50' : 'border-gray-200 bg-gray-50'} rounded-lg`}>
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <p className={`font-medium text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                      #{venta.invoice_number.substring(venta.invoice_number.length - 4)}
+                    </p>
+                    <p className={`text-xs ${isFeminine ? 'text-gray-600' : 'text-gray-500'}`}>{venta.invoice_date}</p>
+                  </div>
+                  <p className={`text-sm font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                    {formatPrice(venta.total_amount)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className={`text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                    <span className="font-medium">Cliente:</span> {venta.client_name}
+                  </p>
+                  <p className={`text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                    <span className="font-medium">Producto:</span> {venta.product_name}
+                  </p>
+                  <div className="flex justify-between items-center mt-2">
+                    <div className="flex items-center">
+                      <span className="text-xs text-gray-500 mr-2">Domicilio:</span>
+                      {venta.has_delivery ? (
+                        <Badge variant="info">Sí</Badge>
+                      ) : (
+                        <Badge variant="default">No</Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-sm text-gray-500">
+                {searchTerm ? 'No se encontraron ventas con esa búsqueda' : 'No hay ventas recientes'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className={`min-w-full divide-y ${isFeminine ? 'divide-pink-100' : 'divide-gray-200'}`}>
             <thead className={isFeminine ? 'bg-pink-50' : 'bg-gray-50'}>
               <tr>
-                <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>ID</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Cliente</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Producto</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Total</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Domicilio</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Fecha</th>
+                <th className={`px-4 lg:px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>ID</th>
+                <th className={`px-4 lg:px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Cliente</th>
+                <th className={`px-4 lg:px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider hidden lg:table-cell`}>Producto</th>
+                <th className={`px-4 lg:px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Total</th>
+                <th className={`px-4 lg:px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider hidden md:table-cell`}>Domicilio</th>
+                <th className={`px-4 lg:px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Fecha</th>
               </tr>
             </thead>
             <tbody className={`bg-white divide-y ${isFeminine ? 'divide-pink-100' : 'divide-gray-200'}`}>
               {currentSales && currentSales.length > 0 ? (
                 currentSales.map((venta) => (
                   <tr key={venta.invoice_number} className={`hover:${isFeminine ? 'bg-pink-50' : 'bg-gray-50'} transition-colors`}>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>#{venta.invoice_number.substring(venta.invoice_number.length - 4)}</td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{venta.client_name}</td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{venta.product_name}</td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{formatPrice(venta.total_amount)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className={`px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                      {formatPrice(venta.total_amount)}
+                    </td>
+                    <td className="px-4 lg:px-6 py-4 whitespace-nowrap hidden md:table-cell">
                       {venta.has_delivery ? (
                         <Badge variant="info">Sí</Badge>
                       ) : (
                         <Badge variant="default">No</Badge>
                       )}
                     </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{venta.invoice_date}</td>
+                    <td className={`px-4 lg:px-6 py-4 whitespace-nowrap text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                      {venta.invoice_date}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={6} className="px-4 lg:px-6 py-4 text-center text-sm text-gray-500">
                     {searchTerm ? 'No se encontraron ventas con esa búsqueda' : 'No hay ventas recientes'}
                   </td>
                 </tr>
@@ -545,51 +597,44 @@ export default function Dashboard() {
         </div>
         
         {/* Pagination */}
-        <div className="flex justify-between items-center mt-4 px-2">
-          <div className="text-sm text-gray-600">
-            {filteredSales.length > 0 ? 
-              `Mostrando ${indexOfFirstItem + 1}-${Math.min(indexOfLastItem, filteredSales.length)} de ${filteredSales.length} ventas` :
-              `0 ventas encontradas`
-            }
-          </div>
-          {filteredSales.length > 0 && (
-            <div className="flex space-x-2">
+        {filteredSales.length > 0 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center mt-4 px-2 space-y-2 sm:space-y-0">
+            <div className="text-xs sm:text-sm text-gray-600 order-2 sm:order-1">
+              Mostrando {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredSales.length)} de {filteredSales.length} ventas
+            </div>
+            <div className="flex space-x-1 sm:space-x-2 order-1 sm:order-2">
               <button
                 onClick={() => paginate(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
                 className={`${
                   currentPage === 1 
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed cursor-pointer' 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                     : `${isFeminine ? 'bg-pink-100 text-pink-600 hover:bg-pink-200' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`
-                } p-2 rounded-md`}
+                } p-1.5 sm:p-2 rounded-md`}
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
               
               {/* Page numbers - show limited range */}
               <div className="flex space-x-1">
-                {Array.from({ length: Math.max(1, Math.min(5, totalPages)) }).map((_, idx) => {
-                  // Calculate which page numbers to show
+                {Array.from({ length: Math.max(1, Math.min(3, totalPages)) }).map((_, idx) => {
+                  // Calculate which page numbers to show (show fewer on mobile)
                   let pageNum;
-                  if (totalPages <= 5) {
-                    // If 5 or fewer pages, show all
+                  if (totalPages <= 3) {
                     pageNum = idx + 1;
-                  } else if (currentPage <= 3) {
-                    // If at start, show first 5
+                  } else if (currentPage <= 2) {
                     pageNum = idx + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    // If at end, show last 5
-                    pageNum = totalPages - 4 + idx;
+                  } else if (currentPage >= totalPages - 1) {
+                    pageNum = totalPages - 2 + idx;
                   } else {
-                    // Otherwise show current page and 2 on each side
-                    pageNum = currentPage - 2 + idx;
+                    pageNum = currentPage - 1 + idx;
                   }
                   
                   return (
                     <button
                       key={pageNum}
                       onClick={() => paginate(pageNum)}
-                      className={`w-8 h-8 flex items-center justify-center rounded-md ${
+                      className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-md text-xs sm:text-sm ${
                         currentPage === pageNum
                           ? isFeminine 
                             ? 'bg-pink-500 text-white' 
@@ -610,22 +655,22 @@ export default function Dashboard() {
                 disabled={currentPage === totalPages || totalPages === 0}
                 className={`${
                   currentPage === totalPages || totalPages === 0
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed cursor-pointer' 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                     : `${isFeminine ? 'bg-pink-100 text-pink-600 hover:bg-pink-200' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`
-                } p-2 rounded-md`}
+                } p-1.5 sm:p-2 rounded-md`}
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </Card>
 
       {/* Low Stock Alert */}
-      <Card className="mb-8">
-        <div className="flex items-center justify-between mb-4">
+      <Card className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
           <div className="flex items-center">
-            <h2 className={`text-xl font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+            <h2 className={`text-lg sm:text-xl font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
               Estado del Inventario
             </h2>
             <button 
@@ -633,7 +678,7 @@ export default function Dashboard() {
               className={`ml-2 p-1.5 ${isFeminine ? 'hover:bg-pink-100 text-pink-600' : 'hover:bg-gray-100 text-gray-600'} rounded-full transition-colors`}
               title="Actualizar datos de inventario"
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
             </button>
           </div>
           <Badge variant={lowStockProducts.length > 0 ? "danger" : "success"} size="lg">
@@ -645,51 +690,51 @@ export default function Dashboard() {
         </div>
         
         {stockSummary && (
-          <div className={`grid grid-cols-3 gap-4 p-4 mb-6 ${isFeminine ? 'bg-pink-50' : 'bg-gray-50'} rounded-lg`}>
+          <div className={`grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4 mb-4 sm:mb-6 ${isFeminine ? 'bg-pink-50' : 'bg-gray-50'} rounded-lg`}>
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Stock Disponible</p>
-              <p className={`text-xl font-bold ${isFeminine ? 'text-green-600' : 'text-green-700'}`}>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Stock Disponible</p>
+              <p className={`text-lg sm:text-xl font-bold ${isFeminine ? 'text-green-600' : 'text-green-700'}`}>
                 {stockSummary.productos_disponibles || 0}
               </p>
               <p className="text-xs text-gray-500">
                 {stockSummary.porcentaje_disponibles ? `${Math.round(stockSummary.porcentaje_disponibles)}%` : '0%'}
               </p>
               {/* Progress Bar */}
-              <div className="w-full bg-gray-200 h-2 mt-2 rounded-full overflow-hidden">
+              <div className="w-full bg-gray-200 h-1.5 sm:h-2 mt-2 rounded-full overflow-hidden">
                 <div 
-                  className="bg-green-500 h-full" 
+                  className="bg-green-500 h-full transition-all duration-500" 
                   style={{ width: `${stockSummary.porcentaje_disponibles || 0}%` }}
                 ></div>
               </div>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Stock Bajo</p>
-              <p className={`text-xl font-bold ${isFeminine ? 'text-amber-600' : 'text-amber-700'}`}>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Stock Bajo</p>
+              <p className={`text-lg sm:text-xl font-bold ${isFeminine ? 'text-amber-600' : 'text-amber-700'}`}>
                 {stockSummary.productos_stock_bajo || 0}
               </p>
               <p className="text-xs text-gray-500">
                 {stockSummary.porcentaje_stock_bajo ? `${Math.round(stockSummary.porcentaje_stock_bajo)}%` : '0%'}
               </p>
               {/* Progress Bar */}
-              <div className="w-full bg-gray-200 h-2 mt-2 rounded-full overflow-hidden">
+              <div className="w-full bg-gray-200 h-1.5 sm:h-2 mt-2 rounded-full overflow-hidden">
                 <div 
-                  className="bg-amber-500 h-full" 
+                  className="bg-amber-500 h-full transition-all duration-500" 
                   style={{ width: `${stockSummary.porcentaje_stock_bajo || 0}%` }}
                 ></div>
               </div>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Sin Stock</p>
-              <p className={`text-xl font-bold ${isFeminine ? 'text-rose-600' : 'text-red-700'}`}>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Sin Stock</p>
+              <p className={`text-lg sm:text-xl font-bold ${isFeminine ? 'text-rose-600' : 'text-red-700'}`}>
                 {stockSummary.productos_sin_stock || 0}
               </p>
               <p className="text-xs text-gray-500">
                 {stockSummary.porcentaje_sin_stock ? `${Math.round(stockSummary.porcentaje_sin_stock)}%` : '0%'}
               </p>
               {/* Progress Bar */}
-              <div className="w-full bg-gray-200 h-2 mt-2 rounded-full overflow-hidden">
+              <div className="w-full bg-gray-200 h-1.5 sm:h-2 mt-2 rounded-full overflow-hidden">
                 <div 
-                  className="bg-red-500 h-full" 
+                  className="bg-red-500 h-full transition-all duration-500" 
                   style={{ width: `${stockSummary.porcentaje_sin_stock || 0}%` }}
                 ></div>
               </div>
@@ -699,9 +744,9 @@ export default function Dashboard() {
         
         {/* Combined visual representation of stock */}
         {stockSummary && (
-          <div className="mb-6 p-4 border border-gray-100 rounded-lg">
-            <p className="text-sm font-medium text-gray-600 mb-3">Distribución del inventario</p>
-            <div className="flex h-6 w-full rounded-lg overflow-hidden">
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 border border-gray-100 rounded-lg">
+            <p className="text-xs sm:text-sm font-medium text-gray-600 mb-3">Distribución del inventario</p>
+            <div className="flex h-4 sm:h-6 w-full rounded-lg overflow-hidden">
               <div 
                 className="bg-green-500 h-full transition-all duration-500 ease-in-out" 
                 style={{ width: `${stockSummary.porcentaje_disponibles || 0}%` }}
@@ -718,17 +763,17 @@ export default function Dashboard() {
                 title={`Sin stock: ${stockSummary.productos_sin_stock || 0} productos (${Math.round(stockSummary.porcentaje_sin_stock || 0)}%)`}
               ></div>
             </div>
-            <div className="flex justify-between mt-2 text-xs text-gray-500">
+            <div className="flex flex-wrap justify-between mt-2 text-xs text-gray-500 gap-2">
               <div className="flex items-center">
-                <div className="w-3 h-3 bg-green-500 mr-1 rounded-sm"></div>
+                <div className="w-2 h-2 sm:w-3 sm:h-3 bg-green-500 mr-1 rounded-sm"></div>
                 <span>Disponible</span>
               </div>
               <div className="flex items-center">
-                <div className="w-3 h-3 bg-amber-500 mr-1 rounded-sm"></div>
+                <div className="w-2 h-2 sm:w-3 sm:h-3 bg-amber-500 mr-1 rounded-sm"></div>
                 <span>Stock bajo</span>
               </div>
               <div className="flex items-center">
-                <div className="w-3 h-3 bg-red-500 mr-1 rounded-sm"></div>
+                <div className="w-2 h-2 sm:w-3 sm:h-3 bg-red-500 mr-1 rounded-sm"></div>
                 <span>Sin stock</span>
               </div>
             </div>
@@ -742,26 +787,28 @@ export default function Dashboard() {
         
         {lowStockProducts.length > 0 ? (
           <div className="space-y-3">
-            <h3 className="font-medium text-gray-700 mb-2 flex items-center">
-              <AlertTriangle className={`h-4 w-4 mr-1.5 ${isFeminine ? 'text-rose-500' : 'text-red-500'}`} />
+            <h3 className="text-sm sm:text-base font-medium text-gray-700 mb-2 flex items-center">
+              <AlertTriangle className={`h-3 w-3 sm:h-4 sm:w-4 mr-1.5 ${isFeminine ? 'text-rose-500' : 'text-red-500'}`} />
               Productos que requieren reabastecimiento
             </h3>
             {lowStockProducts.slice(0, 5).map((producto, index) => (
-              <div key={`producto-${producto.id}-${index}`} className={`flex items-center justify-between p-3 ${
+              <div key={`producto-${producto.id}-${index}`} className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 space-y-2 sm:space-y-0 ${
                 producto.estado === 'critical' 
                   ? isFeminine ? 'bg-rose-50 border border-rose-200' : 'bg-red-50 border border-red-200'
                   : isFeminine ? 'bg-amber-50 border border-amber-200' : 'bg-yellow-50 border border-yellow-200'
               } rounded-lg`}>
-                <div>
-                  <p className={`font-medium ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{producto.nombre}</p>
-                  <div className="flex items-center mt-1">
-                    <div className="w-full max-w-[100px] bg-gray-200 h-2 rounded-full overflow-hidden mr-3">
+                <div className="flex-1">
+                  <p className={`font-medium text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'} mb-2`}>
+                    {producto.nombre}
+                  </p>
+                  <div className="flex items-center">
+                    <div className="w-full max-w-[80px] sm:max-w-[100px] bg-gray-200 h-1.5 sm:h-2 rounded-full overflow-hidden mr-3">
                       <div 
-                        className={`h-full ${producto.cantidad <= producto.minimo * 0.5 ? 'bg-red-500' : 'bg-amber-500'}`}
+                        className={`h-full transition-all duration-300 ${producto.cantidad <= producto.minimo * 0.5 ? 'bg-red-500' : 'bg-amber-500'}`}
                         style={{ width: `${Math.min(100, Math.round((producto.cantidad / producto.minimo) * 100))}%` }}
                       ></div>
                     </div>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-xs sm:text-sm text-gray-600 flex-shrink-0">
                       <span className={producto.cantidad <= producto.minimo * 0.5 ? 'font-medium text-red-600' : ''}>
                         {producto.cantidad}
                       </span>
@@ -773,41 +820,45 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </div>
-                <Badge 
-                  variant={producto.cantidad <= producto.minimo * 0.5 ? "danger" : "warning"} 
-                  size="default"
-                >
-                  {producto.cantidad <= producto.minimo * 0.5 ? 'Crítico' : 'Bajo'}
-                </Badge>
+                <div className="flex justify-end sm:ml-4">
+                  <Badge 
+                    variant={producto.cantidad <= producto.minimo * 0.5 ? "danger" : "warning"} 
+                    size="default"
+                  >
+                    {producto.cantidad <= producto.minimo * 0.5 ? 'Crítico' : 'Bajo'}
+                  </Badge>
+                </div>
               </div>
             ))}
             
-            <div className="flex justify-between items-center mt-4">
-              <p className="text-sm text-gray-500">
+            <div className="flex flex-col sm:flex-row justify-between items-center mt-4 space-y-2 sm:space-y-0">
+              <p className="text-xs sm:text-sm text-gray-500 text-center sm:text-left">
                 {lowStockProducts.length > 5 ? `Mostrando 5 de ${lowStockProducts.length} productos con stock bajo` : ''}
               </p>
               <Button
                 onClick={() => window.location.href = '/dashboard/inventario/suministro'}
                 className={`flex items-center ${isFeminine ? 'bg-pink-600 hover:bg-pink-700' : 'bg-blue-600 hover:bg-blue-700'}`}
               >
-                Ir a gestión de suministros
-                <Eye className="ml-2 h-4 w-4" />
+                <span className="hidden sm:inline">Ir a gestión de suministros</span>
+                <span className="sm:hidden">Gestión suministros</span>
+                <Eye className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-8">
-            <div className={`p-3 ${isFeminine ? 'bg-green-100' : 'bg-green-100'} rounded-full mb-3`}>
-              <ShoppingCart className={`h-6 w-6 ${isFeminine ? 'text-green-600' : 'text-green-600'}`} />
+          <div className="flex flex-col items-center justify-center py-6 sm:py-8">
+            <div className={`p-2 sm:p-3 ${isFeminine ? 'bg-green-100' : 'bg-green-100'} rounded-full mb-3`}>
+              <ShoppingCart className={`h-5 w-5 sm:h-6 sm:w-6 ${isFeminine ? 'text-green-600' : 'text-green-600'}`} />
             </div>
-            <p className="text-center text-gray-600 mb-2">¡Todo bajo control! No hay productos con stock bajo</p>
+            <p className="text-center text-gray-600 mb-2 text-sm sm:text-base">¡Todo bajo control! No hay productos con stock bajo</p>
             <Button
               size="sm"
               onClick={() => window.location.href = '/dashboard/inventario/suministro'}
               className={`mt-2 ${isFeminine ? 'bg-pink-600 hover:bg-pink-700' : ''}`}
             >
-              Ir a Inventario
-              <Eye className="ml-2 h-4 w-4" />
+              <span className="hidden sm:inline">Ir a Inventario</span>
+              <span className="sm:hidden">Inventario</span>
+              <Eye className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </div>
         )}
@@ -815,8 +866,8 @@ export default function Dashboard() {
 
       {/* Payment Methods */}
       <Card>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className={`text-xl font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
+          <h2 className={`text-lg sm:text-xl font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
             Métodos de Pago
           </h2>
           <Badge variant="info" size="lg">
@@ -824,30 +875,63 @@ export default function Dashboard() {
           </Badge>
         </div>
         {dashboardData?.metodos_pago && dashboardData.metodos_pago.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className={`min-w-full divide-y ${isFeminine ? 'divide-pink-100' : 'divide-gray-200'}`}>
-              <thead className={isFeminine ? 'bg-pink-50' : 'bg-gray-50'}>
-                <tr>
-                  <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Método</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Ventas</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Total</th>
-                </tr>
-              </thead>
-              <tbody className={`bg-white divide-y ${isFeminine ? 'divide-pink-100' : 'divide-gray-200'}`}>
-                {dashboardData.metodos_pago.map((metodo, index) => (
-                  <tr key={index} className={`hover:${isFeminine ? 'bg-pink-50' : 'bg-gray-50'} transition-colors`}>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>{metodo.payment_method}</td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm`}>{metodo.count}</td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold`}>{formatPrice(metodo.total)}</td>
+          <>
+            {/* Mobile Cards View */}
+            <div className="block sm:hidden space-y-3">
+              {dashboardData.metodos_pago.map((metodo, index) => (
+                <div key={index} className={`p-4 border ${isFeminine ? 'border-pink-100 bg-pink-50' : 'border-gray-200 bg-gray-50'} rounded-lg`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <p className={`font-medium text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                      {metodo.payment_method}
+                    </p>
+                    <p className={`text-sm font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                      {formatPrice(metodo.total)}
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-600">
+                    <span className="font-medium">Ventas:</span> {metodo.count}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className={`min-w-full divide-y ${isFeminine ? 'divide-pink-100' : 'divide-gray-200'}`}>
+                <thead className={isFeminine ? 'bg-pink-50' : 'bg-gray-50'}>
+                  <tr>
+                    <th className={`px-4 lg:px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Método</th>
+                    <th className={`px-4 lg:px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Ventas</th>
+                    <th className={`px-4 lg:px-6 py-3 text-left text-xs font-medium ${isFeminine ? 'text-pink-700' : 'text-gray-500'} uppercase tracking-wider`}>Total</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className={`bg-white divide-y ${isFeminine ? 'divide-pink-100' : 'divide-gray-200'}`}>
+                  {dashboardData.metodos_pago.map((metodo, index) => (
+                    <tr key={index} className={`hover:${isFeminine ? 'bg-pink-50' : 'bg-gray-50'} transition-colors`}>
+                      <td className={`px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-medium ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                        {metodo.payment_method}
+                      </td>
+                      <td className={`px-4 lg:px-6 py-4 whitespace-nowrap text-sm`}>
+                        {metodo.count}
+                      </td>
+                      <td className={`px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-semibold`}>
+                        {formatPrice(metodo.total)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
-          <p className="text-center text-gray-500 py-4">No hay métodos de pago registrados.</p>
+          <div className="flex flex-col items-center justify-center py-6 sm:py-8">
+            <div className={`p-2 sm:p-3 ${isFeminine ? 'bg-green-100' : 'bg-green-100'} rounded-full mb-3`}>
+              <ShoppingCart className={`h-5 w-5 sm:h-6 sm:w-6 ${isFeminine ? 'text-green-600' : 'text-green-600'}`} />
+            </div>
+            <p className="text-center text-gray-600 mb-2 text-sm sm:text-base">No hay métodos de pago registrados</p>
+          </div>
         )}
       </Card>
-    </>
+    </div>
   );
 }

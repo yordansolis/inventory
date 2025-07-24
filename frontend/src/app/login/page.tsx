@@ -160,40 +160,40 @@ export default function InventoryLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white flex items-center justify-center p-5">
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white flex items-center justify-center p-4 sm:p-5 mobile-safe-padding">
       <div className="w-full max-w-md">
         {/* Header con Logo */}
-        <div className="text-center mb-10">
-          <div className="flex justify-center mb-6">
-            <div className="rounded-full overflow-hidden border-4 border-white shadow-lg p-1 bg-white" style={{width: '160px', height: '160px'}}>
+        <div className="text-center mb-6 sm:mb-10">
+          <div className="flex justify-center mb-4 sm:mb-6">
+            <div className="rounded-full overflow-hidden border-4 border-white shadow-lg p-1 bg-white" style={{width: '120px', height: '120px'}}>
               <Image 
                 src="/logo.svg" 
                 alt="Logo" 
-                width={150} 
-                height={150} 
+                width={110} 
+                height={110} 
                 priority
                 className="rounded-full"
               />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1 sm:mb-2 tracking-tight">
             Dulce Vida
           </h1>
-          <p className="text-base text-pink-600">
+          <p className="text-sm sm:text-base text-pink-600">
             Inicia sesión para continuar
           </p>
         </div>
 
         {/* Login Card */}
         <Card className="bg-white border border-pink-100 shadow-sm rounded-xl">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-5">
             {/* username Field */}
             <div>
-              <div className="mb-2 block">
+              <div className="mb-1 sm:mb-2 block">
                 <Label 
                   htmlFor="username" 
                   children="Nombre de usuario"
-                  className="text-gray-700 text-base font-medium"
+                  className="text-gray-700 text-sm sm:text-base font-medium"
                 />
               </div>
               <TextInput
@@ -214,7 +214,7 @@ export default function InventoryLogin() {
                         gray: "bg-white border-pink-200 text-gray-900 focus:border-pink-400 focus:ring-pink-300"
                       },
                       sizes: {
-                        lg: "p-4 sm:text-base"
+                        lg: "p-3 sm:p-4 sm:text-base"
                       }
                     }
                   }
@@ -225,11 +225,11 @@ export default function InventoryLogin() {
 
             {/* Password Field */}
             <div>
-              <div className="mb-2 block">
+              <div className="mb-1 sm:mb-2 block">
                 <Label 
                   htmlFor="password" 
                   children="Contraseña"
-                  className="text-gray-700 text-base font-medium"
+                  className="text-gray-700 text-sm sm:text-base font-medium"
                 />
               </div>
               <div className="relative">
@@ -251,7 +251,7 @@ export default function InventoryLogin() {
                           gray: "bg-white border-pink-200 text-gray-900 focus:border-pink-400 focus:ring-pink-300"
                         },
                         sizes: {
-                          lg: "p-4 sm:text-base"
+                          lg: "p-3 sm:p-4 sm:text-base"
                         }
                       }
                     }
@@ -264,9 +264,9 @@ export default function InventoryLogin() {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-pink-600 cursor-pointer"
                 >
                   {showPassword ? (
-                    <HiEyeOff className="h-6 w-6" />
+                    <HiEyeOff className="h-5 w-5" />
                   ) : (
-                    <HiEye className="h-6 w-6" />
+                    <HiEye className="h-5 w-5" />
                   )}
                 </button>
               </div>
@@ -275,7 +275,7 @@ export default function InventoryLogin() {
             {/* Error Alert */}
             {error && (
               <Alert color="failure" icon={HiInformationCircle} className="rounded-lg">
-                <span className="text-base">{error}</span>
+                <span className="text-sm sm:text-base">{error}</span>
               </Alert>
             )}
 
@@ -283,7 +283,7 @@ export default function InventoryLogin() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 focus:ring-pink-400 text-white text-base font-medium py-4 rounded-lg transition-all duration-200 shadow-sm cursor-pointer"
+              className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 focus:ring-pink-400 text-white text-sm sm:text-base font-medium py-3 sm:py-4 rounded-lg transition-all duration-200 shadow-sm cursor-pointer"
               size="lg"
             >
               {loading ? (
@@ -295,22 +295,12 @@ export default function InventoryLogin() {
                 'Iniciar sesión'
               )}
             </Button>
-
-            {/* Forgot Password Link */}
-            {/* <div className="text-center mt-4">
-              <a 
-                href="/forgot-password" 
-                className="text-sm text-gray-600 hover:text-black transition-colors"
-              >
-                ¿Olvidaste tu contraseña?
-              </a>
-            </div> */}
           </form>
         </Card>
 
         {/* Footer */}
-        <div className="text-center mt-8 pt-6 border-t border-pink-100">
-          <p className="text-pink-400 text-sm">
+        <div className="text-center mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-pink-100">
+          <p className="text-pink-400 text-xs sm:text-sm">
             © 2025 Dulce Vida. Todos los derechos reservados.
           </p>
         </div>

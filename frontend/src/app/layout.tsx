@@ -17,6 +17,11 @@ export const metadata: Metadata = {
   },
   // Deshabilitar el modo oscuro del sistema operativo
   colorScheme: 'light',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+  },
 };
 
 export default function RootLayout({

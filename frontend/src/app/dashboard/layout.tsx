@@ -65,6 +65,38 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, []);
 
+  // Close sidebar when clicking outside on mobile
+  useEffect(() => {
+    const handleOutsideClick = (event: Event) => {
+      const target = event.target as HTMLElement;
+      const sidebar = document.getElementById('mobile-sidebar');
+      const menuButton = document.getElementById('menu-button');
+      
+      if (sidebar && 
+          sidebarOpen && 
+          !sidebar.contains(target) && 
+          menuButton && 
+          !menuButton.contains(target)) {
+        setSidebarOpen(false);
+      }
+    };
+
+    if (sidebarOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('touchstart', handleOutsideClick);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [sidebarOpen]);
+
+  // Close sidebar on route change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
   const handleLogout = () => {
     logout();
   };
@@ -108,33 +140,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <AuthGuard>
       <div className={`min-h-screen ${isFeminine ? 'bg-gradient-to-br from-pink-50 to-white' : 'bg-gray-50'}`}>
         {/* Navigation Bar */}
-        <div className={`bg-white ${isFeminine ? 'border-b border-pink-100' : 'border-b border-gray-200'} px-6 py-3 flex justify-between items-center shadow-sm`}>
+        <div className={`bg-white ${isFeminine ? 'border-b border-pink-100' : 'border-b border-gray-200'} px-4 sm:px-6 py-3 flex justify-between items-center shadow-sm fixed top-0 left-0 right-0 z-30`}>
           <div className="flex items-center">
             <button
+              id="menu-button"
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className={`md:hidden mr-4 p-2 cursor-pointer ${isFeminine ? 'rounded-full hover:bg-pink-50 text-pink-600 focus:ring-pink-300' : 'rounded-lg hover:bg-gray-100 text-gray-600 focus:ring-primary-500'} focus:outline-none focus:ring-2`}
+              className={`md:hidden mr-2 p-2 cursor-pointer ${isFeminine ? 'rounded-full hover:bg-pink-50 text-pink-600 focus:ring-pink-300' : 'rounded-lg hover:bg-gray-100 text-gray-600 focus:ring-primary-500'} focus:outline-none focus:ring-2`}
+              aria-label="Toggle menu"
             >
               {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
             <div className="flex items-center">
-              <div className="hidden md:block mr-3">
-                <div className={`rounded-full overflow-hidden ${isFeminine ? 'border-2 border-white shadow-sm' : ''} bg-white`} style={{width: '36px', height: '36px'}}>
+              <div className="mr-2 sm:mr-3">
+                <div className={`rounded-full overflow-hidden ${isFeminine ? 'border-2 border-white shadow-sm' : ''} bg-white`} style={{width: '32px', height: '32px'}}>
                   <Image 
                     src="/logo.svg" 
                     alt="Logo" 
-                    width={36} 
-                    height={36} 
+                    width={32} 
+                    height={32} 
                     className="rounded-full"
                   />
                 </div>
               </div>
-              <span className={`text-xl font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+              <span className={`text-lg sm:text-xl font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'} truncate max-w-[120px] sm:max-w-full`}>
                 Dulce Vida
               </span>
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <button
               onClick={toggleTheme}
               className={`p-2 cursor-pointer ${isFeminine 
@@ -142,11 +176,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 : 'rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700'} 
                 flex items-center focus:outline-none transition-colors duration-200`}
               title={isFeminine ? "Cambiar a tema original" : "Cambiar a tema femenino"}
+              aria-label="Toggle theme"
             >
               <Palette className="h-5 w-5" />
             </button>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <div className={`w-8 h-8 ${isFeminine ? 'bg-pink-100 text-pink-700' : 'bg-primary-100 text-primary-700'} rounded-full flex items-center justify-center`}>
                 <span className="text-sm font-medium">
                   {username ? username.charAt(0).toUpperCase() : 'U'}
@@ -160,6 +195,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   : 'rounded-lg hover:bg-gray-100 text-red-600 focus:ring-red-500'} 
                   flex items-center focus:outline-none focus:ring-2`}
                 title="Cerrar sesión"
+                aria-label="Logout"
               >
                 <LogOut className="h-5 w-5" />
                 <span className="hidden sm:block ml-1 text-sm">Salir</span>
@@ -168,16 +204,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="flex relative overflow-x-hidden">
-          {/* Sidebar */}
-          <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-           md:translate-x-0 fixed
-           md:static inset-y-0 left-0 z-50
-           w-64 bg-white ${isFeminine ? 'border-r border-pink-100' : 'border-r border-gray-200'} transition-all
-           duration-300 ease-in-out shadow-md md:shadow-none`}>
-            <div className="py-6">
-              <div className="flex justify-center mb-6 md:hidden">
+        {/* Main Content with top padding for fixed header */}
+        <div className="flex relative pt-[56px] overflow-x-hidden">
+          {/* Sidebar for mobile - with overlay */}
+          <div 
+            id="mobile-sidebar"
+            className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            md:hidden fixed inset-y-0 left-0 z-40
+            w-64 bg-white ${isFeminine ? 'border-r border-pink-100' : 'border-r border-gray-200'} transition-all
+            duration-300 ease-in-out shadow-md pt-[56px] touch-scroll`}
+          >
+            <div className="py-6 h-full overflow-y-auto">
+              <div className="flex justify-center mb-6">
                 <div className={`rounded-full overflow-hidden ${isFeminine ? 'border-2 border-white shadow-sm bg-white p-1' : ''}`} style={{width: '80px', height: '80px'}}>
                   <Image 
                     src="/logo.svg" 
@@ -217,13 +255,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Overlay for mobile */}
           {sidebarOpen && (
             <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+              className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
               onClick={() => setSidebarOpen(false)}
+              aria-hidden="true"
             />
           )}
 
+          {/* Sidebar for desktop */}
+          <div className="hidden md:block w-64 bg-white border-r border-gray-200 h-[calc(100vh-56px)] sticky top-[56px] overflow-y-auto touch-scroll">
+            <div className="py-6">
+              {filteredMenuItems.map((item) => {
+                const IconComponent = item.icon;
+                const isActive = (item.href === '/dashboard' && pathname === '/dashboard') || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className={`w-full flex items-center px-6 py-3 text-left text-sm font-medium transition-colors ${
+                      isActive
+                        ? isFeminine 
+                          ? 'bg-pink-50 text-pink-700 border-r-2 border-pink-500' 
+                          : 'bg-primary-50 text-primary-700 border-r-2 border-primary-600'
+                        : `text-gray-600 ${isFeminine ? 'hover:bg-pink-50 hover:text-pink-700' : 'hover:bg-gray-50 hover:text-gray-900'}`
+                    }`}
+                  >
+                    <IconComponent className={`h-5 w-5 mr-3 ${isActive 
+                      ? isFeminine ? 'text-pink-600' : 'text-primary-600' 
+                      : 'text-gray-500'}`} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Main Content Area */}
-          <div className={`flex-1 px-4 py-6 ${isFeminine ? 'bg-gradient-to-br from-pink-50 to-white' : 'bg-gray-50'}`}>
+          <div className={`flex-1 p-4 sm:px-6 sm:py-6 ${isFeminine ? 'bg-gradient-to-br from-pink-50 to-white' : 'bg-gray-50'} min-h-[calc(100vh-56px)] mobile-safe-padding`}>
             {children}
           </div>
         </div>

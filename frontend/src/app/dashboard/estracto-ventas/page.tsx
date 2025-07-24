@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Badge } from '../../../../components/ui';
-import { Download, FileText, Calendar, Filter, RefreshCw, Search, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, FileText, Calendar, Filter, RefreshCw, Search, ArrowRight, ChevronLeft, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { formatPrice } from '../../utils/format';
 
 type ExtractType = 'monthly' | 'daily' | 'range';
@@ -31,6 +31,9 @@ export default function EstractoVentasPage() {
 
     const [reportData, setReportData] = useState<any>(null);
     const [extractData, setExtractData] = useState<any[]>([]);
+    
+    // Mobile view state
+    const [showMobileView, setShowMobileView] = useState<boolean>(false);
     
     const [years, setYears] = useState<number[]>([]);
     const allMonths = [
@@ -333,16 +336,16 @@ export default function EstractoVentasPage() {
 
     if (error) {
         return (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center h-full p-4">
                 <div className="text-center">
-                    <div className="text-red-600 text-5xl mb-4">⚠️</div>
-                    <p className="mt-4 text-gray-900 font-medium">{error}</p>
+                    <div className="text-red-600 text-4xl md:text-5xl mb-4">⚠️</div>
+                    <p className="mt-4 text-gray-900 font-medium text-sm md:text-base">{error}</p>
                     <button 
                         onClick={() => {
                             setError(null);
                             handleGenerateReport();
                         }}
-                        className="mt-4 px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800"
+                        className="mt-4 px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm"
                     >
                         Reintentar
                     </button>
@@ -352,86 +355,106 @@ export default function EstractoVentasPage() {
     }
 
     return (
-        <>
+        <div className="p-4 md:p-6 space-y-6">
             {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <div className="mb-6 md:mb-8">
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
                     Extracto de Ventas
                 </h1>
-                <p className="text-gray-600">
+                <p className="text-gray-600 text-sm md:text-base">
                     Genera reportes y extractos de ventas por mes, día o rango de fechas.
                 </p>
             </div>
 
             {/* Filter Controls */}
-            <Card className="mb-8">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-gray-900 flex items-center mb-4 md:mb-0">
-                        <Filter className="h-5 w-5 mr-2" />
-                        Filtros de Reporte
-                    </h2>
-                    <div className="flex items-center space-x-2">
+            <Card className="mb-6 md:mb-8">
+                <div className="flex flex-col space-y-4">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between">
+                        <h2 className="text-lg md:text-xl font-semibold text-gray-900 flex items-center mb-4 md:mb-0">
+                            <Filter className="h-5 w-5 mr-2" />
+                            Filtros de Reporte
+                        </h2>
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full md:w-auto">
+                            <Button 
+                                onClick={handleGeneratePDF} 
+                                disabled={loading || !reportData}
+                                variant="outline"
+                                className="flex items-center justify-center text-sm"
+                            >
+                                <Download className="h-4 w-4 mr-2" />
+                                Descargar PDF
+                            </Button>
+                            <Button 
+                                onClick={handleGenerateReport}
+                                disabled={loading}
+                                className="flex items-center justify-center text-sm"
+                            >
+                                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                                {loading ? "Generando..." : "Generar Reporte"}
+                            </Button>
+                        </div>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 border-b border-gray-200 pb-4 mb-4">
                         <Button 
-                            onClick={handleGeneratePDF} 
-                            disabled={loading || !reportData}
-                            variant="outline"
-                            className="flex items-center"
+                            variant={extractType === 'monthly' ? 'default' : 'outline'} 
+                            onClick={() => setExtractType('monthly')}
+                            className="text-sm"
                         >
-                            <Download className="h-4 w-4 mr-2" />
-                            Descargar PDF
+                            Mensual
                         </Button>
                         <Button 
-                            onClick={handleGenerateReport}
-                            disabled={loading}
-                            className="flex items-center"
+                            variant={extractType === 'daily' ? 'default' : 'outline'} 
+                            onClick={() => setExtractType('daily')}
+                            className="text-sm"
                         >
-                            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                            {loading ? "Generando..." : "Generar Reporte"}
+                            Diario
+                        </Button>
+                        <Button 
+                            variant={extractType === 'range' ? 'default' : 'outline'} 
+                            onClick={() => setExtractType('range')}
+                            className="text-sm"
+                        >
+                            Rango
                         </Button>
                     </div>
-                </div>
-                
-                <div className="flex items-center space-x-2 border-b border-gray-200 pb-4 mb-4">
-                    <Button variant={extractType === 'monthly' ? 'default' : 'outline'} onClick={() => setExtractType('monthly')}>Mensual</Button>
-                    <Button variant={extractType === 'daily' ? 'default' : 'outline'} onClick={() => setExtractType('daily')}>Diario</Button>
-                    <Button variant={extractType === 'range' ? 'default' : 'outline'} onClick={() => setExtractType('range')}>Rango</Button>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {extractType === 'monthly' && (
-                        <>
-                            <div>
-                                <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-1">Año</label>
-                                <select id="year" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={year} onChange={(e) => setYear(parseInt(e.target.value))}>
-                                    {years.map(y => <option key={y} value={y}>{y}</option>)}
-                                </select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {extractType === 'monthly' && (
+                            <>
+                                <div>
+                                    <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-1">Año</label>
+                                    <select id="year" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" value={year} onChange={(e) => setYear(parseInt(e.target.value))}>
+                                        {years.map(y => <option key={y} value={y}>{y}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label htmlFor="month" className="block text-sm font-medium text-gray-700 mb-1">Mes</label>
+                                    <select id="month" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" value={month} onChange={(e) => setMonth(parseInt(e.target.value))}>
+                                        {availableMonths.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                    </select>
+                                </div>
+                            </>
+                        )}
+                        {extractType === 'daily' && (
+                            <div className="md:col-span-2">
+                                <label htmlFor="dailyDate" className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                                <input type="date" id="dailyDate" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" value={dailyDate} onChange={(e) => setDailyDate(e.target.value)} max={new Date().toISOString().split('T')[0]} />
                             </div>
-                            <div>
-                                <label htmlFor="month" className="block text-sm font-medium text-gray-700 mb-1">Mes</label>
-                                <select id="month" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={month} onChange={(e) => setMonth(parseInt(e.target.value))}>
-                                    {availableMonths.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                                </select>
-                            </div>
-                        </>
-                    )}
-                    {extractType === 'daily' && (
-                        <div>
-                            <label htmlFor="dailyDate" className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-                            <input type="date" id="dailyDate" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={dailyDate} onChange={(e) => setDailyDate(e.target.value)} max={new Date().toISOString().split('T')[0]} />
-                        </div>
-                    )}
-                    {extractType === 'range' && (
-                        <>
-                            <div>
-                                <label htmlFor="rangeStartDate" className="block text-sm font-medium text-gray-700 mb-1">Fecha de Inicio</label>
-                                <input type="date" id="rangeStartDate" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={rangeStartDate} onChange={(e) => setRangeStartDate(e.target.value)} max={new Date().toISOString().split('T')[0]} />
-                            </div>
-                            <div>
-                                <label htmlFor="rangeEndDate" className="block text-sm font-medium text-gray-700 mb-1">Fecha de Fin</label>
-                                <input type="date" id="rangeEndDate" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={rangeEndDate} onChange={(e) => setRangeEndDate(e.target.value)} max={new Date().toISOString().split('T')[0]} />
-                            </div>
-                        </>
-                    )}
+                        )}
+                        {extractType === 'range' && (
+                            <>
+                                <div>
+                                    <label htmlFor="rangeStartDate" className="block text-sm font-medium text-gray-700 mb-1">Fecha de Inicio</label>
+                                    <input type="date" id="rangeStartDate" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" value={rangeStartDate} onChange={(e) => setRangeStartDate(e.target.value)} max={new Date().toISOString().split('T')[0]} />
+                                </div>
+                                <div>
+                                    <label htmlFor="rangeEndDate" className="block text-sm font-medium text-gray-700 mb-1">Fecha de Fin</label>
+                                    <input type="date" id="rangeEndDate" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" value={rangeEndDate} onChange={(e) => setRangeEndDate(e.target.value)} max={new Date().toISOString().split('T')[0]} />
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </Card>
 
@@ -440,7 +463,7 @@ export default function EstractoVentasPage() {
                 <div className="flex items-center justify-center py-12">
                     <div className="text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-                        <p className="mt-4 text-gray-600">Cargando datos...</p>
+                        <p className="mt-4 text-gray-600 text-sm">Cargando datos...</p>
                     </div>
                 </div>
             )}
@@ -460,181 +483,274 @@ export default function EstractoVentasPage() {
             {!loading && reportData && (
                 <>
                     {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 md:mb-8">
                         <Card>
-                            <div className="flex items-center justify-between">
-                                <div>
+                            <div className="flex items-center justify-between p-4">
+                                <div className="min-w-0 flex-1">
                                     <p className="text-sm font-medium text-gray-600 mb-1">Total Ventas</p>
-                                    <p className="text-2xl font-bold text-gray-900">{formatPrice(reportData.total_ventas || 0)}</p>
+                                    <p className="text-lg md:text-2xl font-bold text-gray-900 truncate">{formatPrice(reportData.total_ventas || 0)}</p>
                                 </div>
-                                <div className="p-3 bg-green-100 rounded-full">
-                                    <FileText className="h-6 w-6 text-green-600" />
+                                <div className="p-3 bg-green-100 rounded-full ml-3">
+                                    <FileText className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
                                 </div>
                             </div>
                         </Card>
 
                         <Card>
-                            <div className="flex items-center justify-between">
-                                <div>
+                            <div className="flex items-center justify-between p-4">
+                                <div className="min-w-0 flex-1">
                                     <p className="text-sm font-medium text-gray-600 mb-1">Cantidad Ventas</p>
-                                    <p className="text-2xl font-bold text-gray-900">{reportData.cantidad_ventas || 0}</p>
+                                    <p className="text-lg md:text-2xl font-bold text-gray-900">{reportData.cantidad_ventas || 0}</p>
                                 </div>
-                                <div className="p-3 bg-blue-100 rounded-full">
-                                    <Calendar className="h-6 w-6 text-blue-600" />
+                                <div className="p-3 bg-blue-100 rounded-full ml-3">
+                                    <Calendar className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
                                 </div>
                             </div>
                         </Card>
 
                         <Card>
-                            <div className="flex items-center justify-between">
-                                <div>
+                            <div className="flex items-center justify-between p-4">
+                                <div className="min-w-0 flex-1">
                                     <p className="text-sm font-medium text-gray-600 mb-1">Ticket Promedio</p>
-                                    <p className="text-2xl font-bold text-gray-900">{formatPrice(reportData.ticket_promedio || 0)}</p>
+                                    <p className="text-lg md:text-2xl font-bold text-gray-900 truncate">{formatPrice(reportData.ticket_promedio || 0)}</p>
                                 </div>
-                                <div className="p-3 bg-purple-100 rounded-full">
-                                    <FileText className="h-6 w-6 text-purple-600" />
+                                <div className="p-3 bg-purple-100 rounded-full ml-3">
+                                    <FileText className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
                                 </div>
                             </div>
                         </Card>
 
                         <Card>
-                            <div className="flex items-center justify-between">
-                                <div>
+                            <div className="flex items-center justify-between p-4">
+                                <div className="min-w-0 flex-1">
                                     <p className="text-sm font-medium text-gray-600 mb-1">Domicilios</p>
-                                    <p className="text-2xl font-bold text-gray-900">{reportData.cantidad_domicilios || 0}</p>
+                                    <p className="text-lg md:text-2xl font-bold text-gray-900">{reportData.cantidad_domicilios || 0}</p>
                                 </div>
-                                <div className="p-3 bg-yellow-100 rounded-full">
-                                    <FileText className="h-6 w-6 text-yellow-600" />
+                                <div className="p-3 bg-yellow-100 rounded-full ml-3">
+                                    <FileText className="h-5 w-5 md:h-6 md:w-6 text-yellow-600" />
                                 </div>
                             </div>
                         </Card>
                     </div>
 
                     {/* Detailed Data */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-2">
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 md:gap-8">
+                        <div className="xl:col-span-2 space-y-6">
                              {/* Productos Más Vendidos */}
-                            <Card className="mb-8">
-                                <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                                    Productos Más Vendidos
-                                </h2>
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
-                                            <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Variante</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Veces Vendido</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ingreso Total</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
-                                            {reportData.productos_top && reportData.productos_top.length > 0 ? (
-                                                reportData.productos_top.map((producto: any, index: number) => (
-                                                    <tr key={index} className="hover:bg-gray-50 transition-colors">
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                            {producto.producto || producto.product_name}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                            {producto.variante || producto.product_variant || '-'}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                            {producto.cantidad_vendida || producto.quantity_sold || 0}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                            {producto.numero_ordenes || 0}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                                                            {formatPrice(producto.ingresos || producto.revenue || 0)}
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            ) : (
-                                                <tr>
-                                                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
-                                                        No hay datos de productos más vendidos
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </Card>
-                        </div>
-                        <div>
-                            {/* Ventas por Método de Pago */}
-                            <Card className="mb-8">
-                                <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                                    Ventas por Método de Pago
-                                </h2>
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
-                                            <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Método</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Ventas</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
-                                            {reportData.metodos_pago && reportData.metodos_pago.length > 0 ? (
-                                                reportData.metodos_pago.map((metodo: any, index: number) => (
-                                                    <tr key={index} className="hover:bg-gray-50 transition-colors">
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                            {metodo.payment_method}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                            {metodo.count}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                                                            {formatPrice(metodo.total)}
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            ) : (
-                                                <tr>
-                                                    <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">
-                                                        No hay datos de métodos de pago
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </Card>
-
-                            {/* Nueva sección: Transferencias por Cuenta */}
-                            {reportData?.transferencias_por_cuenta && reportData.transferencias_por_cuenta.length > 0 && (
-                                <Card>
-                                    <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                                        Transferencias por Cuenta
+                            <Card>
+                                <div className="p-4 md:p-6">
+                                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
+                                        Productos Más Vendidos
                                     </h2>
-                                    <div className="overflow-x-auto">
+                                    
+                                    {/* Desktop Table */}
+                                    <div className="hidden md:block overflow-x-auto">
                                         <table className="min-w-full divide-y divide-gray-200">
                                             <thead className="bg-gray-50">
                                                 <tr>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Trans.</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Variante</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Veces</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="bg-white divide-y divide-gray-200">
-                                                {reportData.transferencias_por_cuenta.map((cuenta: any, index: number) => (
-                                                    <tr key={index} className="hover:bg-gray-50 transition-colors">
-                                                        <td className="px-6 py-4 whitespace-normal text-sm font-medium text-gray-900">
-                                                            {cuenta.cuenta_origen}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                            {cuenta.cantidad_transacciones}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                                                            {formatPrice(cuenta.valor_total)}
+                                                {reportData.productos_top && reportData.productos_top.length > 0 ? (
+                                                    reportData.productos_top.map((producto: any, index: number) => (
+                                                        <tr key={index} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                                                {producto.producto || producto.product_name}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm text-gray-900">
+                                                                {producto.variante || producto.product_variant || '-'}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm text-gray-900">
+                                                                {producto.cantidad_vendida || producto.quantity_sold || 0}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm text-gray-900">
+                                                                {producto.numero_ordenes || 0}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                                                                {formatPrice(producto.ingresos || producto.revenue || 0)}
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan={5} className="px-4 py-4 text-center text-sm text-gray-500">
+                                                            No hay datos de productos más vendidos
                                                         </td>
                                                     </tr>
-                                                ))}
+                                                )}
                                             </tbody>
                                         </table>
+                                    </div>
+
+                                    {/* Mobile Cards */}
+                                    <div className="md:hidden space-y-3">
+                                        {reportData.productos_top && reportData.productos_top.length > 0 ? (
+                                            reportData.productos_top.map((producto: any, index: number) => (
+                                                <div key={index} className="bg-gray-50 rounded-lg p-4 space-y-2">
+                                                    <div className="flex justify-between items-start">
+                                                        <h4 className="font-medium text-gray-900 text-sm">
+                                                            {producto.producto || producto.product_name}
+                                                        </h4>
+                                                        <span className="text-sm font-semibold text-gray-900">
+                                                            {formatPrice(producto.ingresos || producto.revenue || 0)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
+                                                        <div>
+                                                            <span className="block font-medium">Variante</span>
+                                                            <span>{producto.variante || producto.product_variant || '-'}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="block font-medium">Cantidad</span>
+                                                            <span>{producto.cantidad_vendida || producto.quantity_sold || 0}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="block font-medium">Veces</span>
+                                                            <span>{producto.numero_ordenes || 0}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="text-center py-8 text-sm text-gray-500">
+                                                No hay datos de productos más vendidos
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                        
+                        <div className="space-y-6">
+                            {/* Ventas por Método de Pago */}
+                            <Card>
+                                <div className="p-4 md:p-6">
+                                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
+                                        Ventas por Método de Pago
+                                    </h2>
+                                    
+                                    {/* Desktop Table */}
+                                    <div className="hidden md:block overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Método</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Ventas</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {reportData.metodos_pago && reportData.metodos_pago.length > 0 ? (
+                                                    reportData.metodos_pago.map((metodo: any, index: number) => (
+                                                        <tr key={index} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                                                {metodo.payment_method}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm text-gray-900">
+                                                                {metodo.count}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                                                                {formatPrice(metodo.total)}
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan={3} className="px-4 py-4 text-center text-sm text-gray-500">
+                                                            No hay datos de métodos de pago
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Mobile Cards */}
+                                    <div className="md:hidden space-y-3">
+                                        {reportData.metodos_pago && reportData.metodos_pago.length > 0 ? (
+                                            reportData.metodos_pago.map((metodo: any, index: number) => (
+                                                <div key={index} className="bg-gray-50 rounded-lg p-4">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <h4 className="font-medium text-gray-900 text-sm">
+                                                            {metodo.payment_method}
+                                                        </h4>
+                                                        <span className="text-sm font-semibold text-gray-900">
+                                                            {formatPrice(metodo.total)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs text-gray-600">
+                                                        <span className="font-medium">Ventas:</span> {metodo.count}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="text-center py-8 text-sm text-gray-500">
+                                                No hay datos de métodos de pago
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </Card>
+
+                            {/* Transferencias por Cuenta */}
+                            {reportData?.transferencias_por_cuenta && reportData.transferencias_por_cuenta.length > 0 && (
+                                <Card>
+                                    <div className="p-4 md:p-6">
+                                        <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
+                                            Transferencias por Cuenta
+                                        </h2>
+                                        
+                                        {/* Desktop Table */}
+                                        <div className="hidden md:block overflow-x-auto">
+                                            <table className="min-w-full divide-y divide-gray-200">
+                                                <thead className="bg-gray-50">
+                                                    <tr>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Trans.</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="bg-white divide-y divide-gray-200">
+                                                    {reportData.transferencias_por_cuenta.map((cuenta: any, index: number) => (
+                                                        <tr key={index} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                                                {cuenta.cuenta_origen}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm text-gray-900">
+                                                                {cuenta.cantidad_transacciones}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                                                                {formatPrice(cuenta.valor_total)}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Mobile Cards */}
+                                        <div className="md:hidden space-y-3">
+                                            {reportData.transferencias_por_cuenta.map((cuenta: any, index: number) => (
+                                                <div key={index} className="bg-gray-50 rounded-lg p-4">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h4 className="font-medium text-gray-900 text-sm flex-1 mr-2">
+                                                            {cuenta.cuenta_origen}
+                                                        </h4>
+                                                        <span className="text-sm font-semibold text-gray-900">
+                                                            {formatPrice(cuenta.valor_total)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs text-gray-600">
+                                                        <span className="font-medium">Transacciones:</span> {cuenta.cantidad_transacciones}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </Card>
                             )}
@@ -642,79 +758,155 @@ export default function EstractoVentasPage() {
                     </div>
 
                     {/* Extract Table with Pagination */}
-                    <Card className="mt-8">
-                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4">
-                            <h2 className="text-xl font-semibold text-gray-900">
-                                Extracto Detallado
-                            </h2>
-                            <div className="flex items-center space-x-2">
-                                <p className="text-sm text-gray-500">
-                                    Vista resumida. Descargue el PDF para ver todos los detalles.
-                                </p>
-                                <Badge variant="outline">
-                                    {totalRecords} registros en total
-                                </Badge>
+                    <Card className="mt-6 md:mt-8">
+                        <div className="p-4 md:p-6">
+                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 space-y-2 md:space-y-0">
+                                <h2 className="text-lg md:text-xl font-semibold text-gray-900">
+                                    Extracto Detallado
+                                </h2>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                                    <p className="text-xs md:text-sm text-gray-500">
+                                        Vista resumida. Descargue el PDF para ver todos los detalles.
+                                    </p>
+                                    <Badge variant="outline" className="text-xs">
+                                        {totalRecords} registros en total
+                                    </Badge>
+                                </div>
                             </div>
-                        </div>
-                        
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factura</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pago</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referencia</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {extractData && extractData.length > 0 ? (
-                                        extractData.map((item, index) => (
-                                            <tr key={index} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{item.invoice_number}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.invoice_date}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.cliente}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.product_name}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.quantity}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{formatPrice(item.total_amount)}</td>
-                                                <td className="px-4 py-3 whitespace-normal text-sm text-gray-900">
-                                                    {item.payment_method}
-                                                    {item.payment_source_account && 
-                                                     (item.payment_method.toLowerCase().includes('transferencia') || 
-                                                      item.payment_method.toLowerCase().includes('transfer') || 
-                                                      item.payment_method.toLowerCase().includes('digital')) && (
-                                                        <div className="mt-1 text-xs text-gray-500">
-                                                            Cuenta: {item.payment_source_account}
-                                                        </div>
-                                                     )
-                                                    }
-                                                </td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                    {item.payment_reference || '-'}
+                            
+                            {/* Mobile View Toggle */}
+                            <div className="md:hidden mb-4">
+                                <button
+                                    onClick={() => setShowMobileView(!showMobileView)}
+                                    className="flex items-center text-sm text-blue-600 hover:text-blue-800"
+                                >
+                                    {showMobileView ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
+                                    {showMobileView ? 'Vista compacta' : 'Vista detallada'}
+                                </button>
+                            </div>
+                            
+                            {/* Desktop Table */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factura</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pago</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ref.</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {extractData && extractData.length > 0 ? (
+                                            extractData.map((item, index) => (
+                                                <tr key={index} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{item.invoice_number}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.invoice_date}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.cliente}</td>
+                                                    <td className="px-4 py-3 text-sm text-gray-900">{item.product_name}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.quantity}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{formatPrice(item.total_amount)}</td>
+                                                    <td className="px-4 py-3 text-sm text-gray-900">
+                                                        {item.payment_method}
+                                                        {item.payment_source_account && 
+                                                         (item.payment_method.toLowerCase().includes('transferencia') || 
+                                                          item.payment_method.toLowerCase().includes('transfer') || 
+                                                          item.payment_method.toLowerCase().includes('digital')) && (
+                                                            <div className="mt-1 text-xs text-gray-500">
+                                                                Cuenta: {item.payment_source_account}
+                                                            </div>
+                                                         )
+                                                        }
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                                        {item.payment_reference || '-'}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={8} className="px-4 py-4 text-center text-sm text-gray-500">
+                                                    No hay datos de extracto para el período seleccionado.
                                                 </td>
                                             </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={8} className="px-4 py-4 text-center text-sm text-gray-500">
-                                                No hay datos de extracto para el período seleccionado.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
 
-                        {/* Pagination Controls */}
-                        {totalPages > 1 && (
-                            <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6 mt-4">
-                                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                                    <div>
-                                        <p className="text-sm text-gray-700">
+                            {/* Mobile Cards */}
+                            <div className="md:hidden space-y-4">
+                                {extractData && extractData.length > 0 ? (
+                                    extractData.map((item, index) => (
+                                        <div key={index} className="bg-gray-50 rounded-lg p-4 space-y-3">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h4 className="font-medium text-gray-900 text-sm">#{item.invoice_number}</h4>
+                                                    <p className="text-xs text-gray-600">{item.invoice_date}</p>
+                                                </div>
+                                                <span className="text-sm font-semibold text-gray-900">
+                                                    {formatPrice(item.total_amount)}
+                                                </span>
+                                            </div>
+                                            
+                                            {showMobileView && (
+                                                <>
+                                                    <div className="border-t border-gray-200 pt-2">
+                                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                                            <div>
+                                                                <span className="font-medium text-gray-700">Cliente:</span>
+                                                                <p className="text-gray-900">{item.cliente}</p>
+                                                            </div>
+                                                            <div>
+                                                                <span className="font-medium text-gray-700">Cantidad:</span>
+                                                                <p className="text-gray-900">{item.quantity}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="border-t border-gray-200 pt-2">
+                                                        <div className="text-xs">
+                                                            <span className="font-medium text-gray-700">Producto:</span>
+                                                            <p className="text-gray-900 mt-1">{item.product_name}</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="border-t border-gray-200 pt-2">
+                                                        <div className="text-xs">
+                                                            <span className="font-medium text-gray-700">Método de Pago:</span>
+                                                            <p className="text-gray-900 mt-1">{item.payment_method}</p>
+                                                            {item.payment_source_account && 
+                                                             (item.payment_method.toLowerCase().includes('transferencia') || 
+                                                              item.payment_method.toLowerCase().includes('transfer') || 
+                                                              item.payment_method.toLowerCase().includes('digital')) && (
+                                                                <p className="text-gray-500 mt-1">Cuenta: {item.payment_source_account}</p>
+                                                             )
+                                                            }
+                                                            {item.payment_reference && (
+                                                                <p className="text-gray-500 mt-1">Ref: {item.payment_reference}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-8 text-sm text-gray-500">
+                                        No hay datos de extracto para el período seleccionado.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Pagination Controls */}
+                            {totalPages > 1 && (
+                                <div className="flex flex-col sm:flex-row items-center justify-between border-t border-gray-200 px-4 py-3 mt-4 space-y-3 sm:space-y-0">
+                                    <div className="text-center sm:text-left">
+                                        <p className="text-xs md:text-sm text-gray-700">
                                             Mostrando <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> a <span className="font-medium">{Math.min(currentPage * pageSize, totalRecords)}</span> de <span className="font-medium">{totalRecords}</span> resultados
                                         </p>
                                     </div>
@@ -723,32 +915,32 @@ export default function EstractoVentasPage() {
                                             <button
                                                 onClick={handlePreviousPage}
                                                 disabled={currentPage === 1}
-                                                className="relative inline-flex items-center px-2 py-2 rounded-md bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="relative inline-flex items-center px-3 py-2 rounded-md bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
                                             >
-                                                <span className="sr-only">Anterior</span>
-                                                <ChevronLeft className="h-5 w-5" />
+                                                <ChevronLeft className="h-4 w-4" />
+                                                <span className="hidden sm:inline ml-1">Anterior</span>
                                             </button>
                                             
-                                            <span className="text-sm font-medium text-gray-700">
-                                                Página {currentPage} de {totalPages}
+                                            <span className="text-xs md:text-sm font-medium text-gray-700 px-2">
+                                                {currentPage} / {totalPages}
                                             </span>
                                             
                                             <button
                                                 onClick={handleNextPage}
                                                 disabled={currentPage === totalPages}
-                                                className="relative inline-flex items-center px-2 py-2 rounded-md bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="relative inline-flex items-center px-3 py-2 rounded-md bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
                                             >
-                                                <span className="sr-only">Siguiente</span>
-                                                <ChevronRight className="h-5 w-5" />
+                                                <span className="hidden sm:inline mr-1">Siguiente</span>
+                                                <ChevronRight className="h-4 w-4" />
                                             </button>
                                         </nav>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </Card>
                 </>
             )}
-        </>
+        </div>
     );
 }
