@@ -3,6 +3,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { Card, Button } from '../../../../../components/ui'; // Adjust path as needed
 import { getAuthHeaders, getUserId } from '../../../utils/auth';
+import toast, { Toaster } from 'react-hot-toast'; // Import toast and Toaster
 import {
   useReactTable,
   getCoreRowModel,
@@ -83,6 +84,43 @@ export default function ProductsPage() {
     pageSize: 10,
   });
   const [globalFilter, setGlobalFilter] = useState('');
+  
+  // Custom toast styles
+  const showSuccessToast = useCallback((message: string) => {
+    toast.success(message, {
+      duration: 3000,
+      position: "top-center",
+      style: {
+        background: '#10B981',
+        color: 'white',
+        padding: '16px',
+        borderRadius: '8px',
+      },
+      iconTheme: {
+        primary: 'white',
+        secondary: '#10B981',
+      },
+    });
+  }, []);
+
+  const showErrorToast = useCallback((message: string) => {
+    toast.error(message, {
+      duration: 4000,
+      position: "top-center",
+      style: {
+        background: '#EF4444',
+        color: 'white',
+        padding: '16px',
+        borderRadius: '8px',
+      },
+      iconTheme: {
+        primary: 'white',
+        secondary: '#EF4444',
+      },
+    });
+  }, []);
+
+
 
   const formatPrice = useCallback((price: number) => {
     // First format with standard currency formatting
@@ -110,6 +148,72 @@ export default function ProductsPage() {
     const category = categorias.find(cat => cat.id === id);
     return category ? category.nombre_categoria : 'N/A';
   }, [categorias]);
+
+  const handleDeleteProducto = useCallback(async (id: number) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8053';
+      const headers = getAuthHeaders();
+      
+      const response = await fetch(`${apiUrl}/api/v1/products/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
+      }
+      
+      setProductos((prev) => prev.filter((p) => p.id !== id));
+      showSuccessToast('Producto eliminado exitosamente');
+    } catch (err: any) {
+      showErrorToast(`Error al eliminar el producto: ${err.message}`);
+    }
+  }, [showSuccessToast, showErrorToast]);
+
+  // Handle delete confirmation with custom toast
+  const handleDeleteConfirmation = useCallback((producto: Producto) => {
+    toast((t) => (
+      <div className="flex flex-col gap-2">
+        <div className="text-sm font-medium">
+          ¿Está seguro de eliminar {producto.nombre_producto}?
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              handleDeleteProducto(producto.id);
+              toast.dismiss(t.id);
+            }}
+            className="bg-red-600 text-white px-3 py-1 rounded-md text-xs"
+          >
+            Eliminar
+          </button>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="bg-gray-200 text-gray-700 px-3 py-1 rounded-md text-xs"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 6000,
+      position: "top-center",
+    });
+  }, [handleDeleteProducto]);
+
+  const handleEditProducto = useCallback((producto: Producto) => {
+    setFormData({
+      nombre_producto: producto.nombre_producto,
+      variante: producto.variante || '',
+      precio: String(producto.price),
+      id_categoria: String(producto.category_id || ''),
+    });
+    setDisplayPrice(formatPrice(producto.price));
+    setCurrentProductRecipe(producto.receta || []);
+    setEditingId(producto.id);
+    setShowAddForm(true);
+  }, [formatPrice]);
 
   // Define columns
   const columns = useMemo(() => [
@@ -158,7 +262,7 @@ export default function ProductsPage() {
           <Button
             variant="danger"
             size="sm"
-            onClick={() => handleDeleteProducto(row.original.id)}
+            onClick={() => handleDeleteConfirmation(row.original)}
             title="Eliminar producto"
           >
             <Trash2 className="h-4 w-4" />
@@ -166,7 +270,7 @@ export default function ProductsPage() {
         </div>
       ),
     }),
-  ], [formatPrice, getCategoryName, mounted, formatDateToDDMMYYYY]);
+  ], [formatPrice, getCategoryName, mounted, formatDateToDDMMYYYY, handleEditProducto, handleDeleteConfirmation]);
 
   // Create table instance
   const table = useReactTable({
@@ -364,19 +468,19 @@ export default function ProductsPage() {
     const parsedQuantity = parseFloat(newRecipeItem.quantity);
 
     if (isNaN(parsedConsumableId) || parsedConsumableId <= 0 || isNaN(parsedQuantity) || parsedQuantity <= 0) {
-      alert('Por favor, seleccione un insumo y especifique una cantidad válida.');
+      showErrorToast('Por favor, seleccione un insumo y especifique una cantidad válida.');
       return;
     }
 
     const existingItem = currentProductRecipe.find(item => item.consumableId === parsedConsumableId);
     if (existingItem) {
-      alert('Este insumo ya ha sido agregado a la receta.');
+      showErrorToast('Este insumo ya ha sido agregado a la receta.');
       return;
     }
 
     setCurrentProductRecipe((prev) => [...prev, { consumableId: parsedConsumableId, quantity: parsedQuantity }]);
     setNewRecipeItem({ consumableId: '', quantity: '' });
-  }, [newRecipeItem, currentProductRecipe]);
+  }, [newRecipeItem, currentProductRecipe, showErrorToast]);
 
   const handleRemoveRecipeItem = useCallback((consumableIdToRemove: number) => {
     setCurrentProductRecipe((prev) => prev.filter(item => item.consumableId !== consumableIdToRemove));
@@ -385,23 +489,23 @@ export default function ProductsPage() {
   const handleAddOrUpdateProducto = useCallback(async () => {
     // Validate form data
     if (!formData.nombre_producto.trim()) {
-      alert('Por favor, ingrese el nombre del producto.');
+      showErrorToast('Por favor, ingrese el nombre del producto.');
       return;
     }
 
     if (!formData.precio.trim()) {
-      alert('Por favor, ingrese el precio del producto.');
+      showErrorToast('Por favor, ingrese el precio del producto.');
       return;
     }
 
     if (!formData.id_categoria) {
-      alert('Por favor, seleccione una categoría.');
+      showErrorToast('Por favor, seleccione una categoría.');
       return;
     }
 
     // Validar que hay al menos un ingrediente en la receta
     if (currentProductRecipe.length === 0) {
-      alert('Por favor, agregue al menos un ingrediente a la receta del producto.');
+      showErrorToast('Por favor, agregue al menos un ingrediente a la receta del producto.');
       return;
     }
 
@@ -466,50 +570,13 @@ export default function ProductsPage() {
       setDisplayPrice('');
       
       await fetchProducts();
-      alert('Producto guardado exitosamente');
+      showSuccessToast('Producto guardado exitosamente');
       
     } catch (err: any) {
       console.error("Full error:", err);
-      alert(`Error al guardar el producto: ${err.message}`);
+      showErrorToast(`Error al guardar el producto: ${err.message}`);
     }
-  }, [formData, editingId, currentProductRecipe, categorias, fetchProducts]);
-
-  const handleEditProducto = useCallback((producto: Producto) => {
-    setFormData({
-      nombre_producto: producto.nombre_producto,
-      variante: producto.variante || '',
-      precio: String(producto.price),
-      id_categoria: String(producto.category_id || ''),
-    });
-    setDisplayPrice(formatPrice(producto.price));
-    setCurrentProductRecipe(producto.receta || []);
-    setEditingId(producto.id);
-    setShowAddForm(true);
-  }, [formatPrice]);
-
-  const handleDeleteProducto = useCallback(async (id: number) => {
-    if (confirm('¿Está seguro de eliminar este producto?')) {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8053';
-        const headers = getAuthHeaders();
-        
-        const response = await fetch(`${apiUrl}/api/v1/products/${id}`, {
-          method: 'DELETE',
-          headers
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
-        }
-        
-        setProductos((prev) => prev.filter((p) => p.id !== id));
-        alert('Producto eliminado exitosamente');
-      } catch (err: any) {
-        alert(`Error al eliminar el producto: ${err.message}`);
-      }
-    }
-  }, []);
+  }, [formData, editingId, currentProductRecipe, categorias, fetchProducts, showSuccessToast, showErrorToast]);
 
   const handleCancel = useCallback(() => {
     setEditingId(null);
@@ -845,6 +912,8 @@ export default function ProductsPage() {
           )}
         </div>
       </Card>
+      {/* Add Toaster component at the end */}
+      <Toaster />
     </div>
   );
 }
