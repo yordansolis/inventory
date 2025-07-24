@@ -298,14 +298,14 @@ def create_tables():
     sales_table = """
     CREATE TABLE IF NOT EXISTS sales (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
+        user_id INT,
         total_amount DECIMAL(10, 2) NOT NULL,
         sale_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         payment_method VARCHAR(50),
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
     )
     """
 
@@ -331,7 +331,7 @@ def create_tables():
         invoice_date DATE NOT NULL,
         invoice_time TIME NOT NULL,
         client_name VARCHAR(100) NOT NULL,
-        seller_username VARCHAR(50) NOT NULL,
+        seller_username VARCHAR(50),
         client_phone VARCHAR(20),
         has_delivery BOOLEAN DEFAULT FALSE,
         delivery_address VARCHAR(255),
@@ -348,7 +348,7 @@ def create_tables():
         cancelled_at TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (seller_username) REFERENCES users(username) ON DELETE RESTRICT
+        FOREIGN KEY (seller_username) REFERENCES users(username) ON DELETE SET NULL
     )
     """
     

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from typing import List, Optional
 from schemas.schemas import UserResponse, UserCreate, UserUpdate
 from api.v1.auth_service.login import get_current_active_user
@@ -489,3 +489,83 @@ async def activate_user(
     updated_user = execute_query(get_query, (user_id,), fetch_one=True)
     
     return updated_user
+
+# Eliminar un usuario permanentemente
+@router_crud_users.delete("/{user_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+async def permanent_delete_user(
+    user_id: int,
+    current_user: dict = Depends(get_current_superuser)
+):
+    """
+    Eliminar un usuario permanentemente de la base de datos (solo superusuarios).
+    Esta acción es irreversible y conservará los registros de ventas asociados al usuario
+    estableciendo el user_id a NULL.
+    """
+    # Verificar que el usuario exista
+    check_query = "SELECT id, username FROM users WHERE id = %s"
+    user_to_delete = execute_query(check_query, (user_id,), fetch_one=True)
+    
+    if not user_to_delete:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Usuario con ID {user_id} no encontrado"
+        )
+    
+    # No permitir eliminar al propio superusuario
+    if user_id == current_user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No puedes eliminar tu propia cuenta permanentemente"
+        )
+    
+    connection = None
+    cursor = None
+    try:
+        from database.db import get_db_connection
+        connection = get_db_connection()
+        if not connection:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No se pudo establecer conexión con la base de datos"
+            )
+        
+        cursor = connection.cursor()
+        connection.begin()
+        
+        username_to_delete = user_to_delete['username']
+        
+        # 1. Desvincular ventas (sales)
+        # Esto es un respaldo. Con ON DELETE SET NULL, la BD lo haría automáticamente.
+        update_sales_query = "UPDATE sales SET user_id = NULL WHERE user_id = %s"
+        cursor.execute(update_sales_query, (user_id,))
+        
+        # 2. Desvincular compras (purchases)
+        update_purchases_query = "UPDATE purchases SET seller_username = NULL WHERE seller_username = %s"
+        cursor.execute(update_purchases_query, (username_to_delete,))
+
+        # 3. Eliminar de user_permissions (si ON DELETE CASCADE no estuviera, sería necesario)
+        # delete_permissions_query = "DELETE FROM user_permissions WHERE user_id = %s"
+        # cursor.execute(delete_permissions_query, (user_id,))
+        
+        # 4. Eliminar el usuario de la tabla users
+        # La tabla user_permissions tiene ON DELETE CASCADE, por lo que los permisos se borrarán solos.
+        delete_user_query = "DELETE FROM users WHERE id = %s"
+        cursor.execute(delete_user_query, (user_id,))
+        
+        connection.commit()
+        
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        print(f"Error al eliminar permanentemente al usuario: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al eliminar permanentemente al usuario: {str(e)}"
+        )
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -15,7 +15,8 @@ import {
   ChevronRight,
   MoreVertical,
   UserCheck,
-  UserX
+  UserX,
+  Trash2
 } from 'lucide-react';
 import { getAuthHeaders } from '../../utils/auth';
 import toast, { Toaster } from 'react-hot-toast';
@@ -57,7 +58,7 @@ const Switch = ({ checked, onChange, disabled = false }: { checked: boolean; onC
 };
 
 // Dropdown Menu Component para acciones móviles
-const DropdownMenu = ({ user, onEdit, onToggleStatus }: { user: User; onEdit: () => void; onToggleStatus: () => void }) => {
+const DropdownMenu = ({ user, onEdit, onToggleStatus, onPermanentDelete }: { user: User; onEdit: () => void; onToggleStatus: () => void; onPermanentDelete: () => void; }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -109,6 +110,17 @@ const DropdownMenu = ({ user, onEdit, onToggleStatus }: { user: User; onEdit: ()
                     Activar
                   </>
                 )}
+              </button>
+              <div className="border-t border-gray-100 my-1"></div>
+              <button
+                onClick={() => {
+                  onPermanentDelete();
+                  setIsOpen(false);
+                }}
+                className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar
               </button>
             </div>
           </div>
@@ -234,6 +246,37 @@ export default function UsersManagement() {
     }
   }, [users, showSuccessToast, showErrorToast]);
 
+  const handlePermanentDelete = useCallback(async (id: number) => {
+    try {
+      const userToDelete = users.find(u => u.id === id);
+      if (!userToDelete) return;
+
+      const headers = getAuthHeaders();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/admin/users/${id}/permanent`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (response.status === 204) {
+        setUsers(prevUsers => prevUsers.filter(user => user.id !== id));
+        showSuccessToast(`Usuario "${userToDelete.username}" eliminado permanentemente.`);
+        return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Error al eliminar el usuario permanentemente');
+      }
+
+      setUsers(prevUsers => prevUsers.filter(user => user.id !== id));
+      showSuccessToast(`Usuario "${userToDelete.username}" eliminado permanentemente.`);
+
+    } catch (error: any) {
+      console.error('Error al eliminar permanentemente el usuario:', error);
+      showErrorToast(error.message || 'Error al eliminar el usuario');
+    }
+  }, [users, showSuccessToast, showErrorToast]);
+
   // Handle status toggle confirmation with custom toast
   const handleToggleStatusConfirmation = useCallback((user: User) => {
     const newStatus = user.estado === 'activo' ? 'inactivo' : 'activo';
@@ -265,6 +308,38 @@ export default function UsersManagement() {
       position: "top-center",
     });
   }, [handleToggleStatus]);
+
+  const handlePermanentDeleteConfirmation = useCallback((user: User) => {
+    toast((t) => (
+      <div className="flex flex-col gap-2 p-1">
+        <div className="text-sm font-medium">
+          <p className="font-bold text-red-600 flex items-center gap-2"><AlertCircle size={16} /> ¡Acción irreversible!</p>
+          <p className="mt-2">¿Seguro que quieres eliminar a <span className="font-bold">{user.username}</span>?</p>
+          <p className="text-xs text-gray-500 mt-1">Esta acción no se puede deshacer. Los registros de ventas se conservarán.</p>
+        </div>
+        <div className="flex gap-2 justify-end mt-2">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="bg-gray-200 text-gray-700 px-3 py-1 rounded-md text-xs"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => {
+              handlePermanentDelete(user.id);
+              toast.dismiss(t.id);
+            }}
+            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs"
+          >
+            Sí, eliminar
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 10000,
+      position: "top-center",
+    });
+  }, [handlePermanentDelete]);
 
   // Filtrar usuarios por término de búsqueda
   const filteredUsers = users.filter(user => 
@@ -532,6 +607,7 @@ export default function UsersManagement() {
           user={user}
           onEdit={() => handleOpenModal(user)}
           onToggleStatus={() => handleToggleStatusConfirmation(user)}
+          onPermanentDelete={() => handlePermanentDeleteConfirmation(user)}
         />
       </div>
       
@@ -669,6 +745,13 @@ export default function UsersManagement() {
                                 onClick={() => handleOpenModal(user)}
                               >
                                 <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button 
+                                variant="danger" 
+                                size="sm" 
+                                onClick={() => handlePermanentDeleteConfirmation(user)}
+                              >
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
                           </td>
