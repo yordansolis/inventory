@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search, Menu } from 'lucide-react';
 import { Card, Button } from '../../../../../components/ui'; // Adjust path as needed
 import { getAuthHeaders, getUserId } from '../../../utils/auth';
 import toast, { Toaster } from 'react-hot-toast'; // Import toast and Toaster
@@ -43,7 +43,6 @@ interface Producto {
   created_at: string;
   receta: ProductRecipeItem[];
   categoria_nombre?: string;
-  // stock_quantity?: number;
 }
 
 interface ProductoFormData {
@@ -85,6 +84,21 @@ export default function ProductsPage() {
   });
   const [globalFilter, setGlobalFilter] = useState('');
   
+  // Responsive states
+  const [isMobile, setIsMobile] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
+
+  // Check screen size
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+  
   // Custom toast styles
   const showSuccessToast = useCallback((message: string) => {
     toast.success(message, {
@@ -120,10 +134,7 @@ export default function ProductsPage() {
     });
   }, []);
 
-
-
   const formatPrice = useCallback((price: number) => {
-    // First format with standard currency formatting
     const formatted = new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
@@ -131,8 +142,6 @@ export default function ProductsPage() {
       maximumFractionDigits: 2,
     }).format(price);
     
-    // Remove trailing zeros after decimal point
-    // If the price has no meaningful decimal part (e.g. 10.00), remove the decimal part entirely
     return formatted.replace(/,00($|\s)/g, '$1');
   }, []);
 
@@ -171,7 +180,6 @@ export default function ProductsPage() {
     }
   }, [showSuccessToast, showErrorToast]);
 
-  // Handle delete confirmation with custom toast
   const handleDeleteConfirmation = useCallback((producto: Producto) => {
     toast((t) => (
       <div className="flex flex-col gap-2">
@@ -215,8 +223,54 @@ export default function ProductsPage() {
     setShowAddForm(true);
   }, [formatPrice]);
 
-  // Define columns
-  const columns = useMemo(() => [
+  // Mobile-optimized columns
+  const mobileColumns = useMemo(() => [
+    columnHelper.accessor('nombre_producto', {
+      header: 'Producto',
+      cell: info => (
+        <div className="min-w-0">
+          <div className="font-medium text-gray-900 truncate">{info.getValue()}</div>
+          <div className="text-sm text-gray-500 truncate">
+            {info.row.original.variante || 'Sin variante'}
+          </div>
+          <div className="text-sm font-medium text-green-600">
+            {formatPrice(info.row.original.price)}
+          </div>
+        </div>
+      ),
+      enableSorting: true,
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: 'Acciones',
+      cell: ({ row }) => (
+        <div className="flex flex-col space-y-1 sm:flex-row sm:space-y-0 sm:space-x-1">
+          <Button
+            size="sm"
+            onClick={() => handleEditProducto(row.original)}
+            title="Editar producto"
+            className="w-full sm:w-auto text-xs"
+          >
+            <Edit className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+            <span className="sm:hidden">Editar</span>
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => handleDeleteConfirmation(row.original)}
+            title="Eliminar producto"
+            className="w-full sm:w-auto text-xs"
+          >
+            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+            <span className="sm:hidden">Eliminar</span>
+          </Button>
+        </div>
+      ),
+    }),
+  ], [formatPrice, handleEditProducto, handleDeleteConfirmation]);
+
+  // Desktop columns
+  const desktopColumns = useMemo(() => [
     columnHelper.accessor('nombre_producto', {
       header: 'Nombre',
       cell: info => info.getValue(),
@@ -237,11 +291,6 @@ export default function ProductsPage() {
       cell: info => info.getValue() || getCategoryName(info.row.original.category_id),
       enableSorting: true,
     }),
-    // columnHelper.accessor('stock_quantity', {
-    //   header: 'Stock',
-    //   cell: info => info.getValue() !== undefined ? info.getValue() : 'N/A',
-    //   enableSorting: true,
-    // }),
     columnHelper.accessor('created_at', {
       header: 'Creado En',
       cell: info => mounted && info.getValue() ? formatDateToDDMMYYYY(info.getValue()) : 'N/A',
@@ -272,10 +321,10 @@ export default function ProductsPage() {
     }),
   ], [formatPrice, getCategoryName, mounted, formatDateToDDMMYYYY, handleEditProducto, handleDeleteConfirmation]);
 
-  // Create table instance
+  // Create table instance with responsive columns
   const table = useReactTable({
     data: productos,
-    columns,
+    columns: isMobile ? mobileColumns : desktopColumns,
     state: {
       sorting,
       columnFilters,
@@ -312,14 +361,10 @@ export default function ProductsPage() {
       
       const data = await response.json();
       setCategorias(data);
-      
-      if (data.length > 0 && formData.id_categoria === '') {
-        setFormData(prev => ({ ...prev, id_categoria: String(data[0].id) }));
-      }
     } catch (err: any) {
       setError(`Error al cargar categorías: ${err.message}`);
     }
-  }, [formData.id_categoria]);
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -398,6 +443,12 @@ export default function ProductsPage() {
     loadData();
   }, [fetchCategories, fetchProducts, fetchConsumables]);
 
+  useEffect(() => {
+    if (categorias.length > 0 && formData.id_categoria === '') {
+      setFormData(prev => ({ ...prev, id_categoria: String(categorias[0].id) }));
+    }
+  }, [categorias]);
+
   // Form handlers (keeping existing logic)
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
@@ -408,40 +459,29 @@ export default function ProductsPage() {
   }, []);
 
   const handlePriceInputFocus = useCallback(() => {
-    // When focusing, show the raw value without formatting
     const rawValue = formData.precio;
     setDisplayPrice(rawValue);
   }, [formData.precio]);
 
   const handlePriceInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
-    // Allow only numbers, commas, dots, and ensure only one decimal separator
     const sanitizedValue = inputValue.replace(/[^\d.,]/g, '');
     setDisplayPrice(sanitizedValue);
   }, []);
 
   const handlePriceInputBlur = useCallback(() => {
-    // Process the input value when the field loses focus
     const rawInputForProcessing = displayPrice;
-    
-    // Clean the input: remove all non-numeric, non-decimal characters
     const cleanedForInternalState = rawInputForProcessing.replace(/[^\d.,]/g, '');
-    
-    // Standardize to use period as decimal separator
     let standardizedValue = cleanedForInternalState.replace(/,/g, '.');
     
-    // Ensure only one decimal point exists
     const decimalPoints = standardizedValue.match(/\./g);
     if (decimalPoints && decimalPoints.length > 1) {
-      // Keep only the first decimal point
       const parts = standardizedValue.split('.');
       standardizedValue = parts[0] + '.' + parts.slice(1).join('');
     }
 
-    // Store the standardized value in the form data
     setFormData(prev => ({ ...prev, precio: standardizedValue }));
 
-    // Format for display
     const numericPrice = parseFloat(standardizedValue);
     if (!isNaN(numericPrice) && standardizedValue.trim() !== '') {
       setDisplayPrice(formatPrice(numericPrice));
@@ -453,8 +493,6 @@ export default function ProductsPage() {
 
   const handleNewRecipeItemChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const { value } = e.target;
-    
-    // Auto-complete quantity when consumable is selected
     const selectedConsumable = availableConsumables.find(c => c.id === parseInt(value));
     setNewRecipeItem((prev) => ({
       ...prev,
@@ -487,7 +525,6 @@ export default function ProductsPage() {
   }, []);
 
   const handleAddOrUpdateProducto = useCallback(async () => {
-    // Validate form data
     if (!formData.nombre_producto.trim()) {
       showErrorToast('Por favor, ingrese el nombre del producto.');
       return;
@@ -503,7 +540,6 @@ export default function ProductsPage() {
       return;
     }
 
-    // Validar que hay al menos un ingrediente en la receta
     if (currentProductRecipe.length === 0) {
       showErrorToast('Por favor, agregue al menos un ingrediente a la receta del producto.');
       return;
@@ -513,7 +549,6 @@ export default function ProductsPage() {
       const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://127.0.0.1:8053';
       const headers = getAuthHeaders();
       
-      // Prepare data for API - include both product data and recipe
       const productData = {
         nombre_producto: formData.nombre_producto.trim(),
         variante: formData.variante.trim() || null,
@@ -523,7 +558,6 @@ export default function ProductsPage() {
         is_active: true
       };
 
-      // Prepare the complete payload with both product and recipe data
       const completePayload = {
         ...productData,
         ingredients: currentProductRecipe.map(item => ({
@@ -537,14 +571,12 @@ export default function ProductsPage() {
       let response;
       
       if (editingId) {
-        // Update existing product
         response = await fetch(`${apiUrl}/api/v1/products/${editingId}`, {
           method: 'PUT',
           headers,
           body: JSON.stringify(completePayload)
         });
       } else {
-        // Create new product
         response = await fetch(`${apiUrl}/api/v1/products`, {
           method: 'POST',
           headers,
@@ -558,11 +590,9 @@ export default function ProductsPage() {
         throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
       }
       
-      // Get the response data
       const responseData = await response.json();
       console.log("API Response:", responseData);
       
-      // Reset form
       setShowAddForm(false);
       setEditingId(null);
       setFormData({ nombre_producto: '', variante: '', precio: '', id_categoria: String(categorias[0]?.id || '') });
@@ -597,216 +627,290 @@ export default function ProductsPage() {
     }
   }, [fetchProducts, fetchCategories, fetchConsumables]);
 
-  // Modificar la sección del formulario para hacerla más intuitiva
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Gestión de Productos</h1>
+    <div className="p-3 sm:p-6 min-h-screen">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
+          Gestión de Productos
+        </h1>
 
-      <div className="mb-8 flex justify-between">
-        <Button onClick={() => setShowAddForm(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar Nuevo Producto
-        </Button>
-        
-        <Button variant="outline" onClick={handleRefresh} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+        {/* Action buttons - responsive layout */}
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+          <Button 
+            onClick={() => 
+              {
+                // console.log("Abriendo modal");
+                setShowAddForm(true);
+              }
+            }
+            className="w-full sm:w-auto order-2 sm:order-1"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Nuevo Producto
+          </Button>
+          
+          <div className="flex gap-2 order-1 sm:order-2">
+            {/* Mobile search toggle */}
+            <Button 
+              variant="outline" 
+              onClick={() => setShowMobileSearch(!showMobileSearch)}
+              className="sm:hidden"
+            >
+              <Search className="h-4 w-4" />
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={handleRefresh} 
+              disabled={loading}
+              className="flex-1 sm:flex-initial"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Actualizar</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Mobile search input */}
+        {(showMobileSearch || !isMobile) && (
+          <div className={`mt-3 ${isMobile ? 'block' : 'hidden'}`}>
+            <input
+              type="text"
+              placeholder="Buscar productos..."
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        )}
       </div>
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          <p>{error}</p>
+          <p className="text-sm">{error}</p>
         </div>
       )}
 
+      {/* Form Modal/Drawer */}
       {showAddForm && (
-        <Card className="mb-6">
-          <div className="border-b border-gray-200 pb-4 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">
-              {editingId ? 'Editar Producto' : 'Agregar Nuevo Producto'}
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Los productos se crean como disponibles bajo demanda. El control de inventario se realiza a través de los insumos.
-            </p>
-          </div>
+        // <div className="fixed inset-0 z-50 overflow-y-auto bg-red-500">
+        //   <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        //     <div 
+        //       className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+        //       onClick={handleCancel}
+        //       aria-hidden="true"
+        //     ></div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Columna 1: Información del producto */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-800 mb-2">Información del Producto</h3>
-              
-              <div>
-                <label htmlFor="nombre_producto" className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre del Producto *
-                </label>
-                <input
-                  type="text"
-                  id="nombre_producto"
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={formData.nombre_producto}
-                  onChange={handleChange}
-                  placeholder="Ej: Helado de Chocolate"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="variante" className="block text-sm font-medium text-gray-700 mb-1">
-                  Variante
-                </label>
-                <input
-                  type="text"
-                  id="variante"
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={formData.variante}
-                  onChange={handleChange}
-                  placeholder="Ej: Grande, Mediano, etc."
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="precio" className="block text-sm font-medium text-gray-700 mb-1">
-                  Precio (COP) *
-                </label>
-                <input
-                  type="text"
-                  id="precio"
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={displayPrice}
-                  onChange={handlePriceInputChange}
-                  onBlur={handlePriceInputBlur}
-                  onFocus={handlePriceInputFocus}
-                  placeholder="Ej: $ 22.000,00"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="id_categoria" className="block text-sm font-medium text-gray-700 mb-1">
-                  Categoría *
-                </label>
-                <select
-                  id="id_categoria"
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={formData.id_categoria}
-                  onChange={handleChange}
-                >
-                  <option value="">Seleccione una categoría</option>
-                  {categorias.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.nombre_categoria}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            {/* Columna 2: Receta del producto */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-800 mb-2">Receta del Producto</h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Agregue los insumos necesarios para preparar este producto. La cantidad se establece automáticamente según el insumo seleccionado.
-              </p>
-              
-              <div className="grid grid-cols-1 gap-4 mb-4">
-                <div>
-                  <label htmlFor="consumableId" className="block text-sm font-medium text-gray-700 mb-1">
-                    Seleccione un Insumo
-                  </label>
-                  <select
-                    id="consumableId"
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    value={newRecipeItem.consumableId}
-                    onChange={handleNewRecipeItemChange}
-                  >
-                    <option value="">-- Seleccionar insumo --</option>
-                    {availableConsumables.map(consumable => (
-                      <option key={consumable.id} value={consumable.id}>
-                        {consumable.nombre} ({consumable.unidadMedida})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+        //     {/* This element is to trick the browser into centering the modal contents. */}
+        //     <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-                <div className="flex items-end space-x-2">
-                  <div className="flex-1">
-                    <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
-                      Cantidad Predefinida
-                    </label>
-                    <input
-                      type="text"
-                      id="quantity"
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 text-gray-700"
-                      value={newRecipeItem.quantity}
-                      readOnly
-                      placeholder="Cantidad automática"
-                    />
+        //     <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-full max-w-4xl">
+              <Card className="border-0">
+                <div className="p-4 sm:p-6">
+                  {/* Form header */}
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-6">
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+                        {editingId ? 'Editar Producto' : 'Agregar Nuevo Producto'}
+                      </h2>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                        Los productos se crean como disponibles bajo demanda.
+                      </p>
+                    </div>
+                    <Button 
+                      variant="secondary" 
+                      onClick={handleCancel}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button 
-                    onClick={handleAddRecipeItem} 
-                    className="h-10"
-                    disabled={!newRecipeItem.consumableId || !newRecipeItem.quantity || parseFloat(newRecipeItem.quantity) <= 0}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Agregar
-                  </Button>
-                </div>
-              </div>
 
-              {currentProductRecipe.length > 0 ? (
-                <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
-                  <h4 className="text-md font-medium text-gray-800 mb-2">Insumos en la Receta:</h4>
-                  <ul className="divide-y divide-gray-200">
-                    {currentProductRecipe.map(item => {
-                      const consumable = availableConsumables.find(c => c.id === item.consumableId);
-                      return (
-                        <li key={item.consumableId} className="py-2 flex justify-between items-center">
-                          <span className="font-medium">
-                            {consumable?.nombre || 'Insumo Desconocido'}
-                          </span>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-gray-600">
-                              {item.quantity} {consumable?.unidadMedida || ''}
-                            </span>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleRemoveRecipeItem(item.consumableId)}
-                              title="Eliminar insumo de la receta"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                  {/* Form content - responsive grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Product Information */}
+                    <div className="space-y-4">
+                      <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-2">
+                        Información del Producto
+                      </h3>
+                      
+                      <div>
+                        <label htmlFor="nombre_producto" className="block text-sm font-medium text-gray-700 mb-1">
+                          Nombre del Producto *
+                        </label>
+                        <input
+                          type="text"
+                          id="nombre_producto"
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+                          value={formData.nombre_producto}
+                          onChange={handleChange}
+                          placeholder="Ej: Helado de Chocolate"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="variante" className="block text-sm font-medium text-gray-700 mb-1">
+                          Variante
+                        </label>
+                        <input
+                          type="text"
+                          id="variante"
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+                          value={formData.variante}
+                          onChange={handleChange}
+                          placeholder="Ej: Grande, Mediano, etc."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="precio" className="block text-sm font-medium text-gray-700 mb-1">
+                          Precio (COP) *
+                        </label>
+                        <input
+                          type="text"
+                          id="precio"
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+                          value={displayPrice}
+                          onChange={handlePriceInputChange}
+                          onBlur={handlePriceInputBlur}
+                          onFocus={handlePriceInputFocus}
+                          placeholder="Ej: $ 22.000,00"
+                        /> 
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="id_categoria" className="block text-sm font-medium text-gray-700 mb-1">
+                          Categoría *
+                        </label>
+                        <select
+                          id="id_categoria"
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={formData.id_categoria}
+                          onChange={handleChange}
+                        >
+                          <option value="">Seleccione una categoría</option>
+                          {categorias.map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.nombre_categoria}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                      
+                    {/* Recipe Column */}
+                    <div>
+                      <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-2">
+                        Receta del Producto
+                      </h3>
+                      <p className="text-sm text-gray-500 mb-4">
+                        Agregue los insumos necesarios para preparar este producto. La cantidad se establece automáticamente según el insumo seleccionado.
+                      </p>
+                      
+                      <div className="grid grid-cols-1 gap-4 mb-4">
+                        <div>
+                          <label htmlFor="consumableId" className="block text-sm font-medium text-gray-700 mb-1">
+                            Seleccione un Insumo
+                          </label>
+                          <select
+                            id="consumableId"
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={newRecipeItem.consumableId}
+                            onChange={handleNewRecipeItemChange}
+                          >
+                            <option value="">-- Seleccionar insumo --</option>
+                            {availableConsumables.map(consumable => (
+                              <option key={consumable.id} value={consumable.id}>
+                                {consumable.nombre} ({consumable.unidadMedida})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-end space-x-2">
+                          <div className="flex-1">
+                            <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
+                              Cantidad Predefinida
+                            </label>
+                            <input
+                              type="text"
+                              id="quantity"
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 text-gray-700"
+                              value={newRecipeItem.quantity}
+                              readOnly
+                              placeholder="Cantidad automática"
+                            />
                           </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ) : (
-                <div className="border border-dashed border-gray-300 rounded-md p-4 text-center text-gray-500">
-                  No hay insumos agregados a la receta aún.
-                </div>
-              )}
-            </div>
-          </div>
+                          <Button 
+                            onClick={handleAddRecipeItem} 
+                            className="h-10"
+                            disabled={!newRecipeItem.consumableId || !newRecipeItem.quantity || parseFloat(newRecipeItem.quantity) <= 0}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Agregar
+                          </Button>
+                        </div>
+                      </div>
 
-          <div className="mt-8 pt-4 border-t border-gray-200 flex justify-end gap-2">
-            <Button variant="secondary" onClick={handleCancel}>
-              <X className="h-4 w-4 mr-2" />
-              Cancelar
-            </Button>
-            <Button onClick={handleAddOrUpdateProducto}>
-              {editingId ? (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Guardar Cambios
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Producto
-                </>
-              )}
-            </Button>
-          </div>
-        </Card>
+                      {currentProductRecipe.length > 0 ? (
+                        <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
+                          <h4 className="text-md font-medium text-gray-800 mb-2">Insumos en la Receta:</h4>
+                          <ul className="divide-y divide-gray-200">
+                            {currentProductRecipe.map(item => {
+                              const consumable = availableConsumables.find(c => c.id === item.consumableId);
+                              return (
+                                <li key={item.consumableId} className="py-2 flex justify-between items-center">
+                                  <span className="font-medium">
+                                    {consumable?.nombre || 'Insumo Desconocido'}
+                                  </span>
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-gray-600">
+                                      {item.quantity} {consumable?.unidadMedida || ''}
+                                    </span>
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      onClick={() => handleRemoveRecipeItem(item.consumableId)}
+                                      title="Eliminar insumo de la receta"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      ) : (
+                        <div className="border border-dashed border-gray-300 rounded-md p-4 text-center text-gray-500">
+                          No hay insumos agregados a la receta aún.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-8 pt-4 border-t border-gray-200 flex justify-end gap-2">
+                    <Button variant="secondary" onClick={handleCancel}>
+                      <X className="h-4 w-4 mr-2" />
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleAddOrUpdateProducto}>
+                      {editingId ? (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Guardar Cambios
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Crear Producto
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+        //     </div>
+        //   </div>
+        // </div>
       )}
 
       {/* Rest of the component remains the same */}
