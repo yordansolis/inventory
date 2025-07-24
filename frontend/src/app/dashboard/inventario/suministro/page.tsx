@@ -5,6 +5,8 @@ import { Plus, Edit, Trash2, AlertCircle, Loader2 } from 'lucide-react';
 import { getAuthHeaders, isAuthenticated } from '../../../utils/auth';
 import { useRouter } from 'next/navigation';
 import { useApi } from '../../../utils/api';
+import toast from 'react-hot-toast'; // Import toast from react-hot-toast
+import { Toaster } from 'react-hot-toast'; // Import Toaster component
 
 interface ConsumableProduct {
   id: number;
@@ -83,6 +85,72 @@ export default function SuministroPage() {
   const [loadingProducts, setLoadingProducts] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
+
+  // Custom toast styles
+  const showSuccessToast = (message: string) => {
+    toast.success(message, {
+      duration: 3000,
+      position: "top-center",
+      style: {
+        background: '#10B981',
+        color: 'white',
+        padding: '16px',
+        borderRadius: '8px',
+      },
+      iconTheme: {
+        primary: 'white',
+        secondary: '#10B981',
+      },
+    });
+  };
+
+  const showErrorToast = (message: string) => {
+    toast.error(message, {
+      duration: 4000,
+      position: "top-center",
+      style: {
+        background: '#EF4444',
+        color: 'white',
+        padding: '16px',
+        borderRadius: '8px',
+      },
+      iconTheme: {
+        primary: 'white',
+        secondary: '#EF4444',
+      },
+    });
+  };
+  
+  // Handle delete confirmation with custom toast
+  const handleDeleteConfirmation = (producto: ConsumableProduct) => {
+    toast((t) => (
+      <div className="flex flex-col gap-2">
+        <div className="text-sm font-medium">
+          ¿Está seguro de eliminar {producto.nombre}?
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              handleDeleteProduct(producto.id);
+              toast.dismiss(t.id);
+            }}
+            className="bg-red-600 text-white px-3 py-1 rounded-md text-xs"
+          >
+            Eliminar
+          </button>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="bg-gray-200 text-gray-700 px-3 py-1 rounded-md text-xs"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 6000,
+      position: "top-center",
+    });
+  };
 
   // Extract fetch functions outside useEffect for reuse
   const fetchCategories = useCallback(async () => {
@@ -389,139 +457,6 @@ export default function SuministroPage() {
   }, [formData.valorUnitarioCalculado, formData.cantidadUtilizada, parseCurrency, formatCurrencyWithoutTrailingZeros]);
 
   // Optimización: useCallback para evitar re-renders innecesarios
-  const handleAddOrUpdateProduct = useCallback(async () => {
-    const parsedMinimo = formData.minimo === '' ? 0 : parseInt(formData.minimo);
-    const parsedCantidadUnitaria = formData.cantidadUnitaria === '' ? 0 : parseFloat(parseCurrency(formData.cantidadUnitaria));
-    const parsedPrecioPresentacion = formData.precioPresentacion === '' ? 0 : parseFloat(parseCurrency(formData.precioPresentacion));
-    const parsedCantidadUtilizada = formData.cantidadUtilizada === '' ? 0 : parseFloat(parseCurrency(formData.cantidadUtilizada));
-    const parsedCantidadPorProducto = formData.cantidadPorProducto === '' ? 0 : parseFloat(parseCurrency(formData.cantidadPorProducto));
-    
-    if (!formData.nombre.trim() || !formData.unidadMedida.trim() || 
-        (formData.minimo !== '' && (isNaN(parsedMinimo) || parsedMinimo < 0)) ||
-        (formData.cantidadUnitaria !== '' && (isNaN(parsedCantidadUnitaria) || parsedCantidadUnitaria <= 0)) ||
-        (formData.precioPresentacion !== '' && (isNaN(parsedPrecioPresentacion) || parsedPrecioPresentacion < 0))) {
-      alert('Por favor, complete todos los campos obligatorios y asegúrese de que las cantidades sean números válidos.');
-      return;
-    }
-
-    try {
-      await withLoading(async () => {
-        const headers = getAuthHeaders();
-        
-        const productData = {
-          nombre_insumo: formData.nombre.trim(),
-          unidad: formData.unidadMedida.trim(),
-          cantidad_unitaria: parsedCantidadUnitaria,
-          precio_presentacion: parsedPrecioPresentacion,
-          cantidad_utilizada: parsedCantidadUtilizada,
-          cantidad_por_producto: parsedCantidadPorProducto,
-          stock_minimo: parsedMinimo,
-          sitio_referencia: formData.sitioReferencia.trim()
-        };
-        
-        let response;
-        
-        if (editingId) {
-          // Update existing product
-          response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos/${editingId}`, {
-            method: 'PUT',
-            headers,
-            body: JSON.stringify(productData)
-          });
-        } else {
-          // Create new product
-          response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(productData)
-          });
-        }
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || `Error al ${editingId ? 'actualizar' : 'crear'} producto`);
-        }
-        
-        const savedProduct = await response.json();
-        
-        if (!savedProduct || typeof savedProduct !== 'object') {
-          throw new Error(`Error al ${editingId ? 'actualizar' : 'crear'} producto. Respuesta inválida del servidor.`);
-        }
-        
-        if (!savedProduct.id) {
-          throw new Error(`Error al ${editingId ? 'actualizar' : 'crear'} producto. No se pudo obtener el ID del producto.`);
-        }
-        
-        if (editingId) {
-          // Update product in state
-          setProductosConsumibles(prev => 
-            prev.map(p => p.id === editingId ? {
-              id: savedProduct.id,
-              nombre: formData.nombre.trim(),
-              unidadMedida: formData.unidadMedida.trim(),
-              cantidadUnitaria: parsedCantidadUnitaria,
-              precioPresentacion: parsedPrecioPresentacion,
-              cantidadUtilizada: parsedCantidadUtilizada,
-              cantidadActual: parsedCantidadUtilizada, // cantidadUtilizada es lo que queda en stock
-              cantidadPorProducto: parsedCantidadPorProducto,
-              minimo: parsedMinimo,
-              valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
-              valorUtilizado: savedProduct.valor_utilizado || 0,
-              sitioReferencia: formData.sitioReferencia.trim()
-            } : p)
-          );
-        } else {
-          // Add new product to state
-          setProductosConsumibles(prev => [...prev, {
-            id: savedProduct.id,
-            nombre: formData.nombre.trim(),
-            unidadMedida: formData.unidadMedida.trim(),
-            cantidadUnitaria: parsedCantidadUnitaria,
-            precioPresentacion: parsedPrecioPresentacion,
-            cantidadUtilizada: parsedCantidadUtilizada,
-            cantidadActual: parsedCantidadUtilizada, // cantidadUtilizada es lo que queda en stock
-            cantidadPorProducto: parsedCantidadPorProducto,
-            minimo: parsedMinimo,
-            valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
-            valorUtilizado: savedProduct.valor_utilizado || 0,
-            sitioReferencia: formData.sitioReferencia.trim()
-          }]);
-        }
-        
-        // Clear form and editing state
-        setFormData({ 
-          nombre: '', 
-          unidadMedida: '', 
-          cantidadUnitaria: '', 
-          precioPresentacion: '', 
-          cantidadUtilizada: '', 
-          cantidadPorProducto: '',
-          minimo: '', 
-          sitioReferencia: '',
-          valorUnitarioCalculado: '0',
-          valorUtilizadoCalculado: '0'
-        });
-        setEditingId(null);
-        
-        // Refresh the products list from the server to ensure we have the latest data
-        // Usar loadInitialData en lugar de llamar directamente a fetchCategories y fetchProducts
-        const loadInitialData = async () => {
-          const catMap = await fetchCategories();
-          await fetchProducts(catMap);
-        };
-        
-        await loadInitialData();
-      });
-    } catch (err: any) {
-      setError(err.message || `Error al ${editingId ? 'actualizar' : 'crear'} producto`);
-      
-      // Show alert for better visibility of the error
-      alert(`Error: ${err.message || `Error al ${editingId ? 'actualizar' : 'crear'} producto`}`);
-    }
-  // Eliminar fetchCategories y fetchProducts como dependencias para evitar ciclos infinitos
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, editingId, parseCurrency, withLoading]);
-
   const handleEditProduct = useCallback((producto: ConsumableProduct) => {
     // Calculate values for display
     const valorUnitarioCalc = producto.cantidadUnitaria > 0 
@@ -567,9 +502,41 @@ export default function SuministroPage() {
         }
         
         setProductosConsumibles((prev) => prev.filter((p) => p.id !== id));
+        
+        // Show success toast notification with custom style
+        toast.success('Producto eliminado con éxito', {
+          duration: 3000,
+          position: "top-center",
+          style: {
+            background: '#10B981',
+            color: 'white',
+            padding: '16px',
+            borderRadius: '8px',
+          },
+          iconTheme: {
+            primary: 'white',
+            secondary: '#10B981',
+          },
+        });
       });
     } catch (err: any) {
       setError(err.message || 'Error al eliminar producto');
+      
+      // Show error toast notification with custom style
+      toast.error(err.message || 'Error al eliminar producto', {
+        duration: 4000,
+        position: "top-center",
+        style: {
+          background: '#EF4444',
+          color: 'white',
+          padding: '16px',
+          borderRadius: '8px',
+        },
+        iconTheme: {
+          primary: 'white',
+          secondary: '#EF4444',
+        },
+      });
     }
   }, [withLoading]);
 
@@ -714,6 +681,8 @@ export default function SuministroPage() {
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
+
+
 
   return (
     <div className="p-6">
@@ -964,7 +933,179 @@ export default function SuministroPage() {
               Cancelar
             </Button>
           )}
-          <Button onClick={handleAddOrUpdateProduct}>
+          <Button onClick={() => {
+            const parsedMinimo = formData.minimo === '' ? 0 : parseInt(formData.minimo);
+            const parsedCantidadUnitaria = formData.cantidadUnitaria === '' ? 0 : parseFloat(parseCurrency(formData.cantidadUnitaria));
+            const parsedPrecioPresentacion = formData.precioPresentacion === '' ? 0 : parseFloat(parseCurrency(formData.precioPresentacion));
+            const parsedCantidadUtilizada = formData.cantidadUtilizada === '' ? 0 : parseFloat(parseCurrency(formData.cantidadUtilizada));
+            const parsedCantidadPorProducto = formData.cantidadPorProducto === '' ? 0 : parseFloat(parseCurrency(formData.cantidadPorProducto));
+            
+            if (!formData.nombre.trim() || !formData.unidadMedida.trim() || 
+                (formData.minimo !== '' && (isNaN(parsedMinimo) || parsedMinimo < 0)) ||
+                (formData.cantidadUnitaria !== '' && (isNaN(parsedCantidadUnitaria) || parsedCantidadUnitaria <= 0)) ||
+                (formData.precioPresentacion !== '' && (isNaN(parsedPrecioPresentacion) || parsedPrecioPresentacion < 0))) {
+              toast.error('Por favor, complete todos los campos obligatorios y asegúrese de que las cantidades sean números válidos.', {
+                duration: 4000,
+                position: "top-center",
+                style: {
+                  background: '#EF4444',
+                  color: 'white',
+                  padding: '16px',
+                  borderRadius: '8px',
+                },
+                iconTheme: {
+                  primary: 'white',
+                  secondary: '#EF4444',
+                },
+              });
+              return;
+            }
+
+            (async () => {
+              try {
+                await withLoading(async () => {
+                  const headers = getAuthHeaders();
+                  
+                  const productData = {
+                    nombre_insumo: formData.nombre.trim(),
+                    unidad: formData.unidadMedida.trim(),
+                    cantidad_unitaria: parsedCantidadUnitaria,
+                    precio_presentacion: parsedPrecioPresentacion,
+                    cantidad_utilizada: parsedCantidadUtilizada,
+                    cantidad_por_producto: parsedCantidadPorProducto,
+                    stock_minimo: parsedMinimo,
+                    sitio_referencia: formData.sitioReferencia.trim()
+                  };
+                  
+                  let response;
+                  
+                  if (editingId) {
+                    // Update existing product
+                    response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos/${editingId}`, {
+                      method: 'PUT',
+                      headers,
+                      body: JSON.stringify(productData)
+                    });
+                  } else {
+                    // Create new product
+                    response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND}/api/v1/insumos`, {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify(productData)
+                    });
+                  }
+                  
+                  if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Error al ${editingId ? 'actualizar' : 'crear'} producto`);
+                  }
+                  
+                  const savedProduct = await response.json();
+                  
+                  if (!savedProduct || typeof savedProduct !== 'object') {
+                    throw new Error(`Error al ${editingId ? 'actualizar' : 'crear'} producto. Respuesta inválida del servidor.`);
+                  }
+                  
+                  if (!savedProduct.id) {
+                    throw new Error(`Error al ${editingId ? 'actualizar' : 'crear'} producto. No se pudo obtener el ID del producto.`);
+                  }
+                  
+                  // Show success toast notification with custom style
+                  toast.success(`Producto "${formData.nombre.trim()}" ${editingId ? 'actualizado' : 'creado'} con éxito`, {
+                    duration: 3000,
+                    position: "top-center",
+                    style: {
+                      background: '#10B981',
+                      color: 'white',
+                      padding: '16px',
+                      borderRadius: '8px',
+                    },
+                    iconTheme: {
+                      primary: 'white',
+                      secondary: '#10B981',
+                    },
+                  });
+                  
+                  if (editingId) {
+                    // Update product in state
+                    setProductosConsumibles(prev => 
+                      prev.map(p => p.id === editingId ? {
+                        id: savedProduct.id,
+                        nombre: formData.nombre.trim(),
+                        unidadMedida: formData.unidadMedida.trim(),
+                        cantidadUnitaria: parsedCantidadUnitaria,
+                        precioPresentacion: parsedPrecioPresentacion,
+                        cantidadUtilizada: parsedCantidadUtilizada,
+                        cantidadActual: parsedCantidadUtilizada, // cantidadUtilizada es lo que queda en stock
+                        cantidadPorProducto: parsedCantidadPorProducto,
+                        minimo: parsedMinimo,
+                        valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
+                        valorUtilizado: savedProduct.valor_utilizado || 0,
+                        sitioReferencia: formData.sitioReferencia.trim()
+                      } : p)
+                    );
+                  } else {
+                    // Add new product to state
+                    setProductosConsumibles(prev => [...prev, {
+                      id: savedProduct.id,
+                      nombre: formData.nombre.trim(),
+                      unidadMedida: formData.unidadMedida.trim(),
+                      cantidadUnitaria: parsedCantidadUnitaria,
+                      precioPresentacion: parsedPrecioPresentacion,
+                      cantidadUtilizada: parsedCantidadUtilizada,
+                      cantidadActual: parsedCantidadUtilizada, // cantidadUtilizada es lo que queda en stock
+                      cantidadPorProducto: parsedCantidadPorProducto,
+                      minimo: parsedMinimo,
+                      valorUnitario: savedProduct.valor_unitario || (parsedCantidadUnitaria > 0 ? parsedPrecioPresentacion / parsedCantidadUnitaria : 0),
+                      valorUtilizado: savedProduct.valor_utilizado || 0,
+                      sitioReferencia: formData.sitioReferencia.trim()
+                    }]);
+                  }
+                  
+                  // Clear form and editing state
+                  setFormData({ 
+                    nombre: '', 
+                    unidadMedida: '', 
+                    cantidadUnitaria: '', 
+                    precioPresentacion: '', 
+                    cantidadUtilizada: '', 
+                    cantidadPorProducto: '',
+                    minimo: '', 
+                    sitioReferencia: '',
+                    valorUnitarioCalculado: '0',
+                    valorUtilizadoCalculado: '0'
+                  });
+                  setEditingId(null);
+                  
+                  // Refresh the products list from the server to ensure we have the latest data
+                  const loadInitialData = async () => {
+                    const catMap = await fetchCategories();
+                    await fetchProducts(catMap);
+                  };
+                  
+                  await loadInitialData();
+                });
+              } catch (err: any) {
+                setError(err.message || `Error al ${editingId ? 'actualizar' : 'crear'} producto`);
+                
+                // Show error toast notification with custom style
+                toast.error(err.message || `Error al ${editingId ? 'actualizar' : 'crear'} producto`, {
+                  duration: 4000,
+                  position: "top-center",
+                  style: {
+                    background: '#EF4444',
+                    color: 'white',
+                    padding: '16px',
+                    borderRadius: '8px',
+                  },
+                  iconTheme: {
+                    primary: 'white',
+                    secondary: '#EF4444',
+                  },
+                });
+              }
+            })();
+          }}>
             {editingId ? (
               <>
                 <Edit className="h-4 w-4 mr-2" />
@@ -1099,18 +1240,42 @@ export default function SuministroPage() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="danger" 
-                          size="sm" 
-                          onClick={() => {
-                            if (confirm(`¿Está seguro de eliminar ${producto.nombre}?`)) {
-                              handleDeleteProduct(producto.id);
-                            }
-                          }}
-                          title="Eliminar producto"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                                <Button 
+          variant="danger" 
+          size="sm" 
+          onClick={() => {
+            toast((t) => (
+              <div className="flex flex-col gap-2">
+                <div className="text-sm font-medium">
+                  ¿Está seguro de eliminar {producto.nombre}?
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      handleDeleteProduct(producto.id);
+                      toast.dismiss(t.id);
+                    }}
+                    className="bg-red-600 text-white px-3 py-1 rounded-md text-xs"
+                  >
+                    Eliminar
+                  </button>
+                  <button
+                    onClick={() => toast.dismiss(t.id)}
+                    className="bg-gray-200 text-gray-700 px-3 py-1 rounded-md text-xs"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ), {
+              duration: 6000,
+              position: "top-center",
+            });
+          }}
+          title="Eliminar producto"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
                       </div>
                     </td>
                   </tr>
@@ -1156,6 +1321,9 @@ export default function SuministroPage() {
           </div>
         )}
       </Card>
+      
+      {/* Add Toaster component for toast notifications */}
+      <Toaster />
     </div>
   );
 }
