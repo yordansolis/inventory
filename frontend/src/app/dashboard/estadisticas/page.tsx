@@ -440,14 +440,6 @@ export default function EstadisticasPage() {
         <WeeklySalesChart />
       </div>
 
-      {/* Time Range Selector */}
-     
-
-      {/* Sales Over Time Chart */}
-    
-      {/* Top Products and Delivery Charts */}
-      
-
       {/* Payment Methods */}
       <Card>
         <h2 className="text-xl font-semibold text-gray-900 mb-6">

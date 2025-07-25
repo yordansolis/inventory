@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, ChevronLeft, ChevronRight } from "lucide-react";
 import { CartesianGrid, LabelList, Line, LineChart, XAxis, YAxis, ResponsiveContainer } from "recharts";
 
 // Define interfaces for sales data
@@ -23,6 +23,10 @@ export default function SalesChart() {
   // State for loading and error handling
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // State for month selection and display
+  const [displayCount, setDisplayCount] = useState(5); // Default to show 5 months
+  const [startIndex, setStartIndex] = useState(0);
   
   // Fetch sales data from API
   useEffect(() => {
@@ -89,13 +93,74 @@ export default function SalesChart() {
   };
 
   // Procesar datos para el gráfico
-  const chartData = salesData.sales_summary.map((item, index) => ({
+  const processedData = salesData.sales_summary.map((item, index) => ({
     fecha: formatDate(item.fecha),
     fechaCompleta: item.fecha,
     ventas: item.total,
     ventasFormateadas: formatCurrency(item.total),
-    dia: index + 1
+    dia: index + 1,
+    // Extraer mes y año para agrupación
+    mes: new Date(item.fecha).getMonth() + 1,
+    año: new Date(item.fecha).getFullYear()
   }));
+
+  // Agrupar datos por mes para la selección
+  const groupByMonth = () => {
+    const months: { [key: string]: { label: string, data: any[] } } = {};
+    
+    processedData.forEach(item => {
+      const monthKey = `${item.año}-${item.mes.toString().padStart(2, '0')}`;
+      const monthName = new Date(item.fechaCompleta).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+      
+      if (!months[monthKey]) {
+        months[monthKey] = {
+          label: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+          data: []
+        };
+      }
+      
+      months[monthKey].data.push(item);
+    });
+    
+    // Convertir a array y ordenar por fecha (más reciente primero)
+    return Object.entries(months)
+      .map(([key, value]) => ({ key, ...value }))
+      .sort((a, b) => b.key.localeCompare(a.key));
+  };
+
+  const monthsData = groupByMonth();
+  
+  // Seleccionar datos para mostrar según los meses seleccionados
+  const getVisibleData = () => {
+    const visibleMonths = monthsData.slice(startIndex, startIndex + displayCount);
+    let result: any[] = [];
+    
+    visibleMonths.forEach(month => {
+      result = [...result, ...month.data];
+    });
+    
+    // Ordenar por fecha
+    return result.sort((a, b) => new Date(a.fechaCompleta).getTime() - new Date(b.fechaCompleta).getTime());
+  };
+
+  const chartData = getVisibleData();
+  
+  // Calcular límites de paginación
+  const canGoBack = startIndex > 0;
+  const canGoForward = startIndex + displayCount < monthsData.length;
+
+  // Funciones de navegación
+  const goBack = () => {
+    if (canGoBack) {
+      setStartIndex(Math.max(0, startIndex - 1));
+    }
+  };
+
+  const goForward = () => {
+    if (canGoForward) {
+      setStartIndex(Math.min(monthsData.length - displayCount, startIndex + 1));
+    }
+  };
 
   // Calcular estadísticas
   const totalVentas = chartData.reduce((sum, item) => sum + item.ventas, 0);
@@ -190,6 +255,52 @@ export default function SalesChart() {
                 {formatCurrency(totalVentas)}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Chart Controls */}
+        <div className="px-6 pt-4 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <select 
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              value={displayCount}
+              onChange={(e) => {
+                const newCount = parseInt(e.target.value);
+                setDisplayCount(newCount);
+                // Reset start index if needed
+                if (startIndex + newCount > monthsData.length) {
+                  setStartIndex(Math.max(0, monthsData.length - newCount));
+                }
+              }}
+            >
+              <option value={1}>Mostrar 1 mes</option>
+              <option value={3}>Mostrar 3 meses</option>
+              <option value={5}>Mostrar 5 meses</option>
+              <option value={12}>Mostrar 12 meses</option>
+              <option value={999}>Mostrar todos</option>
+            </select>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={goBack}
+              disabled={!canGoBack}
+              className={`p-2 rounded-full ${canGoBack ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-gray-50 text-gray-400 cursor-not-allowed'}`}
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <span className="text-sm text-gray-600">
+              {monthsData.length > 0 ? 
+                `Meses ${startIndex + 1}-${Math.min(startIndex + displayCount, monthsData.length)} de ${monthsData.length}` : 
+                'Sin datos'}
+            </span>
+            <button 
+              onClick={goForward}
+              disabled={!canGoForward}
+              className={`p-2 rounded-full ${canGoForward ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-gray-50 text-gray-400 cursor-not-allowed'}`}
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
           </div>
         </div>
 

@@ -1,6 +1,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { 
+  CartesianGrid, 
+  Line, 
+  LineChart, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  ResponsiveContainer, 
+  Legend,
+  BarChart,
+  Bar
+} from "recharts";
+import { CalendarDays } from 'lucide-react';
 
 
 // Define interfaces for weekly sales data
@@ -156,7 +169,6 @@ export default function WeeklySalesChart() {
   }
 
   return (
-    <>
-    </>
+    <></>
   );
 } 
