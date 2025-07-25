@@ -22,6 +22,7 @@ import {
   Search,
   Star,
   CheckCircle,
+  Shirt,
 } from "lucide-react";
 
 import { Card, Badge, Button } from "./ui";
@@ -89,6 +90,9 @@ export default function FacturacionSection({ productosVendibles, productosConsum
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [loadingCategorias, setLoadingCategorias] = useState(true);
   const [errorCategorias, setErrorCategorias] = useState(null);
+  
+  // Nuevo estado para la programación de camisetas
+  const [todayShirtColor, setTodayShirtColor] = useState({ color: '#ffffff', colorName: 'Blanco' });
 
   // Función para cargar categorías
   const cargarCategorias = useCallback(async () => {
@@ -936,6 +940,35 @@ export default function FacturacionSection({ productosVendibles, productosConsum
     }
   };
 
+  // Efecto para cargar el color de la camiseta del día
+  useEffect(() => {
+    const loadTodayShirtColor = () => {
+      try {
+        // Obtener el día actual
+        const today = new Date();
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const currentDay = dayNames[today.getDay()];
+        
+        // Obtener la programación guardada del localStorage
+        const savedSchedule = localStorage.getItem('camiseta-schedule');
+        if (savedSchedule) {
+          const schedule = JSON.parse(savedSchedule);
+          const todaySchedule = schedule.find(item => item.day === currentDay);
+          if (todaySchedule) {
+            setTodayShirtColor({
+              color: todaySchedule.color,
+              colorName: todaySchedule.colorName
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error al cargar el color de camiseta del día:", error);
+      }
+    };
+
+    loadTodayShirtColor();
+  }, []);
+
   return (
     <div>
       {/* Notificación de éxito */}
@@ -984,8 +1017,26 @@ export default function FacturacionSection({ productosVendibles, productosConsum
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Facturar</h1>
-        <p className="text-gray-600">Crear nueva factura de venta</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Facturar</h1>
+            <p className="text-gray-600">Crear nueva factura de venta</p>
+          </div>
+          <div className="flex items-center space-x-2 bg-white p-2 rounded-lg shadow-sm border border-gray-200">
+            <Shirt 
+              className="h-6 w-6" 
+              style={{ 
+                color: todayShirtColor.color === '#ffffff' ? '#6b7280' : todayShirtColor.color,
+                fill: todayShirtColor.color,
+                stroke: todayShirtColor.color === '#ffffff' ? '#6b7280' : todayShirtColor.color
+              }}
+            />
+            <div className="text-sm">
+              <span className="font-medium">Camiseta hoy:</span>
+              <span className="ml-1">{todayShirtColor.colorName}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1184,15 +1235,17 @@ export default function FacturacionSection({ productosVendibles, productosConsum
                     );
                   })}
                 </div>
-                {loadingCategorias && (
-                  <div className="flex items-center text-sm text-gray-500 mt-2">
-                    <svg className="animate-spin h-4 w-4 mr-2 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Cargando categorías...
-                  </div>
-                )}
+                <div className="flex items-center space-x-4 mt-2">
+                  {loadingCategorias && (
+                    <div className="flex items-center text-sm text-gray-500">
+                      <svg className="animate-spin h-4 w-4 mr-2 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Cargando categorías...
+                    </div>
+                  )}
+                </div>
                 {errorCategorias && (
                   <div className="flex items-center text-sm text-red-500 mt-2">
                     <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
