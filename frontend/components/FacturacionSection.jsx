@@ -942,23 +942,63 @@ export default function FacturacionSection({ productosVendibles, productosConsum
 
   // Efecto para cargar el color de la camiseta del día
   useEffect(() => {
-    const loadTodayShirtColor = () => {
+    const loadTodayShirtColor = async () => {
       try {
         // Obtener el día actual
         const today = new Date();
         const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         const currentDay = dayNames[today.getDay()];
         
-        // Obtener la programación guardada del localStorage
+        // Primero intentar obtener la programación desde la API
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_BACKEND || 'http://localhost:8000';
+          const token = localStorage.getItem('authToken');
+          
+          if (token) {
+            const response = await fetch(`${apiUrl}/api/v1/services/shirt-schedule`, {
+              headers: {
+                'Authorization': `bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.schedule && Array.isArray(data.schedule)) {
+                const todaySchedule = data.schedule.find(item => item.day === currentDay);
+                if (todaySchedule) {
+                  setTodayShirtColor({
+                    color: todaySchedule.color,
+                    colorName: todaySchedule.colorName
+                  });
+                  
+                  // Actualizar también el localStorage para tener un respaldo
+                  localStorage.setItem('camiseta-schedule', JSON.stringify(data.schedule));
+                  return;
+                }
+              }
+            }
+          }
+        } catch (apiError) {
+          console.error("Error al obtener programación de camisetas desde la API:", apiError);
+        }
+        
+        // Si falla la API o no hay datos, intentar con localStorage como fallback
         const savedSchedule = localStorage.getItem('camiseta-schedule');
         if (savedSchedule) {
-          const schedule = JSON.parse(savedSchedule);
-          const todaySchedule = schedule.find(item => item.day === currentDay);
-          if (todaySchedule) {
-            setTodayShirtColor({
-              color: todaySchedule.color,
-              colorName: todaySchedule.colorName
-            });
+          try {
+            const schedule = JSON.parse(savedSchedule);
+            if (Array.isArray(schedule)) {
+              const todaySchedule = schedule.find(item => item.day === currentDay);
+              if (todaySchedule) {
+                setTodayShirtColor({
+                  color: todaySchedule.color,
+                  colorName: todaySchedule.colorName
+                });
+              }
+            }
+          } catch (error) {
+            console.error("Error al parsear la programación guardada:", error);
           }
         }
       } catch (error) {

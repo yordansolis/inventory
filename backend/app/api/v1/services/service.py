@@ -8,6 +8,7 @@ from .extract_service import router_extracts
 from .domiciliary import router_domiciliary
 from .additions import router_additions
 from .pdf_service import router as router_pdf
+from .shirt_schedule import router_shirt_schedule
 from pydantic import BaseModel
 from typing import List, Dict
 from datetime import date
@@ -58,6 +59,9 @@ router_services.include_router(router_domiciliary, prefix="/domiciliarios", tags
 # Incluir el router de adiciones
 router_services.include_router(router_additions, prefix="/adiciones", tags=["adiciones"])
 router_services.include_router(router_pdf)
+
+# Incluir el router de programación de camisetas
+router_services.include_router(router_shirt_schedule, prefix="/shirt-schedule", tags=["shirt-schedule"])
 
 @router_services.get("/")
 async def get_services():

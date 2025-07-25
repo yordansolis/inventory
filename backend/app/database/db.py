@@ -367,6 +367,20 @@ def create_tables():
     )
     """
     
+    # Tabla de programación de camisetas
+    shirt_schedule_table = """
+    CREATE TABLE IF NOT EXISTS shirt_schedule (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        day VARCHAR(20) NOT NULL,
+        day_name VARCHAR(20) NOT NULL,
+        color VARCHAR(20) NOT NULL,
+        color_name VARCHAR(50) NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        updated_by VARCHAR(100) NOT NULL,
+        UNIQUE KEY unique_day (day)
+    )
+    """
+    
     # Lista de tablas en orden de dependencia
     tables = [
         roles_table,
@@ -379,7 +393,8 @@ def create_tables():
         sales_table,
         sale_details_table,
         purchases_table,
-        purchase_details_table
+        purchase_details_table,
+        shirt_schedule_table  # Añadimos la tabla de camisetas al final
     ]
     
     try:
@@ -388,6 +403,7 @@ def create_tables():
         
         # Eliminar las tablas en orden inverso para manejar las dependencias
         drop_tables = [
+            "DROP TABLE IF EXISTS shirt_schedule;",  # Añadimos la tabla de camisetas
             "DROP TABLE IF EXISTS purchase_details;",
             "DROP TABLE IF EXISTS purchases;",
             "DROP TABLE IF EXISTS sale_details;",
@@ -401,9 +417,10 @@ def create_tables():
             "DROP TABLE IF EXISTS roles;"
         ]
         
-        for drop_query in drop_tables:
-            execute_query(drop_query)
-            print(f"Tabla eliminada: {drop_query}")
+        # Comentamos la eliminación de tablas para evitar perder datos
+        # for drop_query in drop_tables:
+        #     execute_query(drop_query)
+        #     print(f"Tabla eliminada: {drop_query}")
         
         # Crear las tablas en el orden correcto
         for table_query in tables:
