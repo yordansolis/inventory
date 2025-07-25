@@ -133,7 +133,15 @@ export default function Dashboard() {
               setDashboardData(dashboardResult);
               // Store all sales for pagination
               if (dashboardResult.ventas_recientes) {
-                setAllSales(dashboardResult.ventas_recientes);
+                // Get today's date in DD/MM/YYYY format to match API response
+                const today = new Date();
+                const todayStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+                
+                // Filter sales for today only
+                const salesToday = dashboardResult.ventas_recientes.filter(
+                  (sale: RecentSale) => sale.invoice_date === todayStr
+                );
+                setAllSales(salesToday);
               }
             } else {
               setError('Error al cargar datos del dashboard');
@@ -570,6 +578,15 @@ export default function Dashboard() {
               {currentSales && currentSales.length > 0 ? (
                 currentSales.map((venta) => (
                   <tr key={venta.invoice_number} className={`hover:${isFeminine ? 'bg-pink-50' : 'bg-gray-50'} transition-colors`}>
+                    <td className={`px-4 lg:px-6 py-4 whitespace-nowrap text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                      #{venta.invoice_number.substring(venta.invoice_number.length - 4)}
+                    </td>
+                    <td className={`px-4 lg:px-6 py-4 whitespace-nowrap text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
+                      {venta.client_name}
+                    </td>
+                    <td className={`px-4 lg:px-6 py-4 whitespace-nowrap text-sm ${isFeminine ? 'text-gray-800' : 'text-gray-900'} hidden lg:table-cell`}>
+                      {venta.product_name}
+                    </td>
                     <td className={`px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-semibold ${isFeminine ? 'text-gray-800' : 'text-gray-900'}`}>
                       {formatPrice(venta.total_amount)}
                     </td>
